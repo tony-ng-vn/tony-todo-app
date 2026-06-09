@@ -2,6 +2,7 @@
   import { onDestroy, onMount, tick } from 'svelte';
   import '../styles.css';
   import FlowRail from '../lib/components/FlowRail.svelte';
+  import LottieAnimation from '../lib/components/LottieAnimation.svelte';
   import SummaryPanel from '../lib/components/SummaryPanel.svelte';
   import TaskDetail from '../lib/components/TaskDetail.svelte';
   import TaskPanel from '../lib/components/TaskPanel.svelte';
@@ -50,6 +51,8 @@
   let draggedSummaryId = null;
   let dropTargetId = null;
   let dropTargetBucket = null;
+  let completionCue = null;
+  let completionCueTimer = null;
 
   $: pendingTodos = getPendingTodos(state);
   $: summary = getDaySummary(state, selectedDay);
@@ -67,6 +70,7 @@
   onDestroy(() => {
     window.clearInterval(liveTimer);
     window.clearTimeout(noteSaveTimer);
+    window.clearTimeout(completionCueTimer);
   });
 
   $: {
@@ -119,6 +123,7 @@
   async function handleComplete(todoId) {
     state = completeTodo(state, todoId);
     const completedTodo = findTodo(todoId);
+    triggerCompletionCue(completedTodo);
     if (selectedTaskId === todoId) {
       selectedTaskId = null;
     }
@@ -200,6 +205,22 @@
 
   function closeTask() {
     selectedTaskId = null;
+  }
+
+  function triggerCompletionCue(todo) {
+    if (!todo || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+      return;
+    }
+
+    completionCue = {
+      id: `${todo.id}-${Date.now()}`,
+      title: todo.title,
+    };
+
+    window.clearTimeout(completionCueTimer);
+    completionCueTimer = window.setTimeout(() => {
+      completionCue = null;
+    }, 1700);
   }
 
   function handleNoteInput() {
@@ -454,4 +475,13 @@
     onNoteInput={handleNoteInput}
     {detailMeta}
   />
+
+  {#if completionCue}
+    <aside class="completion-cue" aria-live="polite" aria-label={`Completed ${completionCue.title}`}>
+      {#key completionCue.id}
+        <LottieAnimation path="/lottie/task-complete.json" ariaLabel="Task completed" />
+      {/key}
+      <span>Done</span>
+    </aside>
+  {/if}
 </main>
