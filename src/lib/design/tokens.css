@@ -28,6 +28,12 @@
   --shadow: rgba(41, 41, 41, 0.1);
   --shadow-soft: 0 10px 30px rgba(41, 41, 41, 0.08);
   --shadow-raised: 0 10px 24px rgba(41, 41, 41, 0.08), 0 1px 0 rgba(255, 255, 255, 0.84) inset;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
   color: var(--strong);
   background: var(--canvas);
   color-scheme: light;
