@@ -2,7 +2,7 @@
 
 A focused todo app for tracking what is open now and what was finished today. Open tasks stay in a quiet work queue; completed tasks move into a daily recap grouped by time of day, with completion time and tracked duration preserved.
 
-The app is a small Vite + vanilla JavaScript frontend backed by InsForge Postgres when configured. Without InsForge env vars, or when opened with `?local=1`, it runs from browser `localStorage`.
+The app is a small SvelteKit frontend backed by InsForge Postgres when configured. Without InsForge env vars, or when opened with `?local=1`, it runs from browser `localStorage`.
 
 ## Features
 
@@ -49,7 +49,7 @@ Install dependencies:
 npm install
 ```
 
-Start the Vite dev server:
+Start the SvelteKit dev server:
 
 ```bash
 npm run dev

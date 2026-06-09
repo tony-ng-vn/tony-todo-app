@@ -18,3 +18,5 @@
 - Duration labels use the requested display scale: minutes under 60 minutes, hour + minute under 24 hours, and day + hour + minute after 24 hours.
 - Restyled open and completed tasks as Notion-like blocks with a title stack, timer metadata, and compact icon actions. Mobile task blocks stack actions below the title so long links remain readable.
 - Added block placement feedback inspired by Notion/Craft/BlockNote patterns: typing a new task shows a thin insertion cursor where the block will land, the inserted block gets a short entrance animation, and recap drag targets show a drop cursor line before the target row.
+- Migrated the frontend shell from a vanilla Vite entrypoint to SvelteKit while keeping the tested domain modules (`todoStore`, `todoRemote`, and `linkify`) intact. The page disables SSR because this app currently depends on browser `localStorage` and client-side InsForge sync state.
+- Moved the empty recap Lottie files to SvelteKit's `static/lottie` asset directory. Added a narrow npm override for `cookie` so SvelteKit avoids the low-severity audit advisory from its declared transitive range.
