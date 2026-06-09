@@ -31,9 +31,7 @@
     updateRemoteTodoTimer,
     updateRemoteTodoTitle,
   } from '../todoRemote.js';
-
-  const STORAGE_KEY = 'done-log-state';
-  const CLIENT_ID_KEY = 'done-log-client-id';
+  import { getOrCreateClientId, loadLocalState, saveLocalState } from '../todoPersistence.js';
 
   let state = createInitialState();
   let selectedDay = formatDayKey(new Date());
@@ -62,8 +60,8 @@
   onMount(() => {
     useRemote = isInsForgeConfigured && !new URLSearchParams(window.location.search).has('local');
     syncMessage = useRemote ? 'Connecting' : 'Local only';
-    clientId = getClientId();
-    state = loadState();
+    clientId = getOrCreateClientId();
+    state = loadLocalState();
     hydrateRemoteTodos();
   });
 
@@ -100,7 +98,7 @@
     newlyAddedTodoId = createdTodo.id;
     draftTitle = '';
     titleDraft = '';
-    saveState(state);
+    saveLocalState(state);
     syncMessage = 'Saving';
     window.setTimeout(() => {
       if (newlyAddedTodoId === createdTodo.id) {
@@ -128,7 +126,7 @@
       selectedTaskId = null;
     }
     selectedDay = formatDayKey(new Date());
-    saveState(state);
+    saveLocalState(state);
     syncMessage = 'Saving';
 
     try {
@@ -143,7 +141,7 @@
     const beforeTodos = state.todos;
     state = action === 'pause' ? pauseTodoTimer(state, todoId) : startTodoTimer(state, todoId);
     const changedTodos = getTimerChangedTodos(beforeTodos, state.todos);
-    saveState(state);
+    saveLocalState(state);
     syncMessage = 'Saving time';
 
     try {
@@ -169,7 +167,7 @@
     const before = findTodo(todoId);
     state = updateTodoTitle(state, todoId, title);
     editingTaskId = null;
-    saveState(state);
+    saveLocalState(state);
     syncMessage = 'Saving title';
     const after = findTodo(todoId);
 
@@ -229,7 +227,7 @@
     }
 
     state = updateTodoNote(state, selectedTaskId, noteDraft);
-    saveState(state);
+    saveLocalState(state);
     syncMessage = 'Saving note';
     window.clearTimeout(noteSaveTimer);
     noteSaveTimer = window.setTimeout(async () => {
@@ -301,7 +299,7 @@
       return;
     }
 
-    saveState(state);
+    saveLocalState(state);
     syncMessage = 'Saving order';
     try {
       await persistCompletionChangedTodos(changedTodos);
@@ -309,19 +307,6 @@
     } catch (error) {
       syncMessage = `Offline cache: ${error.message}`;
     }
-  }
-
-  function loadState() {
-    try {
-      const stored = localStorage.getItem(STORAGE_KEY);
-      return stored ? createInitialState(JSON.parse(stored).todos ?? []) : createInitialState();
-    } catch {
-      return createInitialState();
-    }
-  }
-
-  function saveState(nextState) {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(nextState));
   }
 
   async function hydrateRemoteTodos() {
@@ -342,7 +327,7 @@
       }
 
       state = createInitialState(remoteTodos);
-      saveState(state);
+      saveLocalState(state);
       renderRemoteStatus(remoteTodos.length);
     } catch (error) {
       syncMessage = `Offline cache: ${error.message}`;
@@ -381,17 +366,6 @@
 
   function renderRemoteStatus(count = state.todos.length) {
     syncMessage = useRemote ? `Cloud synced: ${count}` : 'Local only';
-  }
-
-  function getClientId() {
-    const existing = localStorage.getItem(CLIENT_ID_KEY);
-    if (existing) {
-      return existing;
-    }
-
-    const nextClientId = crypto.randomUUID();
-    localStorage.setItem(CLIENT_ID_KEY, nextClientId);
-    return nextClientId;
   }
 
   function findTodo(todoId) {
