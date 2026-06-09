@@ -1,3 +1,6 @@
+const TODO_SELECT_COLUMNS =
+  'id,title,created_at,completed_at,note,source,notion_page_id,notion_database_id,notion_status,first_started_at,active_started_at,tracked_seconds';
+
 export function toRemoteRecord(todo, clientId) {
   return {
     id: todo.id,
@@ -36,15 +39,11 @@ export function fromRemoteRecord(record) {
 export async function loadRemoteTodos(client, clientId) {
   const { data, error } = await client.database
     .from('todos')
-    .select(
-      'id,title,created_at,completed_at,note,source,notion_page_id,notion_database_id,notion_status,first_started_at,active_started_at,tracked_seconds',
-    )
+    .select(TODO_SELECT_COLUMNS)
     .eq('client_id', clientId)
     .order('created_at', { ascending: true });
 
-  if (error) {
-    throw error;
-  }
+  throwIfError(error);
 
   return data.map(fromRemoteRecord);
 }
@@ -52,83 +51,58 @@ export async function loadRemoteTodos(client, clientId) {
 export async function insertRemoteTodo(client, clientId, todo) {
   const { error } = await client.database.from('todos').insert([toRemoteRecord(todo, clientId)]);
 
-  if (error) {
-    throw error;
-  }
+  throwIfError(error);
 }
 
 export async function completeRemoteTodo(client, clientId, todo) {
-  const { error } = await client.database
-    .from('todos')
-    .update({
-      completed_at: todo.completedAt,
-      first_started_at: todo.firstStartedAt ?? null,
-      active_started_at: todo.activeStartedAt ?? null,
-      tracked_seconds: normalizeTrackedSeconds(todo.trackedSeconds),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', todo.id)
-    .eq('client_id', clientId);
-
-  if (error) {
-    throw error;
-  }
+  await updateRemoteTodo(client, clientId, todo, completionFields(todo));
 }
 
 export async function updateRemoteTodoNote(client, clientId, todo) {
-  const { error } = await client.database
-    .from('todos')
-    .update({ note: todo.note ?? '', updated_at: new Date().toISOString() })
-    .eq('id', todo.id)
-    .eq('client_id', clientId);
-
-  if (error) {
-    throw error;
-  }
+  await updateRemoteTodo(client, clientId, todo, { note: todo.note ?? '' });
 }
 
 export async function updateRemoteTodoTitle(client, clientId, todo) {
-  const { error } = await client.database
-    .from('todos')
-    .update({ title: todo.title, updated_at: new Date().toISOString() })
-    .eq('id', todo.id)
-    .eq('client_id', clientId);
-
-  if (error) {
-    throw error;
-  }
+  await updateRemoteTodo(client, clientId, todo, { title: todo.title });
 }
 
 export async function updateRemoteTodoTimer(client, clientId, todo) {
-  const { error } = await client.database
-    .from('todos')
-    .update({
-      first_started_at: todo.firstStartedAt ?? null,
-      active_started_at: todo.activeStartedAt ?? null,
-      tracked_seconds: normalizeTrackedSeconds(todo.trackedSeconds),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', todo.id)
-    .eq('client_id', clientId);
-
-  if (error) {
-    throw error;
-  }
+  await updateRemoteTodo(client, clientId, todo, timerFields(todo));
 }
 
 export async function updateRemoteTodoCompletion(client, clientId, todo) {
+  await updateRemoteTodo(client, clientId, todo, completionFields(todo));
+}
+
+async function updateRemoteTodo(client, clientId, todo, fields) {
   const { error } = await client.database
     .from('todos')
     .update({
-      completed_at: todo.completedAt,
-      first_started_at: todo.firstStartedAt ?? null,
-      active_started_at: todo.activeStartedAt ?? null,
-      tracked_seconds: normalizeTrackedSeconds(todo.trackedSeconds),
+      ...fields,
       updated_at: new Date().toISOString(),
     })
     .eq('id', todo.id)
     .eq('client_id', clientId);
 
+  throwIfError(error);
+}
+
+function completionFields(todo) {
+  return {
+    completed_at: todo.completedAt,
+    ...timerFields(todo),
+  };
+}
+
+function timerFields(todo) {
+  return {
+    first_started_at: todo.firstStartedAt ?? null,
+    active_started_at: todo.activeStartedAt ?? null,
+    tracked_seconds: normalizeTrackedSeconds(todo.trackedSeconds),
+  };
+}
+
+function throwIfError(error) {
   if (error) {
     throw error;
   }
