@@ -50,6 +50,7 @@
   let newlyAddedTodoId = null;
   let liveTimer = null;
   let noteSaveTimer = null;
+  let titleSaveTimer = null;
   let draggedSummaryId = null;
   let dropTargetId = null;
   let dropTargetBucket = null;
@@ -75,6 +76,7 @@
   onDestroy(() => {
     window.clearInterval(liveTimer);
     window.clearTimeout(noteSaveTimer);
+    window.clearTimeout(titleSaveTimer);
     window.clearTimeout(completionCueTimer);
   });
 
@@ -151,9 +153,13 @@
       return;
     }
 
+    editingTaskId = null;
+    await commitTodoTitle(todoId, title);
+  }
+
+  async function commitTodoTitle(todoId, title) {
     const before = findTodo(todoId);
     state = updateTodoTitle(state, todoId, title);
-    editingTaskId = null;
     saveLocalState(state);
     syncMessage = 'Saving title';
     const after = findTodo(todoId);
@@ -208,12 +214,13 @@
     }, 1700);
   }
 
-  function handleNoteInput() {
+  function handleNoteInput(nextNote) {
     if (!selectedTaskId) {
       return;
     }
 
-    state = updateTodoNote(state, selectedTaskId, noteDraft);
+    noteDraft = nextNote;
+    state = updateTodoNote(state, selectedTaskId, nextNote);
     saveLocalState(state);
     syncMessage = 'Saving note';
     window.clearTimeout(noteSaveTimer);
@@ -221,6 +228,13 @@
       const todo = findTodo(selectedTaskId);
       await syncRemoteChange('Saving note', () => persistTodoNote(todo));
     }, 450);
+  }
+
+  function handleDetailTitleCommit(todoId, title) {
+    window.clearTimeout(titleSaveTimer);
+    titleSaveTimer = window.setTimeout(() => {
+      commitTodoTitle(todoId, title);
+    }, 0);
   }
 
   function handleDragStart(event, todoId) {
@@ -452,6 +466,7 @@
     bind:noteDraft
     onClose={closeTask}
     onNoteInput={handleNoteInput}
+    onDetailTitleCommit={handleDetailTitleCommit}
     {detailMeta}
   />
 

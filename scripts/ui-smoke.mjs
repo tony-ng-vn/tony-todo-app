@@ -19,6 +19,9 @@ try {
     ...assertHasMotion(mobile, '.todo-item button', 'Done button'),
     ...assertHasMotion(mobile, '.theme-toggle', 'Theme toggle'),
     ...assertFullScreenShell(desktop, '.workspace', 'workspace shell'),
+    ...assertFixedDocumentScroll(desktop),
+    ...assertRecapRhythm(desktop),
+    ...assertDetailEditing(desktop),
     ...assertGlassSurface(desktop, '.task-panel', 'task panel'),
     ...assertGlassSurface(desktop, '.summary-panel', 'summary panel'),
     ...assertExists(desktop, '.flow-rail', 'frosted focus rail'),
@@ -87,6 +90,7 @@ async function inspectViewport(viewport, isMobile) {
     );
   });
   await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
+  const editChecks = isMobile ? null : await exerciseDetailEditing(page);
 
   const metrics = await page.evaluate(() => {
     function rectFor(selector) {
@@ -142,6 +146,18 @@ async function inspectViewport(viewport, isMobile) {
       },
       summaryBuckets: Array.from(document.querySelectorAll('.summary-section h3')).map((element) => element.textContent.trim()),
       summaryDurations: Array.from(document.querySelectorAll('.summary-duration')).map((element) => element.textContent.trim()),
+      recapRhythm: Array.from(document.querySelectorAll('.summary-section')).map((section) => {
+        const heading = section.querySelector('h3').getBoundingClientRect();
+        const block = section.querySelector('ol > li').getBoundingClientRect();
+        return Math.round(block.top - heading.bottom);
+      }),
+      scroll: {
+        documentHeight: document.documentElement.scrollHeight,
+        viewportHeight: document.documentElement.clientHeight,
+        bodyOverflow: getComputedStyle(document.body).overflow,
+        workspaceOverflow: getComputedStyle(document.querySelector('.workspace')).overflow,
+        summaryOverflowY: getComputedStyle(document.querySelector('.summary-list')).overflowY,
+      },
       rects: {
         '#todo-title': rectFor('#todo-title'),
         '#summary-date': rectFor('#summary-date'),
@@ -174,7 +190,26 @@ async function inspectViewport(viewport, isMobile) {
   });
 
   await page.close();
-  return { viewport, ...metrics };
+  return { viewport, editChecks, ...metrics };
+}
+
+async function exerciseDetailEditing(page) {
+  await page.click('.todo-item .open-task-button');
+  await page.fill('#detail-note', 'Smoke note');
+  await page.fill('#detail-title-input', 'Smoke renamed task');
+  await page.locator('#detail-title-input').blur();
+  await page.waitForTimeout(100);
+
+  return page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    const todo = state.todos.find((item) => item.id === 'ui-smoke-local-task');
+    return {
+      noteValue: document.querySelector('#detail-note')?.value,
+      titleValue: document.querySelector('#detail-title-input')?.value,
+      storedNote: todo?.note,
+      storedTitle: todo?.title,
+    };
+  });
 }
 
 function assertNoOverflow(result) {
@@ -229,4 +264,34 @@ function assertFullScreenShell(result, selector, label) {
   return rect.width === result.viewport.width && rect.height >= result.viewport.height
     ? []
     : [`${label} is ${rect.width}x${rect.height}; expected full ${result.viewport.width}x${result.viewport.height}`];
+}
+
+function assertFixedDocumentScroll(result) {
+  const scroll = result.scroll;
+  const failures = [];
+  if (scroll.documentHeight > scroll.viewportHeight) {
+    failures.push(`document scrolls vertically: ${scroll.documentHeight} > ${scroll.viewportHeight}`);
+  }
+  if (scroll.bodyOverflow !== 'hidden' || scroll.workspaceOverflow !== 'hidden') {
+    failures.push(`page overflow is body=${scroll.bodyOverflow}, workspace=${scroll.workspaceOverflow}; expected hidden`);
+  }
+  if (scroll.summaryOverflowY !== 'auto') {
+    failures.push(`summary list overflow-y is ${scroll.summaryOverflowY}; expected auto`);
+  }
+  return failures;
+}
+
+function assertRecapRhythm(result) {
+  const tooTight = result.recapRhythm.filter((gap) => gap < 12);
+  return tooTight.length ? [`summary label-to-block gaps are ${result.recapRhythm.join(', ')}; expected at least 12`] : [];
+}
+
+function assertDetailEditing(result) {
+  const editChecks = result.editChecks;
+  return editChecks.noteValue === 'Smoke note' &&
+    editChecks.storedNote === 'Smoke note' &&
+    editChecks.titleValue === 'Smoke renamed task' &&
+    editChecks.storedTitle === 'Smoke renamed task'
+    ? []
+    : [`detail editing failed: ${JSON.stringify(editChecks)}`];
 }
