@@ -1,0 +1,179 @@
+import { describe, expect, it } from 'vitest';
+import {
+  addTodo,
+  completeTodo,
+  createInitialState,
+  getDaySummary,
+  getPendingTodos,
+  formatDuration,
+  getElapsedSeconds,
+  pauseTodoTimer,
+  reorderCompletedTodosForDay,
+  startTodoTimer,
+  updateTodoTitle,
+  updateTodoNote,
+} from './todoStore.js';
+
+describe('todo day summary', () => {
+  it('keeps active todos ordered by creation time', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Draft landing page', new Date('2026-06-08T08:10:00'));
+    state = addTodo(state, 'Send invoice', new Date('2026-06-08T08:05:00'));
+
+    expect(getPendingTodos(state).map((todo) => todo.title)).toEqual([
+      'Send invoice',
+      'Draft landing page',
+    ]);
+  });
+
+  it('adds completed todos to the summary for the day they were marked done', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Review prototype', new Date('2026-06-07T21:30:00'));
+    const todoId = state.todos[0].id;
+    const doneAt = new Date('2026-06-08T12:15:00');
+
+    state = completeTodo(state, todoId, doneAt);
+
+    expect(getPendingTodos(state)).toEqual([]);
+    expect(getDaySummary(state, '2026-06-08')).toEqual([
+      {
+        label: 'Lunch',
+        items: [
+          {
+            id: todoId,
+            title: 'Review prototype',
+            completedAt: doneAt.toISOString(),
+            note: '',
+            durationSeconds: 0,
+            durationLabel: '0m',
+          },
+        ],
+      },
+    ]);
+  });
+
+  it('groups a day summary by useful parts of the day in completion order', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Stretch', new Date('2026-06-08T06:30:00'));
+    state = addTodo(state, 'Call Sam', new Date('2026-06-08T07:00:00'));
+    state = completeTodo(state, state.todos[1].id, new Date('2026-06-08T18:45:00'));
+    state = completeTodo(state, state.todos[0].id, new Date('2026-06-08T08:00:00'));
+
+    expect(getDaySummary(state, '2026-06-08').map((section) => section.label)).toEqual([
+      'Morning',
+      'Evening',
+    ]);
+    expect(getDaySummary(state, '2026-06-08')[0].items[0].title).toBe('Stretch');
+    expect(getDaySummary(state, '2026-06-08')[1].items[0].title).toBe('Call Sam');
+  });
+
+  it('updates a task note without changing other task fields', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Call school', new Date('2026-06-08T08:00:00'));
+    const todo = state.todos[0];
+
+    state = updateTodoNote(state, todo.id, 'Ask about the scholarship deadline.');
+
+    expect(state.todos[0]).toEqual({
+      ...todo,
+      note: 'Ask about the scholarship deadline.',
+    });
+  });
+
+  it('updates a task title when the new title has content', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Old task name', new Date('2026-06-08T08:00:00'));
+
+    state = updateTodoTitle(state, state.todos[0].id, '  New task name  ');
+
+    expect(state.todos[0].title).toBe('New task name');
+  });
+
+  it('keeps the existing task title when the new title is empty', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Keep this name', new Date('2026-06-08T08:00:00'));
+
+    state = updateTodoTitle(state, state.todos[0].id, '   ');
+
+    expect(state.todos[0].title).toBe('Keep this name');
+  });
+
+  it('reorders completed todos for a day by rewriting their completion times', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'First', new Date('2026-06-08T08:00:00'));
+    state = addTodo(state, 'Second', new Date('2026-06-08T08:01:00'));
+    state = completeTodo(state, state.todos[0].id, new Date('2026-06-08T12:00:00'));
+    state = completeTodo(state, state.todos[1].id, new Date('2026-06-08T12:10:00'));
+
+    state = reorderCompletedTodosForDay(state, '2026-06-08', [state.todos[1].id, state.todos[0].id]);
+
+    const summaryTitles = getDaySummary(state, '2026-06-08')[0].items.map((item) => item.title);
+    expect(summaryTitles).toEqual(['Second', 'First']);
+    expect(new Date(state.todos[1].completedAt) < new Date(state.todos[0].completedAt)).toBe(true);
+  });
+
+  it('formats tracked duration as minutes, hours, or days', () => {
+    expect(formatDuration(0)).toBe('0m');
+    expect(formatDuration(59)).toBe('1m');
+    expect(formatDuration(59 * 60)).toBe('59m');
+    expect(formatDuration(61 * 60)).toBe('1h 1m');
+    expect(formatDuration(25 * 60 * 60 + 8 * 60)).toBe('1d 1h 8m');
+  });
+
+  it('starts one running task at a time and pauses the previous one', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'First', new Date('2026-06-08T08:00:00'));
+    state = addTodo(state, 'Second', new Date('2026-06-08T08:01:00'));
+    const firstId = state.todos[0].id;
+    const secondId = state.todos[1].id;
+
+    state = startTodoTimer(state, firstId, new Date('2026-06-08T08:10:00.000Z'));
+    state = startTodoTimer(state, secondId, new Date('2026-06-08T08:15:30.000Z'));
+
+    expect(state.todos.find((todo) => todo.id === firstId)).toMatchObject({
+      firstStartedAt: '2026-06-08T08:10:00.000Z',
+      activeStartedAt: null,
+      trackedSeconds: 330,
+    });
+    expect(state.todos.find((todo) => todo.id === secondId)).toMatchObject({
+      firstStartedAt: '2026-06-08T08:15:30.000Z',
+      activeStartedAt: '2026-06-08T08:15:30.000Z',
+      trackedSeconds: 0,
+    });
+  });
+
+  it('pauses a running task and reports elapsed seconds', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Write notes', new Date('2026-06-08T08:00:00'));
+    const todoId = state.todos[0].id;
+
+    state = startTodoTimer(state, todoId, new Date('2026-06-08T08:00:00.000Z'));
+    expect(getElapsedSeconds(state.todos[0], new Date('2026-06-08T08:02:05.000Z'))).toBe(125);
+
+    state = pauseTodoTimer(state, todoId, new Date('2026-06-08T08:02:05.000Z'));
+
+    expect(state.todos[0]).toMatchObject({
+      activeStartedAt: null,
+      trackedSeconds: 125,
+    });
+  });
+
+  it('finalizes a running timer when a task is completed', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Send update', new Date('2026-06-08T08:00:00'));
+    const todoId = state.todos[0].id;
+
+    state = startTodoTimer(state, todoId, new Date('2026-06-08T08:10:00.000Z'));
+    state = completeTodo(state, todoId, new Date('2026-06-08T08:40:10.000Z'));
+
+    expect(state.todos[0]).toMatchObject({
+      completedAt: '2026-06-08T08:40:10.000Z',
+      activeStartedAt: null,
+      trackedSeconds: 1810,
+    });
+    expect(getDaySummary(state, '2026-06-08')[0].items[0]).toMatchObject({
+      durationSeconds: 1810,
+      durationLabel: '30m',
+    });
+  });
+});

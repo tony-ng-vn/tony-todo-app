@@ -1,0 +1,241 @@
+const DAY_PARTS = [
+  { label: 'Morning', start: 5, end: 11 },
+  { label: 'Lunch', start: 11, end: 14 },
+  { label: 'Afternoon', start: 14, end: 17 },
+  { label: 'Evening', start: 17, end: 22 },
+  { label: 'Late night', start: 22, end: 24 },
+  { label: 'Late night', start: 0, end: 5 },
+];
+
+export function createInitialState(todos = []) {
+  return { todos };
+}
+
+export function addTodo(state, title, createdAt = new Date()) {
+  const cleanTitle = title.trim();
+
+  if (!cleanTitle) {
+    return state;
+  }
+
+  return {
+    ...state,
+    todos: [
+      ...state.todos,
+      {
+        id: createTodoId(cleanTitle, createdAt),
+        title: cleanTitle,
+        createdAt: createdAt.toISOString(),
+        completedAt: null,
+        note: '',
+        source: 'app',
+        notionPageId: null,
+        notionDatabaseId: null,
+        notionStatus: null,
+        firstStartedAt: null,
+        activeStartedAt: null,
+        trackedSeconds: 0,
+      },
+    ],
+  };
+}
+
+export function completeTodo(state, todoId, completedAt = new Date()) {
+  const doneAt = completedAt.toISOString();
+  return {
+    ...state,
+    todos: state.todos.map((todo) =>
+      todo.id === todoId
+        ? {
+            ...todo,
+            completedAt: doneAt,
+            activeStartedAt: null,
+            trackedSeconds: getElapsedSeconds(todo, completedAt),
+          }
+        : todo,
+    ),
+  };
+}
+
+export function startTodoTimer(state, todoId, startedAt = new Date()) {
+  const startedAtIso = startedAt.toISOString();
+
+  return {
+    ...state,
+    todos: state.todos.map((todo) => {
+      if (todo.completedAt) {
+        return todo;
+      }
+
+      if (todo.id === todoId) {
+        return {
+          ...todo,
+          firstStartedAt: todo.firstStartedAt ?? startedAtIso,
+          activeStartedAt: startedAtIso,
+          trackedSeconds: normalizedTrackedSeconds(todo),
+        };
+      }
+
+      return todo.activeStartedAt
+        ? {
+            ...todo,
+            activeStartedAt: null,
+            trackedSeconds: getElapsedSeconds(todo, startedAt),
+          }
+        : todo;
+    }),
+  };
+}
+
+export function pauseTodoTimer(state, todoId, pausedAt = new Date()) {
+  return {
+    ...state,
+    todos: state.todos.map((todo) =>
+      todo.id === todoId && todo.activeStartedAt
+        ? {
+            ...todo,
+            activeStartedAt: null,
+            trackedSeconds: getElapsedSeconds(todo, pausedAt),
+          }
+        : todo,
+    ),
+  };
+}
+
+export function getPendingTodos(state) {
+  return state.todos
+    .filter((todo) => !todo.completedAt)
+    .toSorted((first, second) => new Date(first.createdAt) - new Date(second.createdAt));
+}
+
+export function getCompletedTodos(state) {
+  return state.todos
+    .filter((todo) => todo.completedAt)
+    .toSorted((first, second) => new Date(first.completedAt) - new Date(second.completedAt));
+}
+
+export function getDaySummary(state, dayKey) {
+  const sections = new Map();
+
+  for (const todo of getCompletedTodos(state)) {
+    const completedDate = new Date(todo.completedAt);
+    if (formatDayKey(completedDate) !== dayKey) {
+      continue;
+    }
+
+    const label = getDayPartLabel(completedDate);
+    if (!sections.has(label)) {
+      sections.set(label, []);
+    }
+
+    sections.get(label).push({
+      id: todo.id,
+      title: todo.title,
+      completedAt: todo.completedAt,
+      note: todo.note ?? '',
+      durationSeconds: normalizedTrackedSeconds(todo),
+      durationLabel: formatDuration(normalizedTrackedSeconds(todo)),
+    });
+  }
+
+  return Array.from(sections, ([label, items]) => ({ label, items }));
+}
+
+export function updateTodoNote(state, todoId, note) {
+  return {
+    ...state,
+    todos: state.todos.map((todo) => (todo.id === todoId ? { ...todo, note } : todo)),
+  };
+}
+
+export function updateTodoTitle(state, todoId, title) {
+  const cleanTitle = title.trim();
+  if (!cleanTitle) {
+    return state;
+  }
+
+  return {
+    ...state,
+    todos: state.todos.map((todo) => (todo.id === todoId ? { ...todo, title: cleanTitle } : todo)),
+  };
+}
+
+export function reorderCompletedTodosForDay(state, dayKey, orderedIds) {
+  const completedForDay = getCompletedTodos(state).filter((todo) => formatDayKey(new Date(todo.completedAt)) === dayKey);
+  if (completedForDay.length === 0) {
+    return state;
+  }
+
+  const existingById = new Map(completedForDay.map((todo) => [todo.id, todo]));
+  const orderedForDay = [
+    ...orderedIds.map((id) => existingById.get(id)).filter(Boolean),
+    ...completedForDay.filter((todo) => !orderedIds.includes(todo.id)),
+  ];
+  const firstCompletion = new Date(completedForDay[0].completedAt);
+  const nextCompletedAtById = new Map(
+    orderedForDay.map((todo, index) => [todo.id, new Date(firstCompletion.getTime() + index * 60_000).toISOString()]),
+  );
+
+  return {
+    ...state,
+    todos: state.todos.map((todo) =>
+      nextCompletedAtById.has(todo.id) ? { ...todo, completedAt: nextCompletedAtById.get(todo.id) } : todo,
+    ),
+  };
+}
+
+export function formatDayKey(date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+export function getElapsedSeconds(todo, now = new Date()) {
+  const baseSeconds = normalizedTrackedSeconds(todo);
+  if (!todo.activeStartedAt) {
+    return baseSeconds;
+  }
+
+  const startedAt = new Date(todo.activeStartedAt).getTime();
+  const nowTime = now.getTime();
+  const elapsed = Math.floor((nowTime - startedAt) / 1000);
+  return baseSeconds + Math.max(0, Math.min(elapsed, 24 * 60 * 60));
+}
+
+export function formatDuration(seconds) {
+  const cleanSeconds = Math.max(0, seconds);
+  const totalMinutes = cleanSeconds === 0 ? 0 : Math.max(1, Math.floor(cleanSeconds / 60));
+  const days = Math.floor(totalMinutes / (24 * 60));
+  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
+  const minutes = totalMinutes % 60;
+
+  if (days > 0) {
+    return `${days}d ${hours}h ${minutes}m`;
+  }
+
+  if (hours > 0) {
+    return `${hours}h ${minutes}m`;
+  }
+
+  return `${totalMinutes}m`;
+}
+
+export function getDayPartLabel(date) {
+  const hour = date.getHours();
+  return DAY_PARTS.find((part) => hour >= part.start && hour < part.end)?.label ?? 'Late night';
+}
+
+export function createTodoId(title, date) {
+  const slug = title
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/(^-|-$)/g, '')
+    .slice(0, 32);
+
+  return `${date.getTime()}-${slug || 'todo'}`;
+}
+
+function normalizedTrackedSeconds(todo) {
+  return Math.max(0, Math.floor(Number(todo.trackedSeconds ?? 0)));
+}
