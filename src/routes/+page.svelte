@@ -35,6 +35,7 @@
 
   const TIMER_SYNC_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds'];
   const COMPLETION_SYNC_FIELDS = ['completedAt'];
+  const THEME_STORAGE_KEY = 'done-log-theme';
 
   let state = createInitialState();
   let selectedDay = formatDayKey(new Date());
@@ -54,6 +55,7 @@
   let dropTargetBucket = null;
   let completionCue = null;
   let completionCueTimer = null;
+  let themeMode = 'light';
 
   $: pendingTodos = getPendingTodos(state);
   $: summary = getDaySummary(state, selectedDay);
@@ -65,6 +67,8 @@
     syncMessage = useRemote ? 'Connecting' : 'Local only';
     clientId = getOrCreateClientId();
     state = loadLocalState();
+    themeMode = loadThemeMode();
+    applyThemeMode(themeMode);
     hydrateRemoteTodos();
   });
 
@@ -181,6 +185,11 @@
 
   function closeTask() {
     selectedTaskId = null;
+  }
+
+  function toggleThemeMode() {
+    themeMode = themeMode === 'dark' ? 'light' : 'dark';
+    applyThemeMode(themeMode);
   }
 
   function triggerCompletionCue(todo) {
@@ -350,6 +359,20 @@
     syncMessage = `Offline cache: ${error.message}`;
   }
 
+  function loadThemeMode() {
+    const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
+    if (storedTheme === 'light' || storedTheme === 'dark') {
+      return storedTheme;
+    }
+
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  function applyThemeMode(nextThemeMode) {
+    document.documentElement.dataset.theme = nextThemeMode;
+    localStorage.setItem(THEME_STORAGE_KEY, nextThemeMode);
+  }
+
   function findTodo(todoId) {
     return state.todos.find((todo) => todo.id === todoId);
   }
@@ -394,6 +417,7 @@
     {draftTitle}
     {editingTaskId}
     {newlyAddedTodoId}
+    {themeMode}
     onSubmit={handleSubmit}
     onDraftInput={handleDraftInput}
     onStartTitleEdit={startTitleEdit}
@@ -402,6 +426,7 @@
     onTimerAction={handleTimerAction}
     onOpenTask={openTask}
     onComplete={handleComplete}
+    onToggleTheme={toggleThemeMode}
   />
 
   <FlowRail {completedToday} />

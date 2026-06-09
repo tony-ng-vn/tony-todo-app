@@ -33,3 +33,27 @@ export function iconPause() {
     </svg>
   `;
 }
+
+export function iconMoon() {
+  return `
+    <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M11.75 10.75A5.25 5.25 0 0 1 5.25 4.25a5.5 5.5 0 1 0 6.5 6.5z" />
+    </svg>
+  `;
+}
+
+export function iconSun() {
+  return `
+    <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <circle cx="8" cy="8" r="3" />
+      <path d="M8 1.5v1.25" />
+      <path d="M8 13.25v1.25" />
+      <path d="M1.5 8h1.25" />
+      <path d="M13.25 8h1.25" />
+      <path d="M3.25 3.25l.9.9" />
+      <path d="M11.85 11.85l.9.9" />
+      <path d="M12.75 3.25l-.9.9" />
+      <path d="M4.15 11.85l-.9.9" />
+    </svg>
+  `;
+}

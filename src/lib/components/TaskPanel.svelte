@@ -1,7 +1,7 @@
 <script>
   import { formatDuration, getElapsedSeconds } from '../../todoStore.js';
   import { linkifyText } from '../../linkify.js';
-  import { iconCheck, iconPage, iconPause, iconPlay } from './icons.js';
+  import { iconCheck, iconMoon, iconPage, iconPause, iconPlay, iconSun } from './icons.js';
 
   export let syncMessage = 'Local only';
   export let pendingTodos = [];
@@ -9,6 +9,7 @@
   export let draftTitle = '';
   export let editingTaskId = null;
   export let newlyAddedTodoId = null;
+  export let themeMode = 'light';
   export let onSubmit;
   export let onDraftInput;
   export let onStartTitleEdit;
@@ -17,6 +18,7 @@
   export let onTimerAction;
   export let onOpenTask;
   export let onComplete;
+  export let onToggleTheme;
 </script>
 
 <section class="task-panel" aria-labelledby="task-heading">
@@ -26,7 +28,18 @@
       <h1 id="task-heading">Today</h1>
       <p class="panel-note">A quiet workspace for the next thing, and proof of what already moved.</p>
     </div>
-    <output class="sync-status" id="sync-status" aria-live="polite">{syncMessage}</output>
+    <div class="header-actions">
+      <output class="sync-status" id="sync-status" aria-live="polite">{syncMessage}</output>
+      <button
+        type="button"
+        class="theme-toggle"
+        on:click={onToggleTheme}
+        aria-label={`Switch to ${themeMode === 'dark' ? 'light' : 'dark'} mode`}
+      >
+        {@html themeMode === 'dark' ? iconSun() : iconMoon()}
+        <span>{themeMode === 'dark' ? 'Light' : 'Dark'}</span>
+      </button>
+    </div>
   </div>
 
   <form class="new-task-form" id="new-task-form" on:submit|preventDefault={onSubmit}>

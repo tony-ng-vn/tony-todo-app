@@ -13,13 +13,16 @@ try {
     ...assertNoOverflow(desktop),
     ...assertMinimumTarget(mobile, '#todo-title', 44, 'mobile task input'),
     ...assertMinimumTarget(mobile, '#summary-date', 44, 'mobile date input'),
+    ...assertMinimumTarget(mobile, '.theme-toggle', 34, 'mobile theme toggle'),
     ...assertMinimumContrast(mobile, '.todo-item button', 4.5, 'Done button'),
     ...assertHasMotion(mobile, '.input-row button', 'Add button'),
     ...assertHasMotion(mobile, '.todo-item button', 'Done button'),
+    ...assertHasMotion(mobile, '.theme-toggle', 'Theme toggle'),
     ...assertFullScreenShell(desktop, '.workspace', 'workspace shell'),
     ...assertGlassSurface(desktop, '.task-panel', 'task panel'),
     ...assertGlassSurface(desktop, '.summary-panel', 'summary panel'),
     ...assertExists(desktop, '.flow-rail', 'frosted focus rail'),
+    ...assertExists(desktop, '.theme-toggle', 'theme toggle'),
     ...assertBucketLabels(desktop),
     ...assertIncludes(desktop.summaryDurations, '25m', 'summary duration text'),
   ];
@@ -135,12 +138,14 @@ async function inspectViewport(viewport, isMobile) {
       scrollWidth: document.documentElement.scrollWidth,
       exists: {
         '.flow-rail': Boolean(document.querySelector('.flow-rail')),
+        '.theme-toggle': Boolean(document.querySelector('.theme-toggle')),
       },
       summaryBuckets: Array.from(document.querySelectorAll('.summary-section h3')).map((element) => element.textContent.trim()),
       summaryDurations: Array.from(document.querySelectorAll('.summary-duration')).map((element) => element.textContent.trim()),
       rects: {
         '#todo-title': rectFor('#todo-title'),
         '#summary-date': rectFor('#summary-date'),
+        '.theme-toggle': rectFor('.theme-toggle'),
         '.workspace': rectFor('.workspace'),
       },
       glass: {
@@ -154,6 +159,7 @@ async function inspectViewport(viewport, isMobile) {
       transitions: {
         '.input-row button': transitionFor('.input-row button'),
         '.todo-item button': transitionFor('.todo-item button'),
+        '.theme-toggle': transitionFor('.theme-toggle'),
       },
     };
 

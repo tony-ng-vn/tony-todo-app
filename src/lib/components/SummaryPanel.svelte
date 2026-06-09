@@ -28,8 +28,8 @@
   <div class="day-rhythm" aria-hidden="true">
     <span>Morning</span>
     <span>Lunch</span>
-    <span>Afternoon</span>
     <span>Evening</span>
+    <span>Night</span>
   </div>
   <div class="summary-list" id="summary-list">
     {#if summary.length}
