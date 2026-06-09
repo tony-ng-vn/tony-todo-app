@@ -20,6 +20,8 @@ try {
     ...assertGlassSurface(desktop, '.task-panel', 'task panel'),
     ...assertGlassSurface(desktop, '.summary-panel', 'summary panel'),
     ...assertExists(desktop, '.flow-rail', 'frosted focus rail'),
+    ...assertBucketLabels(desktop),
+    ...assertIncludes(desktop.summaryDurations, '25m', 'summary duration text'),
   ];
 
   if (failures.length) {
@@ -33,6 +35,11 @@ try {
 async function inspectViewport(viewport, isMobile) {
   const page = await browser.newPage({ viewport, isMobile });
   await page.addInitScript(() => {
+    const today = new Date();
+    const dayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const completedAt = (hour, minute) =>
+      new Date(`${dayKey}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`).toISOString();
+
     localStorage.setItem('done-log-client-id', 'ui-smoke-local');
     localStorage.setItem(
       'done-log-state',
@@ -43,6 +50,34 @@ async function inspectViewport(viewport, isMobile) {
             title: 'Review daily plan',
             createdAt: '2026-06-08T08:00:00.000Z',
             completedAt: null,
+          },
+          {
+            id: 'ui-smoke-morning-task',
+            title: 'Morning completed task',
+            createdAt: completedAt(7, 0),
+            completedAt: completedAt(8, 15),
+            trackedSeconds: 25 * 60,
+          },
+          {
+            id: 'ui-smoke-lunch-task',
+            title: 'Lunch completed task',
+            createdAt: completedAt(10, 0),
+            completedAt: completedAt(12, 10),
+            trackedSeconds: 5 * 60,
+          },
+          {
+            id: 'ui-smoke-evening-task',
+            title: 'Evening completed task',
+            createdAt: completedAt(15, 0),
+            completedAt: completedAt(18, 30),
+            trackedSeconds: 75 * 60,
+          },
+          {
+            id: 'ui-smoke-night-task',
+            title: 'Night completed task',
+            createdAt: completedAt(19, 0),
+            completedAt: completedAt(21, 20),
+            trackedSeconds: 2 * 60 * 60,
           },
         ],
       }),
@@ -101,6 +136,8 @@ async function inspectViewport(viewport, isMobile) {
       exists: {
         '.flow-rail': Boolean(document.querySelector('.flow-rail')),
       },
+      summaryBuckets: Array.from(document.querySelectorAll('.summary-section h3')).map((element) => element.textContent.trim()),
+      summaryDurations: Array.from(document.querySelectorAll('.summary-duration')).map((element) => element.textContent.trim()),
       rects: {
         '#todo-title': rectFor('#todo-title'),
         '#summary-date': rectFor('#summary-date'),
@@ -161,6 +198,17 @@ function assertHasMotion(result, selector, label) {
 
 function assertExists(result, selector, label) {
   return result.exists[selector] ? [] : [`${label} is missing from the rendered interface`];
+}
+
+function assertBucketLabels(result) {
+  const expected = ['Morning', 'Lunch', 'Evening', 'Night'];
+  return expected.every((label, index) => result.summaryBuckets[index] === label)
+    ? []
+    : [`summary buckets are ${result.summaryBuckets.join(', ')}; expected ${expected.join(', ')}`];
+}
+
+function assertIncludes(values, expected, label) {
+  return values.includes(expected) ? [] : [`${label} does not include ${expected}; saw ${values.join(', ')}`];
 }
 
 function assertGlassSurface(result, selector, label) {

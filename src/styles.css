@@ -572,7 +572,16 @@ h2 {
 
 .summary-section {
   border-left: 1px solid var(--border);
+  border-radius: 8px;
   padding-left: 16px;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease;
+}
+
+.summary-section.is-bucket-target {
+  border-left-color: var(--strong);
+  background: rgba(255, 255, 255, 0.5);
 }
 
 .summary-section h3 {
@@ -628,6 +637,20 @@ h2 {
 
 .summary-section li.is-dragging {
   opacity: 0.46;
+}
+
+.summary-empty-bucket {
+  min-height: 42px;
+  display: flex;
+  align-items: center;
+  padding: 10px 12px;
+  border: 1px dashed var(--border);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.28);
+  color: var(--subtle);
+  cursor: default;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .summary-section time {

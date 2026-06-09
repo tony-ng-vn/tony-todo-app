@@ -1,10 +1,8 @@
-const DAY_PARTS = [
+const SUMMARY_BUCKETS = [
   { label: 'Morning', start: 5, end: 11 },
   { label: 'Lunch', start: 11, end: 14 },
-  { label: 'Afternoon', start: 14, end: 17 },
-  { label: 'Evening', start: 17, end: 22 },
-  { label: 'Late night', start: 22, end: 24 },
-  { label: 'Late night', start: 0, end: 5 },
+  { label: 'Evening', start: 14, end: 21 },
+  { label: 'Night', start: 21, end: 5 },
 ];
 
 export function createInitialState(todos = []) {
@@ -115,7 +113,7 @@ export function getCompletedTodos(state) {
 }
 
 export function getDaySummary(state, dayKey) {
-  const sections = new Map();
+  const sections = new Map(SUMMARY_BUCKETS.map((bucket) => [bucket.label, []]));
 
   for (const todo of getCompletedTodos(state)) {
     const completedDate = new Date(todo.completedAt);
@@ -124,10 +122,6 @@ export function getDaySummary(state, dayKey) {
     }
 
     const label = getDayPartLabel(completedDate);
-    if (!sections.has(label)) {
-      sections.set(label, []);
-    }
-
     sections.get(label).push({
       id: todo.id,
       title: todo.title,
@@ -184,6 +178,37 @@ export function reorderCompletedTodosForDay(state, dayKey, orderedIds) {
   };
 }
 
+export function moveCompletedTodoToSummaryBucket(state, dayKey, todoId, bucketLabel, targetId = null) {
+  if (!SUMMARY_BUCKETS.some((bucket) => bucket.label === bucketLabel)) {
+    return state;
+  }
+
+  const summary = getDaySummary(state, dayKey);
+  const targetSection = summary.find((section) => section.label === bucketLabel);
+  const movingTodo = state.todos.find((todo) => todo.id === todoId && todo.completedAt);
+
+  if (!targetSection || !movingTodo || formatDayKey(new Date(movingTodo.completedAt)) !== dayKey) {
+    return state;
+  }
+
+  const targetIds = targetSection.items.map((item) => item.id).filter((id) => id !== todoId);
+  const targetIndex = targetId ? targetIds.indexOf(targetId) : -1;
+  const orderedTargetIds =
+    targetIndex === -1
+      ? [...targetIds, todoId]
+      : [...targetIds.slice(0, targetIndex), todoId, ...targetIds.slice(targetIndex)];
+  const completedAtById = new Map(
+    orderedTargetIds.map((id, index) => [id, completedAtForBucketPosition(dayKey, bucketLabel, index)]),
+  );
+
+  return {
+    ...state,
+    todos: state.todos.map((todo) =>
+      completedAtById.has(todo.id) ? { ...todo, completedAt: completedAtById.get(todo.id) } : todo,
+    ),
+  };
+}
+
 export function formatDayKey(date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -223,7 +248,11 @@ export function formatDuration(seconds) {
 
 export function getDayPartLabel(date) {
   const hour = date.getHours();
-  return DAY_PARTS.find((part) => hour >= part.start && hour < part.end)?.label ?? 'Late night';
+  return SUMMARY_BUCKETS.find((bucket) =>
+    bucket.start < bucket.end
+      ? hour >= bucket.start && hour < bucket.end
+      : hour >= bucket.start || hour < bucket.end,
+  )?.label ?? 'Night';
 }
 
 export function createTodoId(title, date) {
@@ -238,4 +267,11 @@ export function createTodoId(title, date) {
 
 function normalizedTrackedSeconds(todo) {
   return Math.max(0, Math.floor(Number(todo.trackedSeconds ?? 0)));
+}
+
+function completedAtForBucketPosition(dayKey, bucketLabel, index) {
+  const bucket = SUMMARY_BUCKETS.find((candidate) => candidate.label === bucketLabel);
+  const date = new Date(`${dayKey}T00:00:00`);
+  date.setHours(bucket.start, index, 0, 0);
+  return date.toISOString();
 }

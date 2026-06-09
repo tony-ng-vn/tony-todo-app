@@ -13,9 +13,9 @@
     formatDuration,
     getDaySummary,
     getElapsedSeconds,
+    moveCompletedTodoToSummaryBucket,
     getPendingTodos,
     pauseTodoTimer,
-    reorderCompletedTodosForDay,
     startTodoTimer,
     updateTodoNote,
     updateTodoTitle,
@@ -49,6 +49,7 @@
   let noteSaveTimer = null;
   let draggedSummaryId = null;
   let dropTargetId = null;
+  let dropTargetBucket = null;
 
   $: pendingTodos = getPendingTodos(state);
   $: summary = getDaySummary(state, selectedDay);
@@ -230,31 +231,59 @@
   function handleDragEnd() {
     draggedSummaryId = null;
     dropTargetId = null;
+    dropTargetBucket = null;
   }
 
-  function handleDragOver(event, todoId) {
+  function handleDragOver(event, todoId, bucketLabel) {
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
     dropTargetId = todoId;
+    dropTargetBucket = bucketLabel;
   }
 
-  async function handleDrop(event, targetId) {
+  function handleBucketDragOver(event, bucketLabel) {
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    dropTargetId = null;
+    dropTargetBucket = bucketLabel;
+  }
+
+  async function handleDrop(event, targetId, bucketLabel) {
     const draggedId = event.dataTransfer.getData('text/plain');
     if (!draggedId || draggedId === targetId) {
       return;
     }
 
     event.preventDefault();
-    const summaryIds = getSummaryIdsForSelectedDay();
-    const reorderedIds = moveIdBefore(summaryIds, draggedId, targetId);
-    state = reorderCompletedTodosForDay(state, selectedDay, reorderedIds);
+    await moveSummaryTodo(draggedId, bucketLabel, targetId);
+  }
+
+  async function handleBucketDrop(event, bucketLabel) {
+    const draggedId = event.dataTransfer.getData('text/plain');
+    if (!draggedId) {
+      return;
+    }
+
+    event.preventDefault();
+    await moveSummaryTodo(draggedId, bucketLabel);
+  }
+
+  async function moveSummaryTodo(draggedId, bucketLabel, targetId = null) {
+    const beforeTodos = state.todos;
+    state = moveCompletedTodoToSummaryBucket(state, selectedDay, draggedId, bucketLabel, targetId);
+    const changedTodos = getCompletionChangedTodos(beforeTodos, state.todos);
     draggedSummaryId = null;
     dropTargetId = null;
+    dropTargetBucket = null;
+
+    if (changedTodos.length === 0) {
+      return;
+    }
+
     saveState(state);
     syncMessage = 'Saving order';
-
     try {
-      await persistReorderedTodos(reorderedIds);
+      await persistCompletionChangedTodos(changedTodos);
       renderRemoteStatus();
     } catch (error) {
       syncMessage = `Offline cache: ${error.message}`;
@@ -324,9 +353,8 @@
     await updateRemoteTodoTimer(insforge, clientId, todo);
   }
 
-  async function persistReorderedTodos(orderedIds) {
+  async function persistCompletionChangedTodos(todosToUpdate) {
     if (!useRemote) return;
-    const todosToUpdate = orderedIds.map((id) => findTodo(id)).filter(Boolean);
     await Promise.all(todosToUpdate.map((todo) => updateRemoteTodoCompletion(insforge, clientId, todo)));
   }
 
@@ -349,20 +377,6 @@
     return state.todos.find((todo) => todo.id === todoId);
   }
 
-  function getSummaryIdsForSelectedDay() {
-    return getDaySummary(state, selectedDay).flatMap((section) => section.items.map((item) => item.id));
-  }
-
-  function moveIdBefore(ids, draggedId, targetId) {
-    const withoutDragged = ids.filter((id) => id !== draggedId);
-    const targetIndex = withoutDragged.indexOf(targetId);
-    if (targetIndex === -1) {
-      return ids;
-    }
-
-    return [...withoutDragged.slice(0, targetIndex), draggedId, ...withoutDragged.slice(targetIndex)];
-  }
-
   function getTimerChangedTodos(beforeTodos, afterTodos) {
     const beforeById = new Map(beforeTodos.map((todo) => [todo.id, todo]));
     return afterTodos.filter((todo) => {
@@ -374,6 +388,11 @@
           before.trackedSeconds !== todo.trackedSeconds)
       );
     });
+  }
+
+  function getCompletionChangedTodos(beforeTodos, afterTodos) {
+    const beforeById = new Map(beforeTodos.map((todo) => [todo.id, todo]));
+    return afterTodos.filter((todo) => beforeById.get(todo.id)?.completedAt !== todo.completedAt);
   }
 
   function completedTime(completedAt) {
@@ -417,11 +436,14 @@
     bind:selectedDay
     {draggedSummaryId}
     {dropTargetId}
+    {dropTargetBucket}
     onOpenTask={openTask}
     onDragStart={handleDragStart}
     onDragEnd={handleDragEnd}
     onDragOver={handleDragOver}
     onDrop={handleDrop}
+    onBucketDragOver={handleBucketDragOver}
+    onBucketDrop={handleBucketDrop}
     {completedTime}
   />
 

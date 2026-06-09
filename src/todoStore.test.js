@@ -7,6 +7,7 @@ import {
   getPendingTodos,
   formatDuration,
   getElapsedSeconds,
+  moveCompletedTodoToSummaryBucket,
   pauseTodoTimer,
   reorderCompletedTodosForDay,
   startTodoTimer,
@@ -26,6 +27,17 @@ describe('todo day summary', () => {
     ]);
   });
 
+  it('always renders the four recap buckets for the selected day', () => {
+    const state = createInitialState();
+
+    expect(getDaySummary(state, '2026-06-08')).toEqual([
+      { label: 'Morning', items: [] },
+      { label: 'Lunch', items: [] },
+      { label: 'Evening', items: [] },
+      { label: 'Night', items: [] },
+    ]);
+  });
+
   it('adds completed todos to the summary for the day they were marked done', () => {
     let state = createInitialState();
     state = addTodo(state, 'Review prototype', new Date('2026-06-07T21:30:00'));
@@ -35,24 +47,22 @@ describe('todo day summary', () => {
     state = completeTodo(state, todoId, doneAt);
 
     expect(getPendingTodos(state)).toEqual([]);
-    expect(getDaySummary(state, '2026-06-08')).toEqual([
-      {
-        label: 'Lunch',
-        items: [
-          {
-            id: todoId,
-            title: 'Review prototype',
-            completedAt: doneAt.toISOString(),
-            note: '',
-            durationSeconds: 0,
-            durationLabel: '0m',
-          },
-        ],
-      },
-    ]);
+    expect(getDaySummary(state, '2026-06-08')[1]).toEqual({
+      label: 'Lunch',
+      items: [
+        {
+          id: todoId,
+          title: 'Review prototype',
+          completedAt: doneAt.toISOString(),
+          note: '',
+          durationSeconds: 0,
+          durationLabel: '0m',
+        },
+      ],
+    });
   });
 
-  it('groups a day summary by useful parts of the day in completion order', () => {
+  it('groups a day summary into fixed buckets in recap order', () => {
     let state = createInitialState();
     state = addTodo(state, 'Stretch', new Date('2026-06-08T06:30:00'));
     state = addTodo(state, 'Call Sam', new Date('2026-06-08T07:00:00'));
@@ -61,10 +71,12 @@ describe('todo day summary', () => {
 
     expect(getDaySummary(state, '2026-06-08').map((section) => section.label)).toEqual([
       'Morning',
+      'Lunch',
       'Evening',
+      'Night',
     ]);
     expect(getDaySummary(state, '2026-06-08')[0].items[0].title).toBe('Stretch');
-    expect(getDaySummary(state, '2026-06-08')[1].items[0].title).toBe('Call Sam');
+    expect(getDaySummary(state, '2026-06-08')[2].items[0].title).toBe('Call Sam');
   });
 
   it('updates a task note without changing other task fields', () => {
@@ -107,9 +119,29 @@ describe('todo day summary', () => {
 
     state = reorderCompletedTodosForDay(state, '2026-06-08', [state.todos[1].id, state.todos[0].id]);
 
-    const summaryTitles = getDaySummary(state, '2026-06-08')[0].items.map((item) => item.title);
+    const summaryTitles = getDaySummary(state, '2026-06-08')[1].items.map((item) => item.title);
     expect(summaryTitles).toEqual(['Second', 'First']);
     expect(new Date(state.todos[1].completedAt) < new Date(state.todos[0].completedAt)).toBe(true);
+  });
+
+  it('moves a completed todo to another bucket without changing tracked duration', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Morning task', new Date('2026-06-08T08:00:00'));
+    state = addTodo(state, 'Night task', new Date('2026-06-08T08:01:00'));
+    state = completeTodo(state, state.todos[0].id, new Date('2026-06-08T08:30:00'));
+    state = completeTodo(state, state.todos[1].id, new Date('2026-06-08T21:30:00'));
+    state.todos[0] = { ...state.todos[0], trackedSeconds: 47 * 60 };
+    const movedId = state.todos[0].id;
+
+    state = moveCompletedTodoToSummaryBucket(state, '2026-06-08', movedId, 'Night');
+
+    const summary = getDaySummary(state, '2026-06-08');
+    expect(summary[0].items).toEqual([]);
+    expect(summary[3].items.map((item) => item.title)).toEqual(['Night task', 'Morning task']);
+    expect(summary[3].items.find((item) => item.id === movedId)).toMatchObject({
+      durationSeconds: 47 * 60,
+      durationLabel: '47m',
+    });
   });
 
   it('formats tracked duration as minutes, hours, or days', () => {
@@ -171,7 +203,10 @@ describe('todo day summary', () => {
       activeStartedAt: null,
       trackedSeconds: 1810,
     });
-    expect(getDaySummary(state, '2026-06-08')[0].items[0]).toMatchObject({
+    const completedSummaryItem = getDaySummary(state, '2026-06-08')
+      .flatMap((section) => section.items)
+      .find((item) => item.id === todoId);
+    expect(completedSummaryItem).toMatchObject({
       durationSeconds: 1810,
       durationLabel: '30m',
     });
