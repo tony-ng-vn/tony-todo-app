@@ -1,7 +1,10 @@
 <script>
   import { onDestroy, onMount, tick } from 'svelte';
   import '../styles.css';
-  import { linkifyText } from '../linkify.js';
+  import FlowRail from '../lib/components/FlowRail.svelte';
+  import SummaryPanel from '../lib/components/SummaryPanel.svelte';
+  import TaskDetail from '../lib/components/TaskDetail.svelte';
+  import TaskPanel from '../lib/components/TaskPanel.svelte';
   import {
     addTodo,
     completeTodo,
@@ -387,217 +390,46 @@
       : `Created ${new Intl.DateTimeFormat([], { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(todo.createdAt))}`;
     return `${dateText} · ${durationText}`;
   }
-
-  function iconPage() {
-    return `
-      <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">
-        <path d="M4.5 2.5h5L12.5 5.5v8h-8z" />
-        <path d="M9.5 2.5v3h3" />
-        <path d="M6.25 8.25h5" />
-        <path d="M6.25 10.75h4" />
-      </svg>
-    `;
-  }
-
-  function iconCheck() {
-    return `
-      <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">
-        <path d="M3.25 8.25l3 3 7-7" />
-      </svg>
-    `;
-  }
-
-  function iconPlay() {
-    return `
-      <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">
-        <path d="M5.25 3.25v9.5l8-4.75z" />
-      </svg>
-    `;
-  }
-
-  function iconPause() {
-    return `
-      <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">
-        <path d="M5.25 3.5v9" />
-        <path d="M10.75 3.5v9" />
-      </svg>
-    `;
-  }
 </script>
 
 <main class="workspace" aria-label="Done Log todo app">
-  <section class="task-panel" aria-labelledby="task-heading">
-    <div class="brand-row">
-      <div>
-        <p class="eyebrow">Done Log</p>
-        <h1 id="task-heading">Today</h1>
-        <p class="panel-note">A quiet workspace for the next thing, and proof of what already moved.</p>
-      </div>
-      <output class="sync-status" id="sync-status" aria-live="polite">{syncMessage}</output>
-    </div>
+  <TaskPanel
+    {syncMessage}
+    {pendingTodos}
+    bind:titleDraft
+    {draftTitle}
+    {editingTaskId}
+    {newlyAddedTodoId}
+    onSubmit={handleSubmit}
+    onDraftInput={handleDraftInput}
+    onStartTitleEdit={startTitleEdit}
+    onTitleKeydown={handleTitleKeydown}
+    onCommitTitleEdit={commitTitleEdit}
+    onTimerAction={handleTimerAction}
+    onOpenTask={openTask}
+    onComplete={handleComplete}
+  />
 
-    <form class="new-task-form" id="new-task-form" on:submit|preventDefault={handleSubmit}>
-      <label for="todo-title">New task</label>
-      <div class="input-row">
-        <input
-          id="todo-title"
-          name="title"
-          type="text"
-          autocomplete="off"
-          placeholder="+ Add task and press Enter"
-          bind:value={titleDraft}
-          on:input={handleDraftInput}
-        />
-        <button type="submit">Add</button>
-      </div>
-    </form>
+  <FlowRail {completedToday} />
 
-    <div class="section-heading">
-      <h2>Open</h2>
-      <span id="open-count">{pendingTodos.length} open</span>
-    </div>
-    <ul class="todo-list" id="todo-list">
-      {#each pendingTodos as todo (todo.id)}
-        {@const isRunning = Boolean(todo.activeStartedAt)}
-        {@const elapsedSeconds = getElapsedSeconds(todo)}
-        {@const timerAction = isRunning ? 'pause' : 'start'}
-        {@const timerText = isRunning ? 'Pause' : elapsedSeconds > 0 ? 'Resume' : 'Start'}
-        <li class:is-running={isRunning} class:is-new-block={newlyAddedTodoId === todo.id} class="todo-item">
-          <span class="task-block-dot" aria-hidden="true"></span>
-          <div class="task-content">
-            {#if editingTaskId === todo.id}
-              <input
-                class="task-title-input"
-                data-title-input={todo.id}
-                value={todo.title}
-                aria-label={`Edit ${todo.title} title`}
-                on:keydown={(event) => handleTitleKeydown(event, todo.id, event.currentTarget.value)}
-                on:focusout={(event) => commitTitleEdit(todo.id, event.currentTarget.value)}
-              />
-            {:else}
-              <span
-                class="task-title"
-                data-title-id={todo.id}
-                title="Double-click to rename"
-                role="button"
-                tabindex="0"
-                on:dblclick={() => startTitleEdit(todo.id)}
-                on:keydown={(event) => event.key === 'Enter' && startTitleEdit(todo.id)}
-              >
-                {@html linkifyText(todo.title)}
-              </span>
-            {/if}
-            <span class:is-live={isRunning} class="task-duration" data-timer-label={todo.id}>
-              {isRunning ? 'Tracking' : 'Duration'} {formatDuration(elapsedSeconds)}
-            </span>
-          </div>
-          <div class="task-actions">
-            <button type="button" class="timer-button" on:click={() => handleTimerAction(timerAction, todo.id)} aria-label={`${timerText} ${todo.title} timer`}>
-              {@html isRunning ? iconPause() : iconPlay()}
-              <span>{timerText}</span>
-            </button>
-            <button type="button" class="open-task-button" on:click={() => openTask(todo.id)} aria-label={`Open ${todo.title} details`}>
-              {@html iconPage()}
-              <span>Open</span>
-            </button>
-            <button type="button" on:click={() => handleComplete(todo.id)} aria-label={`Mark ${todo.title} done`}>
-              {@html iconCheck()}
-              <span>Done</span>
-            </button>
-          </div>
-        </li>
-      {/each}
-      {#if draftTitle}
-        <li class="block-insertion-cue" aria-live="polite">
-          <span class="block-insertion-line" aria-hidden="true"></span>
-          <span class="block-insertion-label">New block lands here</span>
-        </li>
-      {/if}
-      {#if pendingTodos.length === 0}
-        <li class="empty-state">No open tasks. Add one when the next thing appears.</li>
-      {/if}
-    </ul>
-  </section>
+  <SummaryPanel
+    {summary}
+    bind:selectedDay
+    {draggedSummaryId}
+    {dropTargetId}
+    onOpenTask={openTask}
+    onDragStart={handleDragStart}
+    onDragEnd={handleDragEnd}
+    onDragOver={handleDragOver}
+    onDrop={handleDrop}
+    {completedTime}
+  />
 
-  <div class="flow-rail" aria-label="Today progress">
-    <output class="done-count" id="done-count" aria-label="Completed today">{completedToday} done today</output>
-    <span class="rail-line" aria-hidden="true"></span>
-    <span class="rail-caption">Done log</span>
-  </div>
-
-  <aside class="summary-panel" aria-labelledby="summary-heading">
-    <div class="summary-top">
-      <div>
-        <p class="eyebrow">Daily ledger</p>
-        <h2 id="summary-heading">Today recap</h2>
-      </div>
-      <input id="summary-date" type="date" bind:value={selectedDay} />
-    </div>
-    <div class="day-rhythm" aria-hidden="true">
-      <span>Morning</span>
-      <span>Lunch</span>
-      <span>Afternoon</span>
-      <span>Evening</span>
-    </div>
-    <div class="summary-list" id="summary-list">
-      {#if summary.length}
-        {#each summary as section (section.label)}
-          <section class="summary-section" aria-label={section.label}>
-            <h3>{section.label}</h3>
-            <ol>
-              {#each section.items as item (item.id)}
-                <li
-                  draggable="true"
-                  data-summary-id={item.id}
-                  class:is-dragging={draggedSummaryId === item.id}
-                  class:is-drop-target={dropTargetId === item.id}
-                  on:dragstart={(event) => handleDragStart(event, item.id)}
-                  on:dragend={handleDragEnd}
-                  on:dragover={(event) => handleDragOver(event, item.id)}
-                  on:drop={(event) => handleDrop(event, item.id)}
-                >
-                  <time datetime={item.completedAt}>{completedTime(item.completedAt)}</time>
-                  <div class="summary-block">
-                    <span class="summary-title">{@html linkifyText(item.title)}</span>
-                    <span class="summary-duration">{item.durationLabel}</span>
-                  </div>
-                  <button type="button" class="open-task-button" on:click={() => openTask(item.id)} aria-label={`Open ${item.title} details`}>
-                    {@html iconPage()}
-                    <span>Open</span>
-                  </button>
-                </li>
-              {/each}
-            </ol>
-          </section>
-        {/each}
-      {:else}
-        <div class="empty-summary">
-          <strong>No finished tasks for this date.</strong>
-          <span>Complete a task and it will land here automatically.</span>
-        </div>
-      {/if}
-    </div>
-  </aside>
-
-  <aside class:is-open={selectedTask} class="task-detail" id="task-detail" aria-labelledby="detail-heading" aria-hidden={String(!selectedTask)}>
-    <div class="detail-header">
-      <div>
-        <p class="eyebrow">Task page</p>
-        <h2 id="detail-heading">Details</h2>
-      </div>
-      <button type="button" class="detail-close" id="detail-close" aria-label="Close task details" on:click={closeTask}>Close</button>
-    </div>
-    {#if selectedTask}
-      <p class="detail-title" id="detail-title">{@html linkifyText(selectedTask.title)}</p>
-      <label class="detail-note-label" for="detail-note">Notes</label>
-      <textarea
-        id="detail-note"
-        class="detail-note"
-        placeholder="Add context, links, or reminders for this task."
-        bind:value={noteDraft}
-        on:input={handleNoteInput}
-      ></textarea>
-      <p class="detail-meta" id="detail-meta">{detailMeta(selectedTask)}</p>
-    {/if}
-  </aside>
+  <TaskDetail
+    {selectedTask}
+    bind:noteDraft
+    onClose={closeTask}
+    onNoteInput={handleNoteInput}
+    {detailMeta}
+  />
 </main>
