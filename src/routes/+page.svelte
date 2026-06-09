@@ -33,6 +33,9 @@
   } from '../todoRemote.js';
   import { getOrCreateClientId, loadLocalState, saveLocalState } from '../todoPersistence.js';
 
+  const TIMER_SYNC_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds'];
+  const COMPLETION_SYNC_FIELDS = ['completedAt'];
+
   let state = createInitialState();
   let selectedDay = formatDayKey(new Date());
   let syncMessage = 'Local only';
@@ -99,19 +102,13 @@
     draftTitle = '';
     titleDraft = '';
     saveLocalState(state);
-    syncMessage = 'Saving';
     window.setTimeout(() => {
       if (newlyAddedTodoId === createdTodo.id) {
         newlyAddedTodoId = null;
       }
     }, 700);
 
-    try {
-      await persistNewTodo(createdTodo);
-      renderRemoteStatus();
-    } catch (error) {
-      syncMessage = `Offline cache: ${error.message}`;
-    }
+    await syncRemoteChange('Saving', () => persistNewTodo(createdTodo));
   }
 
   function handleDraftInput() {
@@ -127,14 +124,7 @@
     }
     selectedDay = formatDayKey(new Date());
     saveLocalState(state);
-    syncMessage = 'Saving';
-
-    try {
-      await persistCompletedTodo(completedTodo);
-      renderRemoteStatus();
-    } catch (error) {
-      syncMessage = `Offline cache: ${error.message}`;
-    }
+    await syncRemoteChange('Saving', () => persistCompletedTodo(completedTodo));
   }
 
   async function handleTimerAction(action, todoId) {
@@ -142,14 +132,7 @@
     state = action === 'pause' ? pauseTodoTimer(state, todoId) : startTodoTimer(state, todoId);
     const changedTodos = getTimerChangedTodos(beforeTodos, state.todos);
     saveLocalState(state);
-    syncMessage = 'Saving time';
-
-    try {
-      await Promise.all(changedTodos.map((todo) => persistTodoTimer(todo)));
-      renderRemoteStatus();
-    } catch (error) {
-      syncMessage = `Offline cache: ${error.message}`;
-    }
+    await syncRemoteChange('Saving time', () => Promise.all(changedTodos.map((todo) => persistTodoTimer(todo))));
   }
 
   async function startTitleEdit(todoId) {
@@ -176,12 +159,7 @@
       return;
     }
 
-    try {
-      await persistTodoTitle(after);
-      renderRemoteStatus();
-    } catch (error) {
-      syncMessage = `Offline cache: ${error.message}`;
-    }
+    await syncRemoteChange('Saving title', () => persistTodoTitle(after));
   }
 
   function handleTitleKeydown(event, todoId, title) {
@@ -232,12 +210,7 @@
     window.clearTimeout(noteSaveTimer);
     noteSaveTimer = window.setTimeout(async () => {
       const todo = findTodo(selectedTaskId);
-      try {
-        await persistTodoNote(todo);
-        renderRemoteStatus();
-      } catch (error) {
-        syncMessage = `Offline cache: ${error.message}`;
-      }
+      await syncRemoteChange('Saving note', () => persistTodoNote(todo));
     }, 450);
   }
 
@@ -300,13 +273,7 @@
     }
 
     saveLocalState(state);
-    syncMessage = 'Saving order';
-    try {
-      await persistCompletionChangedTodos(changedTodos);
-      renderRemoteStatus();
-    } catch (error) {
-      syncMessage = `Offline cache: ${error.message}`;
-    }
+    await syncRemoteChange('Saving order', () => persistCompletionChangedTodos(changedTodos));
   }
 
   async function hydrateRemoteTodos() {
@@ -330,7 +297,18 @@
       saveLocalState(state);
       renderRemoteStatus(remoteTodos.length);
     } catch (error) {
-      syncMessage = `Offline cache: ${error.message}`;
+      showOfflineCache(error);
+    }
+  }
+
+  async function syncRemoteChange(statusMessage, syncAction) {
+    syncMessage = statusMessage;
+
+    try {
+      await syncAction();
+      renderRemoteStatus();
+    } catch (error) {
+      showOfflineCache(error);
     }
   }
 
@@ -368,26 +346,28 @@
     syncMessage = useRemote ? `Cloud synced: ${count}` : 'Local only';
   }
 
+  function showOfflineCache(error) {
+    syncMessage = `Offline cache: ${error.message}`;
+  }
+
   function findTodo(todoId) {
     return state.todos.find((todo) => todo.id === todoId);
   }
 
   function getTimerChangedTodos(beforeTodos, afterTodos) {
-    const beforeById = new Map(beforeTodos.map((todo) => [todo.id, todo]));
-    return afterTodos.filter((todo) => {
-      const before = beforeById.get(todo.id);
-      return (
-        before &&
-        (before.firstStartedAt !== todo.firstStartedAt ||
-          before.activeStartedAt !== todo.activeStartedAt ||
-          before.trackedSeconds !== todo.trackedSeconds)
-      );
-    });
+    return getTodosWithChangedFields(beforeTodos, afterTodos, TIMER_SYNC_FIELDS);
   }
 
   function getCompletionChangedTodos(beforeTodos, afterTodos) {
+    return getTodosWithChangedFields(beforeTodos, afterTodos, COMPLETION_SYNC_FIELDS);
+  }
+
+  function getTodosWithChangedFields(beforeTodos, afterTodos, fields) {
     const beforeById = new Map(beforeTodos.map((todo) => [todo.id, todo]));
-    return afterTodos.filter((todo) => beforeById.get(todo.id)?.completedAt !== todo.completedAt);
+    return afterTodos.filter((todo) => {
+      const before = beforeById.get(todo.id);
+      return before && fields.some((field) => before[field] !== todo[field]);
+    });
   }
 
   function completedTime(completedAt) {
