@@ -59,6 +59,9 @@
                   <time datetime={item.completedAt}>{completedTime(item.completedAt)}</time>
                   <div class="summary-block">
                     <span class="summary-title">{@html linkifyText(item.title)}</span>
+                    {#if item.progressLabel}
+                      <span class="summary-progress">{item.progressLabel}</span>
+                    {/if}
                     <span class="summary-duration">{item.durationLabel}</span>
                   </div>
                   <button type="button" class="open-task-button" on:click={() => onOpenTask(item.id)} aria-label={`Open ${item.title} details`}>

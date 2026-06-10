@@ -14,11 +14,15 @@
     formatDuration,
     getDaySummary,
     getElapsedSeconds,
+    getProgressSessions,
+    logProgressSession,
     moveCompletedTodoToSummaryBucket,
     getPendingTodos,
     pauseTodoTimer,
+    setTodoProgressive,
     startTodoTimer,
     updateTodoNote,
+    updateTodoProgress,
     updateTodoTitle,
   } from '../todoStore.js';
   import { insforge, isInsForgeConfigured } from '../insforgeClient.js';
@@ -28,6 +32,7 @@
     loadRemoteTodos,
     updateRemoteTodoCompletion,
     updateRemoteTodoNote,
+    updateRemoteTodoProgress,
     updateRemoteTodoTimer,
     updateRemoteTodoTitle,
   } from '../todoRemote.js';
@@ -50,6 +55,7 @@
   let newlyAddedTodoId = null;
   let liveTimer = null;
   let noteSaveTimer = null;
+  let progressSaveTimer = null;
   let titleSaveTimer = null;
   let draggedSummaryId = null;
   let dropTargetId = null;
@@ -59,9 +65,14 @@
   let themeMode = 'light';
 
   $: pendingTodos = getPendingTodos(state);
+  $: pendingViewTodos = pendingTodos.map((todo) => ({
+    ...todo,
+    latestProgressSession: getProgressSessions(state, todo.id)[0] ?? null,
+  }));
   $: summary = getDaySummary(state, selectedDay);
   $: completedToday = summary.reduce((total, section) => total + section.items.length, 0);
-  $: selectedTask = findTodo(selectedTaskId);
+  $: selectedTask = state.todos.find((todo) => todo.id === selectedTaskId);
+  $: selectedTaskSessions = selectedTaskId ? getProgressSessions(state, selectedTaskId) : [];
 
   onMount(() => {
     useRemote = isInsForgeConfigured && !new URLSearchParams(window.location.search).has('local');
@@ -76,6 +87,7 @@
   onDestroy(() => {
     window.clearInterval(liveTimer);
     window.clearTimeout(noteSaveTimer);
+    window.clearTimeout(progressSaveTimer);
     window.clearTimeout(titleSaveTimer);
     window.clearTimeout(completionCueTimer);
   });
@@ -122,14 +134,29 @@
   }
 
   async function handleComplete(todoId) {
-    state = completeTodo(state, todoId);
-    const completedTodo = findTodo(todoId);
+    const beforeTodos = state.todos;
+    const beforeTodo = findTodo(todoId);
+    state = logProgressSession(state, todoId);
+    const afterTodo = findTodo(todoId);
+    const createdTodo = state.todos.find((todo) => !beforeTodos.some((before) => before.id === todo.id));
+    const completedTodo = createdTodo ?? afterTodo;
+
     triggerCompletionCue(completedTodo);
-    if (selectedTaskId === todoId) {
+    if (!beforeTodo?.isProgressive && selectedTaskId === todoId) {
       selectedTaskId = null;
     }
     selectedDay = formatDayKey(new Date());
     saveLocalState(state);
+
+    if (beforeTodo?.isProgressive) {
+      await syncRemoteChange('Saving session', async () => {
+        await persistTodoTimer(afterTodo);
+        await persistTodoProgress(afterTodo);
+        await persistNewTodo(createdTodo);
+      });
+      return;
+    }
+
     await syncRemoteChange('Saving', () => persistCompletedTodo(completedTodo));
   }
 
@@ -227,6 +254,24 @@
     noteSaveTimer = window.setTimeout(async () => {
       const todo = findTodo(selectedTaskId);
       await syncRemoteChange('Saving note', () => persistTodoNote(todo));
+    }, 450);
+  }
+
+  async function handleProgressiveChange(todoId, isProgressive) {
+    state = setTodoProgressive(state, todoId, isProgressive);
+    const todo = findTodo(todoId);
+    saveLocalState(state);
+    await syncRemoteChange('Saving progress', () => persistTodoProgress(todo));
+  }
+
+  function handleProgressInput(todoId, progressLabel) {
+    state = updateTodoProgress(state, todoId, progressLabel);
+    saveLocalState(state);
+    syncMessage = 'Saving progress';
+    window.clearTimeout(progressSaveTimer);
+    progressSaveTimer = window.setTimeout(async () => {
+      const todo = findTodo(todoId);
+      await syncRemoteChange('Saving progress', () => persistTodoProgress(todo));
     }, 450);
   }
 
@@ -355,6 +400,11 @@
     await updateRemoteTodoTitle(insforge, clientId, todo);
   }
 
+  async function persistTodoProgress(todo) {
+    if (!useRemote || !todo) return;
+    await updateRemoteTodoProgress(insforge, clientId, todo);
+  }
+
   async function persistTodoTimer(todo) {
     if (!useRemote || !todo) return;
     await updateRemoteTodoTimer(insforge, clientId, todo);
@@ -426,7 +476,7 @@
 <main class="workspace" aria-label="Done Log todo app">
   <TaskPanel
     {syncMessage}
-    {pendingTodos}
+    pendingTodos={pendingViewTodos}
     bind:titleDraft
     {draftTitle}
     {editingTaskId}
@@ -463,10 +513,15 @@
 
   <TaskDetail
     {selectedTask}
+    {selectedTaskSessions}
     bind:noteDraft
     onClose={closeTask}
     onNoteInput={handleNoteInput}
     onDetailTitleCommit={handleDetailTitleCommit}
+    onProgressiveChange={handleProgressiveChange}
+    onProgressInput={handleProgressInput}
+    {formatDuration}
+    {completedTime}
     {detailMeta}
   />
 

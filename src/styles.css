@@ -230,6 +230,7 @@ h2 {
 .summary-top input,
 .task-title-input,
 .detail-title-input,
+.progress-input,
 .detail-note {
   min-width: 0;
   border: 1px solid var(--border);
@@ -410,7 +411,9 @@ h2 {
 }
 
 .task-duration,
-.summary-duration {
+.summary-duration,
+.summary-progress,
+.task-progress-label {
   color: var(--subtle);
   font-size: 12px;
   font-weight: 500;
@@ -418,6 +421,11 @@ h2 {
 
 .task-duration.is-live {
   color: var(--strong);
+}
+
+.task-progress-label,
+.summary-progress {
+  overflow-wrap: anywhere;
 }
 
 .task-title a,
@@ -783,6 +791,49 @@ h2 {
   font-weight: 500;
 }
 
+.progress-toggle {
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--empty-surface);
+  color: var(--strong);
+}
+
+.progress-toggle input {
+  width: 16px;
+  height: 16px;
+  margin: 2px 0 0;
+  accent-color: var(--strong);
+}
+
+.progress-toggle span {
+  display: grid;
+  gap: 2px;
+}
+
+.progress-toggle strong {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.progress-toggle small,
+.session-history small {
+  color: var(--subtle);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.progress-input {
+  width: 100%;
+  min-height: 42px;
+  padding: 0 12px;
+  font-size: 14px;
+}
+
 .detail-note {
   width: 100%;
   min-height: 220px;
@@ -798,6 +849,59 @@ h2 {
   margin: 0;
   color: var(--default);
   font-size: 13px;
+}
+
+.session-history {
+  display: grid;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.session-history h3,
+.session-history p,
+.session-history ol {
+  margin: 0;
+}
+
+.session-history h3 {
+  color: var(--subtle);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.session-history ol {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.session-history li {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--block-surface);
+}
+
+.session-history time {
+  color: var(--default);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+}
+
+.session-history span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--strong);
+  font-size: 13px;
+  font-weight: 500;
 }
 
 @media (max-width: 900px) {

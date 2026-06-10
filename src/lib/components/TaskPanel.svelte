@@ -67,6 +67,7 @@
     {#each pendingTodos as todo (todo.id)}
       {@const isRunning = Boolean(todo.activeStartedAt)}
       {@const elapsedSeconds = getElapsedSeconds(todo)}
+      {@const latestSession = todo.latestProgressSession}
       {@const timerAction = isRunning ? 'pause' : 'start'}
       {@const timerText = isRunning ? 'Pause' : elapsedSeconds > 0 ? 'Resume' : 'Start'}
       <li class:is-running={isRunning} class:is-new-block={newlyAddedTodoId === todo.id} class="todo-item">
@@ -95,8 +96,20 @@
             </span>
           {/if}
           <span class:is-live={isRunning} class="task-duration" data-timer-label={todo.id}>
-            {isRunning ? 'Tracking' : 'Duration'} {formatDuration(elapsedSeconds)}
+            {#if todo.isProgressive}
+              {isRunning ? 'Tracking session' : 'Session'} {formatDuration(elapsedSeconds)}
+            {:else}
+              {isRunning ? 'Tracking' : 'Duration'} {formatDuration(elapsedSeconds)}
+            {/if}
           </span>
+          {#if todo.isProgressive}
+            <span class="task-progress-label">
+              {todo.progressLabel || 'Add session note in task page'}
+              {#if latestSession}
+                · last {formatDuration(latestSession.trackedSeconds)}
+              {/if}
+            </span>
+          {/if}
         </div>
         <div class="task-actions">
           <button type="button" class="timer-button" on:click={() => onTimerAction(timerAction, todo.id)} aria-label={`${timerText} ${todo.title} timer`}>
@@ -107,9 +120,9 @@
             {@html iconPage()}
             <span>Open</span>
           </button>
-          <button type="button" on:click={() => onComplete(todo.id)} aria-label={`Mark ${todo.title} done`}>
+          <button type="button" on:click={() => onComplete(todo.id)} aria-label={todo.isProgressive ? `Log ${todo.title} session` : `Mark ${todo.title} done`}>
             {@html iconCheck()}
-            <span>Done</span>
+            <span>{todo.isProgressive ? 'Log session' : 'Done'}</span>
           </button>
         </div>
       </li>

@@ -22,6 +22,7 @@ try {
     ...assertFixedDocumentScroll(desktop),
     ...assertRecapRhythm(desktop),
     ...assertDetailEditing(desktop),
+    ...assertProgressiveSession(desktop),
     ...assertGlassSurface(desktop, '.task-panel', 'task panel'),
     ...assertGlassSurface(desktop, '.summary-panel', 'summary panel'),
     ...assertExists(desktop, '.flow-rail', 'frosted focus rail'),
@@ -198,16 +199,28 @@ async function exerciseDetailEditing(page) {
   await page.fill('#detail-note', 'Smoke note');
   await page.fill('#detail-title-input', 'Smoke renamed task');
   await page.locator('#detail-title-input').blur();
+  await page.waitForFunction(() => document.querySelector('#detail-title-input')?.value === 'Smoke renamed task');
+  await page.locator('.progress-toggle input').check();
+  await page.fill('#progress-label', 'pages 41-52');
+  await page.click('.todo-item button[aria-label^="Log"]');
   await page.waitForTimeout(100);
 
   return page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     const todo = state.todos.find((item) => item.id === 'ui-smoke-local-task');
+    const session = state.todos.find((item) => item.parentTaskId === 'ui-smoke-local-task');
     return {
       noteValue: document.querySelector('#detail-note')?.value,
       titleValue: document.querySelector('#detail-title-input')?.value,
       storedNote: todo?.note,
       storedTitle: todo?.title,
+      storedIsProgressive: todo?.isProgressive,
+      storedProgressLabel: todo?.progressLabel,
+      parentStillOpen: todo?.completedAt === null,
+      sessionTitle: session?.title,
+      sessionProgressLabel: session?.progressLabel,
+      sessionCompleted: Boolean(session?.completedAt),
+      recapProgress: Array.from(document.querySelectorAll('.summary-progress')).map((element) => element.textContent.trim()),
     };
   });
 }
@@ -294,4 +307,17 @@ function assertDetailEditing(result) {
     editChecks.storedTitle === 'Smoke renamed task'
     ? []
     : [`detail editing failed: ${JSON.stringify(editChecks)}`];
+}
+
+function assertProgressiveSession(result) {
+  const editChecks = result.editChecks;
+  return editChecks.storedIsProgressive === true &&
+    editChecks.storedProgressLabel === 'pages 41-52' &&
+    editChecks.parentStillOpen === true &&
+    editChecks.sessionTitle === 'Smoke renamed task' &&
+    editChecks.sessionProgressLabel === 'pages 41-52' &&
+    editChecks.sessionCompleted === true &&
+    editChecks.recapProgress.includes('pages 41-52')
+    ? []
+    : [`progressive session failed: ${JSON.stringify(editChecks)}`];
 }
