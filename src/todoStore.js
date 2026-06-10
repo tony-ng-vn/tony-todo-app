@@ -6,7 +6,7 @@ const SUMMARY_BUCKETS = [
 ];
 
 export function createInitialState(todos = []) {
-  return { todos };
+  return { todos: todos.map(normalizeTodo) };
 }
 
 export function addTodo(state, title, createdAt = new Date()) {
@@ -33,6 +33,10 @@ export function addTodo(state, title, createdAt = new Date()) {
         firstStartedAt: null,
         activeStartedAt: null,
         trackedSeconds: 0,
+        isProgressive: false,
+        parentTaskId: null,
+        isProgressSession: false,
+        progressLabel: '',
       },
     ],
   };
@@ -102,7 +106,7 @@ export function pauseTodoTimer(state, todoId, pausedAt = new Date()) {
 
 export function getPendingTodos(state) {
   return state.todos
-    .filter((todo) => !todo.completedAt)
+    .filter((todo) => !todo.completedAt && !todo.isProgressSession)
     .toSorted((first, second) => new Date(first.createdAt) - new Date(second.createdAt));
 }
 
@@ -129,6 +133,9 @@ export function getDaySummary(state, dayKey) {
       note: todo.note ?? '',
       durationSeconds: normalizedTrackedSeconds(todo),
       durationLabel: formatDuration(normalizedTrackedSeconds(todo)),
+      parentTaskId: todo.parentTaskId ?? null,
+      isProgressSession: Boolean(todo.isProgressSession),
+      progressLabel: todo.progressLabel ?? '',
     });
   }
 
@@ -152,6 +159,67 @@ export function updateTodoTitle(state, todoId, title) {
     ...state,
     todos: state.todos.map((todo) => (todo.id === todoId ? { ...todo, title: cleanTitle } : todo)),
   };
+}
+
+export function setTodoProgressive(state, todoId, isProgressive) {
+  return {
+    ...state,
+    todos: state.todos.map((todo) =>
+      todo.id === todoId && !todo.isProgressSession
+        ? {
+            ...todo,
+            isProgressive: Boolean(isProgressive),
+          }
+        : todo,
+    ),
+  };
+}
+
+export function updateTodoProgress(state, todoId, progressLabel) {
+  return {
+    ...state,
+    todos: state.todos.map((todo) =>
+      todo.id === todoId
+        ? {
+            ...todo,
+            progressLabel: progressLabel.trim(),
+          }
+        : todo,
+    ),
+  };
+}
+
+export function logProgressSession(state, todoId, completedAt = new Date()) {
+  const parent = state.todos.find((todo) => todo.id === todoId);
+
+  if (!parent?.isProgressive) {
+    return completeTodo(state, todoId, completedAt);
+  }
+
+  const session = createProgressSession(parent, completedAt);
+
+  return {
+    ...state,
+    todos: [
+      ...state.todos.map((todo) =>
+        todo.id === todoId
+          ? {
+              ...todo,
+              firstStartedAt: null,
+              activeStartedAt: null,
+              trackedSeconds: 0,
+            }
+          : todo,
+      ),
+      session,
+    ],
+  };
+}
+
+export function getProgressSessions(state, parentTaskId) {
+  return state.todos
+    .filter((todo) => todo.parentTaskId === parentTaskId && todo.isProgressSession)
+    .toSorted((first, second) => new Date(second.completedAt) - new Date(first.completedAt));
 }
 
 export function reorderCompletedTodosForDay(state, dayKey, orderedIds) {
@@ -267,6 +335,50 @@ export function createTodoId(title, date) {
 
 function normalizedTrackedSeconds(todo) {
   return Math.max(0, Math.floor(Number(todo.trackedSeconds ?? 0)));
+}
+
+function normalizeTodo(todo) {
+  return {
+    ...todo,
+    note: todo.note ?? '',
+    source: todo.source ?? 'app',
+    notionPageId: todo.notionPageId ?? null,
+    notionDatabaseId: todo.notionDatabaseId ?? null,
+    notionStatus: todo.notionStatus ?? null,
+    firstStartedAt: todo.firstStartedAt ?? null,
+    activeStartedAt: todo.activeStartedAt ?? null,
+    trackedSeconds: normalizedTrackedSeconds(todo),
+    isProgressive: Boolean(todo.isProgressive),
+    parentTaskId: todo.parentTaskId ?? null,
+    isProgressSession: Boolean(todo.isProgressSession),
+    progressLabel: todo.progressLabel ?? '',
+  };
+}
+
+function createProgressSession(parent, completedAt) {
+  const doneAt = completedAt.toISOString();
+  const trackedSeconds = getElapsedSeconds(parent, completedAt);
+
+  return {
+    ...normalizeTodo({
+      id: createProgressSessionId(parent.id, completedAt),
+      title: parent.title,
+      createdAt: parent.activeStartedAt ?? completedAt.toISOString(),
+      completedAt: doneAt,
+      note: parent.progressLabel ?? '',
+      source: 'progress-session',
+      parentTaskId: parent.id,
+      isProgressSession: true,
+      progressLabel: parent.progressLabel ?? '',
+      firstStartedAt: parent.firstStartedAt ?? null,
+      activeStartedAt: null,
+      trackedSeconds,
+    }),
+  };
+}
+
+function createProgressSessionId(parentId, completedAt) {
+  return `${completedAt.getTime()}-${parentId.slice(0, 24)}-session`;
 }
 
 function completedAtForBucketPosition(dayKey, bucketLabel, index) {

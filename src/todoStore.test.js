@@ -5,12 +5,16 @@ import {
   createInitialState,
   getDaySummary,
   getPendingTodos,
+  getProgressSessions,
   formatDuration,
   getElapsedSeconds,
+  logProgressSession,
   moveCompletedTodoToSummaryBucket,
   pauseTodoTimer,
   reorderCompletedTodosForDay,
+  setTodoProgressive,
   startTodoTimer,
+  updateTodoProgress,
   updateTodoTitle,
   updateTodoNote,
 } from './todoStore.js';
@@ -57,6 +61,9 @@ describe('todo day summary', () => {
           note: '',
           durationSeconds: 0,
           durationLabel: '0m',
+          parentTaskId: null,
+          isProgressSession: false,
+          progressLabel: '',
         },
       ],
     });
@@ -210,5 +217,58 @@ describe('todo day summary', () => {
       durationSeconds: 1810,
       durationLabel: '30m',
     });
+  });
+
+  it('logs a progressive task session without completing the parent task', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Read Atomic Habits', new Date('2026-06-09T08:00:00'));
+    const parentId = state.todos[0].id;
+
+    state = setTodoProgressive(state, parentId, true);
+    state = updateTodoProgress(state, parentId, 'pages 41-52');
+    const doneAt = new Date('2026-06-09T20:28:00');
+    state = startTodoTimer(state, parentId, new Date('2026-06-09T20:00:00'));
+    state = logProgressSession(state, parentId, doneAt);
+
+    const parent = state.todos.find((todo) => todo.id === parentId);
+    const sessions = getProgressSessions(state, parentId);
+
+    expect(parent).toMatchObject({
+      title: 'Read Atomic Habits',
+      isProgressive: true,
+      completedAt: null,
+      activeStartedAt: null,
+      trackedSeconds: 0,
+      progressLabel: 'pages 41-52',
+    });
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]).toMatchObject({
+      title: 'Read Atomic Habits',
+      parentTaskId: parentId,
+      isProgressSession: true,
+      progressLabel: 'pages 41-52',
+      completedAt: doneAt.toISOString(),
+      trackedSeconds: 28 * 60,
+    });
+    expect(getPendingTodos(state).map((todo) => todo.id)).toContain(parentId);
+    const summaryItem = getDaySummary(state, '2026-06-09')
+      .flatMap((section) => section.items)
+      .find((item) => item.parentTaskId === parentId);
+    expect(summaryItem).toMatchObject({
+      title: 'Read Atomic Habits',
+      progressLabel: 'pages 41-52',
+      durationLabel: '28m',
+    });
+  });
+
+  it('falls back to normal completion for non-progressive tasks', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Submit form', new Date('2026-06-09T08:00:00'));
+    const doneAt = new Date('2026-06-09T09:00:00');
+
+    state = logProgressSession(state, state.todos[0].id, doneAt);
+
+    expect(state.todos).toHaveLength(1);
+    expect(state.todos[0].completedAt).toBe(doneAt.toISOString());
   });
 });

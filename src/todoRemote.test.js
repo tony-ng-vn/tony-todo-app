@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { fromRemoteRecord, toRemoteRecord, updateRemoteTodoTimer, updateRemoteTodoTitle } from './todoRemote.js';
+import { fromRemoteRecord, toRemoteRecord, updateRemoteTodoProgress, updateRemoteTodoTimer, updateRemoteTodoTitle } from './todoRemote.js';
 
 describe('todo remote mapping', () => {
   it('maps local todos to InsForge records with a client scope', () => {
@@ -14,6 +14,10 @@ describe('todo remote mapping', () => {
           firstStartedAt: '2026-06-08T08:10:00.000Z',
           activeStartedAt: null,
           trackedSeconds: 1800,
+          isProgressive: true,
+          parentTaskId: null,
+          isProgressSession: false,
+          progressLabel: 'pages 41-52',
         },
         'client-123',
       ),
@@ -31,6 +35,10 @@ describe('todo remote mapping', () => {
       first_started_at: '2026-06-08T08:10:00.000Z',
       active_started_at: null,
       tracked_seconds: 1800,
+      is_progressive: true,
+      parent_task_id: null,
+      is_progress_session: false,
+      progress_label: 'pages 41-52',
     });
   });
 
@@ -49,6 +57,10 @@ describe('todo remote mapping', () => {
         first_started_at: '2026-06-08T08:10:00.000Z',
         active_started_at: null,
         tracked_seconds: 1800,
+        is_progressive: true,
+        parent_task_id: null,
+        is_progress_session: false,
+        progress_label: 'Chapter 4',
       }),
     ).toEqual({
       id: 'todo-1',
@@ -63,6 +75,10 @@ describe('todo remote mapping', () => {
       firstStartedAt: '2026-06-08T08:10:00.000Z',
       activeStartedAt: null,
       trackedSeconds: 1800,
+      isProgressive: true,
+      parentTaskId: null,
+      isProgressSession: false,
+      progressLabel: 'Chapter 4',
     });
   });
 
@@ -136,6 +152,46 @@ describe('todo remote mapping', () => {
       first_started_at: '2026-06-08T08:10:00.000Z',
       active_started_at: '2026-06-08T08:20:00.000Z',
       tracked_seconds: 600,
+    });
+    expect(calls).toContainEqual(['eq', 'id', 'todo-1']);
+    expect(calls).toContainEqual(['eq', 'client_id', 'client-123']);
+  });
+
+  it('updates remote progress fields scoped by client id', async () => {
+    const calls = [];
+    const client = {
+      database: {
+        from(table) {
+          calls.push(['from', table]);
+          return {
+            update(values) {
+              calls.push(['update', values]);
+              return {
+                eq(column, value) {
+                  calls.push(['eq', column, value]);
+                  return this;
+                },
+                then(resolve) {
+                  resolve({ error: null });
+                },
+              };
+            },
+          };
+        },
+      },
+    };
+
+    await updateRemoteTodoProgress(client, 'client-123', {
+      id: 'todo-1',
+      isProgressive: true,
+      progressLabel: 'pages 41-52',
+    });
+
+    expect(calls[0]).toEqual(['from', 'todos']);
+    expect(calls[1][0]).toBe('update');
+    expect(calls[1][1]).toMatchObject({
+      is_progressive: true,
+      progress_label: 'pages 41-52',
     });
     expect(calls).toContainEqual(['eq', 'id', 'todo-1']);
     expect(calls).toContainEqual(['eq', 'client_id', 'client-123']);
