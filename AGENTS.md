@@ -19,4 +19,9 @@ Key patterns:
 - Database inserts take an array: `insert([{ ... }])`.
 - Reference users with `auth.users(id)`; use `auth.uid()` in RLS policies.
 - For storage uploads, persist both the returned `url` and `key`.
+
+Design rules:
+
+- Keep this app in the glass design system: translucent surfaces, blurred backdrops, soft inset highlights, and restrained borders.
+- Never ship visible scrollbars. Scrollable regions should remain scrollable but hide native scrollbar rails/thumbs.
 <!-- INSFORGE:END -->

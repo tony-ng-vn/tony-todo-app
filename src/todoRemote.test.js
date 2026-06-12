@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { fromRemoteRecord, toRemoteRecord, updateRemoteTodoProgress, updateRemoteTodoTimer, updateRemoteTodoTitle } from './todoRemote.js';
+import {
+  deleteRemoteTodo,
+  fromRemoteRecord,
+  toRemoteRecord,
+  updateRemoteTodoProgress,
+  updateRemoteTodoTimer,
+  updateRemoteTodoTitle,
+} from './todoRemote.js';
 
 describe('todo remote mapping', () => {
   it('maps local todos to InsForge records with a client scope', () => {
@@ -195,5 +202,39 @@ describe('todo remote mapping', () => {
     });
     expect(calls).toContainEqual(['eq', 'id', 'todo-1']);
     expect(calls).toContainEqual(['eq', 'client_id', 'client-123']);
+  });
+
+  it('deletes a remote todo scoped by client id', async () => {
+    const calls = [];
+    const client = {
+      database: {
+        from(table) {
+          calls.push(['from', table]);
+          return {
+            delete() {
+              calls.push(['delete']);
+              return {
+                eq(column, value) {
+                  calls.push(['eq', column, value]);
+                  return this;
+                },
+                then(resolve) {
+                  resolve({ error: null });
+                },
+              };
+            },
+          };
+        },
+      },
+    };
+
+    await deleteRemoteTodo(client, 'client-123', 'todo-1');
+
+    expect(calls).toEqual([
+      ['from', 'todos'],
+      ['delete'],
+      ['eq', 'id', 'todo-1'],
+      ['eq', 'client_id', 'client-123'],
+    ]);
   });
 });

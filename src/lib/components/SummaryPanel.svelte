@@ -1,4 +1,6 @@
 <script>
+  import { tick } from 'svelte';
+  import CalendarPicker from './CalendarPicker.svelte';
   import { linkifyText } from '../../linkify.js';
   import { iconPage } from './icons.js';
 
@@ -14,7 +16,47 @@
   export let onDrop;
   export let onBucketDragOver;
   export let onBucketDrop;
+  export let onCompletedTimeChange;
   export let completedTime;
+
+  let editingTimeId = null;
+  let timeDraft = '';
+
+  async function startTimeEdit(item) {
+    editingTimeId = item.id;
+    timeDraft = timeInputValue(item.completedAt);
+    await tick();
+    document.querySelector(`#summary-time-edit-${CSS.escape(item.id)}`)?.focus();
+    document.querySelector(`#summary-time-edit-${CSS.escape(item.id)}`)?.select();
+  }
+
+  async function commitTimeEdit(item) {
+    const nextTime = timeDraft.trim();
+    editingTimeId = null;
+
+    if (!nextTime || nextTime === timeInputValue(item.completedAt)) {
+      return;
+    }
+
+    await onCompletedTimeChange(item.id, nextTime);
+  }
+
+  function handleTimeKeydown(event, item) {
+    if (event.key === 'Escape') {
+      editingTimeId = null;
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.currentTarget.blur();
+    }
+  }
+
+  function timeInputValue(completedAt) {
+    const date = new Date(completedAt);
+    return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  }
 </script>
 
 <aside class="summary-panel" aria-labelledby="summary-heading">
@@ -23,7 +65,7 @@
       <p class="eyebrow">Daily ledger</p>
       <h2 id="summary-heading">Today recap</h2>
     </div>
-    <input id="summary-date" type="date" bind:value={selectedDay} />
+    <CalendarPicker id="summary-date" value={selectedDay} label="Select recap date" onChange={(nextDate) => (selectedDay = nextDate)} />
   </div>
   <div class="day-rhythm" aria-hidden="true">
     <span>Morning</span>
@@ -56,7 +98,28 @@
                   on:dragover={(event) => onDragOver(event, item.id, section.label)}
                   on:drop={(event) => onDrop(event, item.id, section.label)}
                 >
-                  <time datetime={item.completedAt}>{completedTime(item.completedAt)}</time>
+                  {#if editingTimeId === item.id}
+                    <input
+                      id={`summary-time-edit-${item.id}`}
+                      class="summary-time-input"
+                      type="time"
+                      step="60"
+                      bind:value={timeDraft}
+                      aria-label={`Edit ${item.title} finished time`}
+                      on:keydown={(event) => handleTimeKeydown(event, item)}
+                      on:focusout={() => commitTimeEdit(item)}
+                    />
+                  {:else}
+                    <button
+                      type="button"
+                      class="summary-time-button"
+                      title="Double-click to edit finished time"
+                      on:dblclick={() => startTimeEdit(item)}
+                      aria-label={`Edit ${item.title} finished time`}
+                    >
+                      <time datetime={item.completedAt}>{completedTime(item.completedAt)}</time>
+                    </button>
+                  {/if}
                   <div class="summary-block">
                     <span class="summary-title">{@html linkifyText(item.title)}</span>
                     {#if item.progressLabel}
@@ -64,7 +127,7 @@
                     {/if}
                     <span class="summary-duration">{item.durationLabel}</span>
                   </div>
-                  <button type="button" class="open-task-button" on:click={() => onOpenTask(item.id)} aria-label={`Open ${item.title} details`}>
+                  <button type="button" class="open-task-button" on:click={(event) => onOpenTask(item.id, event.currentTarget)} aria-label={`Open ${item.title} details`}>
                     {@html iconPage()}
                     <span>Open</span>
                   </button>

@@ -10,10 +10,12 @@
     addTodo,
     completeTodo,
     createInitialState,
+    deleteTodo,
     formatDayKey,
     formatDuration,
     getDaySummary,
     getElapsedSeconds,
+    getMillisecondsUntilNextDay,
     getProgressSessions,
     logProgressSession,
     moveCompletedTodoToSummaryBucket,
@@ -21,6 +23,8 @@
     pauseTodoTimer,
     setTodoProgressive,
     startTodoTimer,
+    updateCompletedTodoTiming,
+    updateTodoCompletedAt,
     updateTodoNote,
     updateTodoProgress,
     updateTodoTitle,
@@ -28,6 +32,7 @@
   import { insforge, isInsForgeConfigured } from '../insforgeClient.js';
   import {
     completeRemoteTodo,
+    deleteRemoteTodo,
     insertRemoteTodo,
     loadRemoteTodos,
     updateRemoteTodoCompletion,
@@ -54,9 +59,11 @@
   let noteDraft = '';
   let newlyAddedTodoId = null;
   let liveTimer = null;
-  let noteSaveTimer = null;
+  let dayRolloverTimer = null;
   let progressSaveTimer = null;
   let titleSaveTimer = null;
+  let detailAnchor = null;
+  let noteDraftTaskId = null;
   let draggedSummaryId = null;
   let dropTargetId = null;
   let dropTargetBucket = null;
@@ -65,10 +72,10 @@
   let themeMode = 'light';
 
   $: pendingTodos = getPendingTodos(state);
-  $: pendingViewTodos = pendingTodos.map((todo) => ({
-    ...todo,
-    latestProgressSession: getProgressSessions(state, todo.id)[0] ?? null,
-  }));
+  $: pendingViewTodos = withLatestProgressSession(pendingTodos);
+  $: ongoingTodos = pendingViewTodos.filter((todo) => todo.activeStartedAt);
+  $: openTodos = pendingViewTodos.filter((todo) => !todo.activeStartedAt);
+  $: openCount = openTodos.length;
   $: summary = getDaySummary(state, selectedDay);
   $: completedToday = summary.reduce((total, section) => total + section.items.length, 0);
   $: selectedTask = state.todos.find((todo) => todo.id === selectedTaskId);
@@ -81,15 +88,22 @@
     state = loadLocalState();
     themeMode = loadThemeMode();
     applyThemeMode(themeMode);
+    window.addEventListener('pointerdown', handleWindowPointerDown);
+    window.addEventListener('focus', syncSelectedDayToToday);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    scheduleSelectedDayRefresh();
     hydrateRemoteTodos();
   });
 
   onDestroy(() => {
     window.clearInterval(liveTimer);
-    window.clearTimeout(noteSaveTimer);
+    window.clearTimeout(dayRolloverTimer);
     window.clearTimeout(progressSaveTimer);
     window.clearTimeout(titleSaveTimer);
     window.clearTimeout(completionCueTimer);
+    window.removeEventListener('pointerdown', handleWindowPointerDown);
+    window.removeEventListener('focus', syncSelectedDayToToday);
+    document.removeEventListener('visibilitychange', handleVisibilityChange);
   });
 
   $: {
@@ -102,8 +116,9 @@
   }
 
   $: {
-    if (selectedTask && noteDraft !== (selectedTask.note ?? '')) {
-      noteDraft = selectedTask.note ?? '';
+    if (selectedTask?.id !== noteDraftTaskId) {
+      noteDraftTaskId = selectedTask?.id ?? null;
+      noteDraft = selectedTask?.note ?? '';
     }
   }
 
@@ -131,6 +146,13 @@
 
   function handleDraftInput() {
     draftTitle = titleDraft.trim();
+  }
+
+  function withLatestProgressSession(todos) {
+    return todos.map((todo) => ({
+      ...todo,
+      latestProgressSession: getProgressSessions(state, todo.id)[0] ?? null,
+    }));
   }
 
   async function handleComplete(todoId) {
@@ -211,18 +233,56 @@
     }
   }
 
-  function openTask(todoId) {
+  function openTask(todoId, triggerElement = null) {
+    detailAnchor = triggerElement ? rectSnapshot(triggerElement) : null;
     selectedTaskId = todoId;
     tick().then(() => document.querySelector('#detail-note')?.focus());
   }
 
   function closeTask() {
     selectedTaskId = null;
+    detailAnchor = null;
+    noteDraftTaskId = null;
+  }
+
+  function handleWindowPointerDown(event) {
+    if (!selectedTaskId) {
+      return;
+    }
+
+    const target = event.target;
+    if (target.closest('#task-detail') || target.closest('.open-task-button') || target.closest('.calendar-popover')) {
+      return;
+    }
+
+    closeTask();
   }
 
   function toggleThemeMode() {
     themeMode = themeMode === 'dark' ? 'light' : 'dark';
     applyThemeMode(themeMode);
+  }
+
+  function handleVisibilityChange() {
+    if (document.visibilityState === 'visible') {
+      syncSelectedDayToToday();
+    }
+  }
+
+  function syncSelectedDayToToday() {
+    const today = formatDayKey(new Date());
+    if (selectedDay !== today) {
+      selectedDay = today;
+    }
+    scheduleSelectedDayRefresh();
+  }
+
+  function scheduleSelectedDayRefresh() {
+    window.clearTimeout(dayRolloverTimer);
+    dayRolloverTimer = window.setTimeout(
+      syncSelectedDayToToday,
+      Math.max(1000, getMillisecondsUntilNextDay(new Date())),
+    );
   }
 
   function triggerCompletionCue(todo) {
@@ -247,14 +307,25 @@
     }
 
     noteDraft = nextNote;
-    state = updateTodoNote(state, selectedTaskId, nextNote);
+  }
+
+  async function handleNoteSave(todoId, nextNote) {
+    const before = findTodo(todoId);
+    state = updateTodoNote(state, todoId, nextNote);
+    const after = findTodo(todoId);
     saveLocalState(state);
-    syncMessage = 'Saving note';
-    window.clearTimeout(noteSaveTimer);
-    noteSaveTimer = window.setTimeout(async () => {
-      const todo = findTodo(selectedTaskId);
-      await syncRemoteChange('Saving note', () => persistTodoNote(todo));
-    }, 450);
+
+    if (!before || !after || before.note === after.note) {
+      renderRemoteStatus();
+      return;
+    }
+
+    await syncRemoteChange('Saving note', () => persistTodoNote(after));
+  }
+
+  async function handleNoteTodoToggle(todoId, nextNote) {
+    noteDraft = nextNote;
+    await handleNoteSave(todoId, nextNote);
   }
 
   async function handleProgressiveChange(todoId, isProgressive) {
@@ -280,6 +351,77 @@
     titleSaveTimer = window.setTimeout(() => {
       commitTodoTitle(todoId, title);
     }, 0);
+  }
+
+  async function handleCompletedAtChange(todoId, dateValue, timeValue) {
+    if (!dateValue || !timeValue) {
+      return;
+    }
+
+    const completedAt = new Date(`${dateValue}T${timeValue}`);
+    if (Number.isNaN(completedAt.getTime())) {
+      return;
+    }
+
+    const beforeTodos = state.todos;
+    state = updateTodoCompletedAt(state, todoId, completedAt);
+    const changedTodos = getCompletionChangedTodos(beforeTodos, state.todos);
+
+    if (changedTodos.length === 0) {
+      return;
+    }
+
+    saveLocalState(state);
+    await syncRemoteChange('Saving finish time', () => persistCompletionChangedTodos(changedTodos));
+  }
+
+  async function handleCompletedTimingChange(todoId, startedAt, completedAt) {
+    const beforeTodos = state.todos;
+    state = updateCompletedTodoTiming(state, todoId, startedAt, completedAt);
+    const changedTodos = getTodosWithChangedFields(beforeTodos, state.todos, [
+      ...TIMER_SYNC_FIELDS,
+      ...COMPLETION_SYNC_FIELDS,
+    ]);
+    const updatedTodo = findTodo(todoId);
+
+    if (updatedTodo?.completedAt) {
+      selectedDay = formatDayKey(new Date(updatedTodo.completedAt));
+    }
+
+    if (changedTodos.length === 0) {
+      return;
+    }
+
+    saveLocalState(state);
+    await syncRemoteChange('Saving time', () => persistCompletionChangedTodos(changedTodos));
+  }
+
+  async function handleSummaryCompletedTimeChange(todoId, timeValue) {
+    const todo = findTodo(todoId);
+    if (!todo?.completedAt) {
+      return;
+    }
+
+    const completedAt = new Date(todo.completedAt);
+    const dateValue = `${completedAt.getFullYear()}-${String(completedAt.getMonth() + 1).padStart(2, '0')}-${String(completedAt.getDate()).padStart(2, '0')}`;
+    await handleCompletedAtChange(todoId, dateValue, timeValue);
+  }
+
+  async function handleDeleteTask(todoId) {
+    const deletedIds = state.todos
+      .filter((todo) => todo.id === todoId || todo.parentTaskId === todoId)
+      .map((todo) => todo.id);
+
+    if (deletedIds.length === 0) {
+      return;
+    }
+
+    state = deleteTodo(state, todoId);
+    if (selectedTaskId === todoId || deletedIds.includes(selectedTaskId)) {
+      selectedTaskId = null;
+    }
+    saveLocalState(state);
+    await syncRemoteChange('Deleting task', () => persistDeletedTodos(deletedIds));
   }
 
   function handleDragStart(event, todoId) {
@@ -415,6 +557,11 @@
     await Promise.all(todosToUpdate.map((todo) => updateRemoteTodoCompletion(insforge, clientId, todo)));
   }
 
+  async function persistDeletedTodos(todoIds) {
+    if (!useRemote) return;
+    await Promise.all(todoIds.map((todoId) => deleteRemoteTodo(insforge, clientId, todoId)));
+  }
+
   function renderRemoteStatus(count = state.todos.length) {
     syncMessage = useRemote ? `Cloud synced: ${count}` : 'Local only';
   }
@@ -439,6 +586,18 @@
 
   function findTodo(todoId) {
     return state.todos.find((todo) => todo.id === todoId);
+  }
+
+  function rectSnapshot(element) {
+    const rect = element.getBoundingClientRect();
+    return {
+      left: rect.left,
+      right: rect.right,
+      top: rect.top,
+      bottom: rect.bottom,
+      width: rect.width,
+      height: rect.height,
+    };
   }
 
   function getTimerChangedTodos(beforeTodos, afterTodos) {
@@ -476,7 +635,9 @@
 <main class="workspace" aria-label="Done Log todo app">
   <TaskPanel
     {syncMessage}
-    pendingTodos={pendingViewTodos}
+    {ongoingTodos}
+    {openTodos}
+    {openCount}
     bind:titleDraft
     {draftTitle}
     {editingTaskId}
@@ -508,18 +669,24 @@
     onDrop={handleDrop}
     onBucketDragOver={handleBucketDragOver}
     onBucketDrop={handleBucketDrop}
+    onCompletedTimeChange={handleSummaryCompletedTimeChange}
     {completedTime}
   />
 
   <TaskDetail
     {selectedTask}
+    {detailAnchor}
     {selectedTaskSessions}
     bind:noteDraft
     onClose={closeTask}
     onNoteInput={handleNoteInput}
+    onNoteSave={handleNoteSave}
+    onNoteTodoToggle={handleNoteTodoToggle}
     onDetailTitleCommit={handleDetailTitleCommit}
     onProgressiveChange={handleProgressiveChange}
     onProgressInput={handleProgressInput}
+    onCompletedTimingChange={handleCompletedTimingChange}
+    onDeleteTask={handleDeleteTask}
     {formatDuration}
     {completedTime}
     {detailMeta}

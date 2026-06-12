@@ -59,6 +59,58 @@ export function completeTodo(state, todoId, completedAt = new Date()) {
   };
 }
 
+export function updateTodoCompletedAt(state, todoId, completedAt) {
+  const doneAt = completedAt.toISOString();
+
+  return {
+    ...state,
+    todos: state.todos.map((todo) =>
+      todo.id === todoId && todo.completedAt
+        ? {
+            ...todo,
+            completedAt: doneAt,
+            activeStartedAt: null,
+          }
+        : todo,
+    ),
+  };
+}
+
+export function deleteTodo(state, todoId) {
+  return {
+    ...state,
+    todos: state.todos.filter((todo) => todo.id !== todoId && todo.parentTaskId !== todoId),
+  };
+}
+
+export function updateCompletedTodoTiming(state, todoId, startedAt, completedAt) {
+  const start = new Date(startedAt);
+  const end = new Date(completedAt);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return state;
+  }
+
+  const startTime = Math.min(start.getTime(), end.getTime());
+  const endTime = Math.max(start.getTime(), end.getTime());
+  const trackedSeconds = Math.floor((endTime - startTime) / 1000);
+
+  return {
+    ...state,
+    todos: state.todos.map((todo) =>
+      todo.id === todoId && todo.completedAt
+        ? {
+            ...todo,
+            firstStartedAt: new Date(startTime).toISOString(),
+            activeStartedAt: null,
+            completedAt: new Date(endTime).toISOString(),
+            trackedSeconds,
+          }
+        : todo,
+    ),
+  };
+}
+
 export function startTodoTimer(state, todoId, startedAt = new Date()) {
   const startedAtIso = startedAt.toISOString();
 
@@ -282,6 +334,12 @@ export function formatDayKey(date) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+export function getMillisecondsUntilNextDay(now = new Date()) {
+  const nextDay = new Date(now);
+  nextDay.setHours(24, 0, 0, 0);
+  return nextDay.getTime() - now.getTime();
 }
 
 export function getElapsedSeconds(todo, now = new Date()) {

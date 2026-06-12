@@ -4,6 +4,7 @@ import {
   completeTodo,
   createInitialState,
   getDaySummary,
+  getMillisecondsUntilNextDay,
   getPendingTodos,
   getProgressSessions,
   formatDuration,
@@ -14,6 +15,9 @@ import {
   reorderCompletedTodosForDay,
   setTodoProgressive,
   startTodoTimer,
+  deleteTodo,
+  updateCompletedTodoTiming,
+  updateTodoCompletedAt,
   updateTodoProgress,
   updateTodoTitle,
   updateTodoNote,
@@ -131,6 +135,67 @@ describe('todo day summary', () => {
     expect(new Date(state.todos[1].completedAt) < new Date(state.todos[0].completedAt)).toBe(true);
   });
 
+  it('updates the finished date and time for a completed todo without changing its duration', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'File receipt', new Date('2026-06-08T08:00:00'));
+    const todoId = state.todos[0].id;
+    state = completeTodo(state, todoId, new Date('2026-06-08T08:30:00'));
+    state.todos[0] = { ...state.todos[0], trackedSeconds: 17 * 60 };
+
+    state = updateTodoCompletedAt(state, todoId, new Date('2026-06-09T21:45:00'));
+
+    expect(state.todos[0]).toMatchObject({
+      completedAt: new Date('2026-06-09T21:45:00').toISOString(),
+      trackedSeconds: 17 * 60,
+    });
+    expect(getDaySummary(state, '2026-06-08').flatMap((section) => section.items)).toEqual([]);
+    expect(getDaySummary(state, '2026-06-09')[3].items[0]).toMatchObject({
+      id: todoId,
+      title: 'File receipt',
+      durationLabel: '17m',
+    });
+  });
+
+  it('updates completed task start and end times to recalculate duration', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Adjust meeting', new Date('2026-06-10T08:00:00.000Z'));
+    const todoId = state.todos[0].id;
+    state = completeTodo(state, todoId, new Date('2026-06-10T15:00:00.000Z'));
+
+    state = updateCompletedTodoTiming(
+      state,
+      todoId,
+      new Date('2026-06-10T13:15:00.000Z'),
+      new Date('2026-06-10T15:45:00.000Z'),
+    );
+
+    expect(state.todos[0]).toMatchObject({
+      firstStartedAt: '2026-06-10T13:15:00.000Z',
+      activeStartedAt: null,
+      completedAt: '2026-06-10T15:45:00.000Z',
+      trackedSeconds: 150 * 60,
+    });
+    expect(getDaySummary(state, '2026-06-10').flatMap((section) => section.items)[0]).toMatchObject({
+      durationSeconds: 150 * 60,
+      durationLabel: '2h 30m',
+    });
+  });
+
+  it('deletes a todo and its progress sessions', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Read chapter', new Date('2026-06-09T08:00:00'));
+    const parentId = state.todos[0].id;
+    state = setTodoProgressive(state, parentId, true);
+    state = updateTodoProgress(state, parentId, 'pages 10-20');
+    state = logProgressSession(state, parentId, new Date('2026-06-09T20:00:00'));
+
+    state = deleteTodo(state, parentId);
+
+    expect(state.todos).toEqual([]);
+    expect(getPendingTodos(state)).toEqual([]);
+    expect(getDaySummary(state, '2026-06-09').flatMap((section) => section.items)).toEqual([]);
+  });
+
   it('moves a completed todo to another bucket without changing tracked duration', () => {
     let state = createInitialState();
     state = addTodo(state, 'Morning task', new Date('2026-06-08T08:00:00'));
@@ -157,6 +222,11 @@ describe('todo day summary', () => {
     expect(formatDuration(59 * 60)).toBe('59m');
     expect(formatDuration(61 * 60)).toBe('1h 1m');
     expect(formatDuration(25 * 60 * 60 + 8 * 60)).toBe('1d 1h 8m');
+  });
+
+  it('calculates the delay until the next local day', () => {
+    expect(getMillisecondsUntilNextDay(new Date(2026, 5, 11, 23, 59, 58, 500))).toBe(1500);
+    expect(getMillisecondsUntilNextDay(new Date(2026, 5, 11, 0, 0, 0, 0))).toBe(24 * 60 * 60 * 1000);
   });
 
   it('starts one running task at a time and pauses the previous one', () => {
@@ -194,6 +264,25 @@ describe('todo day summary', () => {
     expect(state.todos[0]).toMatchObject({
       activeStartedAt: null,
       trackedSeconds: 125,
+    });
+  });
+
+  it('resumes a stopped task and keeps total duration across interruptions', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Interrupted task', new Date('2026-06-08T08:00:00'));
+    const todoId = state.todos[0].id;
+
+    state = startTodoTimer(state, todoId, new Date('2026-06-08T08:00:00.000Z'));
+    state = pauseTodoTimer(state, todoId, new Date('2026-06-08T08:05:00.000Z'));
+    state = startTodoTimer(state, todoId, new Date('2026-06-08T08:20:00.000Z'));
+
+    expect(getElapsedSeconds(state.todos[0], new Date('2026-06-08T08:27:30.000Z'))).toBe(12 * 60 + 30);
+
+    state = pauseTodoTimer(state, todoId, new Date('2026-06-08T08:27:30.000Z'));
+
+    expect(state.todos[0]).toMatchObject({
+      activeStartedAt: null,
+      trackedSeconds: 12 * 60 + 30,
     });
   });
 

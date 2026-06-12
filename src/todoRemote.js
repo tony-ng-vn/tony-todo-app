@@ -86,6 +86,12 @@ export async function updateRemoteTodoCompletion(client, clientId, todo) {
   await updateRemoteTodo(client, clientId, todo, completionFields(todo));
 }
 
+export async function deleteRemoteTodo(client, clientId, todoId) {
+  const { error } = await client.database.from('todos').delete().eq('id', todoId).eq('client_id', clientId);
+
+  throwIfError(error);
+}
+
 async function updateRemoteTodo(client, clientId, todo, fields) {
   const { error } = await client.database
     .from('todos')
