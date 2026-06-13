@@ -59,6 +59,24 @@ export function completeTodo(state, todoId, completedAt = new Date()) {
   };
 }
 
+export function failTodo(state, todoId, failedAt = new Date()) {
+  const doneAt = failedAt.toISOString();
+  return {
+    ...state,
+    todos: state.todos.map((todo) =>
+      todo.id === todoId
+        ? {
+            ...todo,
+            completedAt: doneAt,
+            activeStartedAt: null,
+            trackedSeconds: getElapsedSeconds(todo, failedAt),
+            notionStatus: 'Failed',
+          }
+        : todo,
+    ),
+  };
+}
+
 export function updateTodoCompletedAt(state, todoId, completedAt) {
   const doneAt = completedAt.toISOString();
 
@@ -185,6 +203,7 @@ export function getDaySummary(state, dayKey) {
       note: todo.note ?? '',
       durationSeconds: normalizedTrackedSeconds(todo),
       durationLabel: formatDuration(normalizedTrackedSeconds(todo)),
+      outcome: todo.notionStatus === 'Failed' ? 'failed' : 'done',
       parentTaskId: todo.parentTaskId ?? null,
       isProgressSession: Boolean(todo.isProgressSession),
       progressLabel: todo.progressLabel ?? '',

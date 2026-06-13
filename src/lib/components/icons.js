@@ -17,6 +17,15 @@ export function iconCheck() {
   `;
 }
 
+export function iconX() {
+  return `
+    <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M4.25 4.25l7.5 7.5" />
+      <path d="M11.75 4.25l-7.5 7.5" />
+    </svg>
+  `;
+}
+
 export function iconPlay() {
   return `
     <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  completeRemoteTodo,
   deleteRemoteTodo,
   fromRemoteRecord,
   toRemoteRecord,
@@ -199,6 +200,47 @@ describe('todo remote mapping', () => {
     expect(calls[1][1]).toMatchObject({
       is_progressive: true,
       progress_label: 'pages 41-52',
+    });
+    expect(calls).toContainEqual(['eq', 'id', 'todo-1']);
+    expect(calls).toContainEqual(['eq', 'client_id', 'client-123']);
+  });
+
+  it('syncs a failed terminal outcome through remote completion fields', async () => {
+    const calls = [];
+    const client = {
+      database: {
+        from(table) {
+          calls.push(['from', table]);
+          return {
+            update(values) {
+              calls.push(['update', values]);
+              return {
+                eq(column, value) {
+                  calls.push(['eq', column, value]);
+                  return this;
+                },
+                then(resolve) {
+                  resolve({ error: null });
+                },
+              };
+            },
+          };
+        },
+      },
+    };
+
+    await completeRemoteTodo(client, 'client-123', {
+      id: 'todo-1',
+      completedAt: '2026-06-08T09:00:00.000Z',
+      firstStartedAt: null,
+      activeStartedAt: null,
+      trackedSeconds: 0,
+      notionStatus: 'Failed',
+    });
+
+    expect(calls[1][1]).toMatchObject({
+      completed_at: '2026-06-08T09:00:00.000Z',
+      notion_status: 'Failed',
     });
     expect(calls).toContainEqual(['eq', 'id', 'todo-1']);
     expect(calls).toContainEqual(['eq', 'client_id', 'client-123']);

@@ -1,7 +1,7 @@
 <script>
   import { formatDuration, getElapsedSeconds } from '../../todoStore.js';
   import { linkifyText } from '../../linkify.js';
-  import { iconCheck, iconMoon, iconPage, iconPause, iconPlay, iconSun } from './icons.js';
+  import { iconCheck, iconMoon, iconPage, iconPause, iconPlay, iconSun, iconX } from './icons.js';
 
   export let syncMessage = 'Local only';
   export let ongoingTodos = [];
@@ -20,6 +20,7 @@
   export let onTimerAction;
   export let onOpenTask;
   export let onComplete;
+  export let onFail;
   export let onToggleTheme;
 </script>
 
@@ -159,6 +160,10 @@
       <button type="button" on:click={() => onComplete(todo.id)} aria-label={todo.isProgressive ? `Log ${todo.title} session` : `Mark ${todo.title} done`}>
         {@html iconCheck()}
         <span>{todo.isProgressive ? 'Log session' : 'Done'}</span>
+      </button>
+      <button type="button" class="fail-task-button" on:click={() => onFail(todo.id)} aria-label={`Mark ${todo.title} failed`}>
+        {@html iconX()}
+        <span>Fail</span>
       </button>
     </div>
   </li>

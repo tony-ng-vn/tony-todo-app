@@ -3,6 +3,7 @@ import {
   addTodo,
   completeTodo,
   createInitialState,
+  failTodo,
   getDaySummary,
   getMillisecondsUntilNextDay,
   getPendingTodos,
@@ -65,11 +66,33 @@ describe('todo day summary', () => {
           note: '',
           durationSeconds: 0,
           durationLabel: '0m',
+          outcome: 'done',
           parentTaskId: null,
           isProgressSession: false,
           progressLabel: '',
         },
       ],
+    });
+  });
+
+  it('marks failed todos as finished with a failed outcome in the day summary', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Submit proposal', new Date('2026-06-08T08:00:00'));
+    const todoId = state.todos[0].id;
+    const failedAt = new Date('2026-06-08T17:20:00');
+
+    state = failTodo(state, todoId, failedAt);
+
+    expect(getPendingTodos(state)).toEqual([]);
+    expect(state.todos[0]).toMatchObject({
+      completedAt: failedAt.toISOString(),
+      activeStartedAt: null,
+      notionStatus: 'Failed',
+    });
+    expect(getDaySummary(state, '2026-06-08')[2].items[0]).toMatchObject({
+      id: todoId,
+      title: 'Submit proposal',
+      outcome: 'failed',
     });
   });
 

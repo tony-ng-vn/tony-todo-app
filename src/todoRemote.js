@@ -108,6 +108,7 @@ async function updateRemoteTodo(client, clientId, todo, fields) {
 function completionFields(todo) {
   return {
     completed_at: todo.completedAt,
+    notion_status: todo.notionStatus ?? null,
     ...timerFields(todo),
   };
 }

@@ -11,6 +11,7 @@
     completeTodo,
     createInitialState,
     deleteTodo,
+    failTodo,
     formatDayKey,
     formatDuration,
     getDaySummary,
@@ -77,7 +78,10 @@
   $: openTodos = pendingViewTodos.filter((todo) => !todo.activeStartedAt);
   $: openCount = openTodos.length;
   $: summary = getDaySummary(state, selectedDay);
-  $: completedToday = summary.reduce((total, section) => total + section.items.length, 0);
+  $: completedToday = summary.reduce(
+    (total, section) => total + section.items.filter((item) => item.outcome !== 'failed').length,
+    0,
+  );
   $: selectedTask = state.todos.find((todo) => todo.id === selectedTaskId);
   $: selectedTaskSessions = selectedTaskId ? getProgressSessions(state, selectedTaskId) : [];
 
@@ -180,6 +184,24 @@
     }
 
     await syncRemoteChange('Saving', () => persistCompletedTodo(completedTodo));
+  }
+
+  async function handleFail(todoId) {
+    const beforeTodo = findTodo(todoId);
+    state = failTodo(state, todoId);
+    const failedTodo = findTodo(todoId);
+
+    if (!beforeTodo || !failedTodo || beforeTodo.completedAt === failedTodo.completedAt) {
+      renderRemoteStatus();
+      return;
+    }
+
+    if (selectedTaskId === todoId) {
+      selectedTaskId = null;
+    }
+    selectedDay = formatDayKey(new Date());
+    saveLocalState(state);
+    await syncRemoteChange('Saving failed task', () => persistCompletedTodo(failedTodo));
   }
 
   async function handleTimerAction(action, todoId) {
@@ -651,6 +673,7 @@
     onTimerAction={handleTimerAction}
     onOpenTask={openTask}
     onComplete={handleComplete}
+    onFail={handleFail}
     onToggleTheme={toggleThemeMode}
   />
 

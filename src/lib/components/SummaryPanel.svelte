@@ -122,6 +122,9 @@
                   {/if}
                   <div class="summary-block">
                     <span class="summary-title">{@html linkifyText(item.title)}</span>
+                    {#if item.outcome === 'failed'}
+                      <span class="summary-outcome is-failed">Failed</span>
+                    {/if}
                     {#if item.progressLabel}
                       <span class="summary-progress">{item.progressLabel}</span>
                     {/if}
