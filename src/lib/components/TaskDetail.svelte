@@ -106,6 +106,22 @@
     }
   }
 
+  async function handleNoteTextareaKeydown(event) {
+    if (event.key !== 'Tab') {
+      return;
+    }
+
+    event.preventDefault();
+    const textarea = event.currentTarget;
+    const selectionStart = textarea.selectionStart ?? textarea.value.length;
+    const selectionEnd = textarea.selectionEnd ?? selectionStart;
+    const nextValue = `${textarea.value.slice(0, selectionStart)}\t${textarea.value.slice(selectionEnd)}`;
+    onNoteInput(nextValue);
+
+    await tick();
+    textarea.setSelectionRange(selectionStart + 1, selectionStart + 1);
+  }
+
   function parseNoteTodos(note) {
     return note
       .split('\n')
@@ -258,6 +274,7 @@
       placeholder="Add context, links, or reminders for this task."
       value={noteDraft}
       on:input={handleNoteTextareaInput}
+      on:keydown={handleNoteTextareaKeydown}
     ></textarea>
     {#if noteTodos.length}
       <div class="note-todo-list" aria-label="Note todos">

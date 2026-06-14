@@ -321,6 +321,14 @@ async function exerciseDetailEditing(page) {
     return state.todos.find((item) => item.id === 'ui-smoke-local-task')?.note === '- [x] Follow up with USCIS';
   });
   const clickedTodoValue = await page.locator('#detail-note').inputValue();
+  await page.focus('#detail-note');
+  await page.locator('#detail-note').evaluate((textarea) => textarea.setSelectionRange(0, 0));
+  await page.keyboard.press('Tab');
+  const tabEditCheck = await page.evaluate(() => ({
+    noteValue: document.querySelector('#detail-note')?.value,
+    selectionStart: document.querySelector('#detail-note')?.selectionStart,
+    activeElementId: document.activeElement?.id,
+  }));
 
   await page.mouse.click(24, 24);
   await page.waitForTimeout(120);
@@ -431,7 +439,7 @@ async function exerciseDetailEditing(page) {
     return !state.todos.some((item) => item.id === 'ui-smoke-evening-task');
   });
 
-  const editChecks = await page.evaluate(({ taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteBeforeSave, slashTodoValue, clickedTodoValue }) => {
+  const editChecks = await page.evaluate(({ taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteBeforeSave, slashTodoValue, clickedTodoValue, tabEditCheck }) => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     const todo = state.todos.find((item) => item.id === 'ui-smoke-local-task');
     const session = state.todos.find((item) => item.parentTaskId === 'ui-smoke-local-task');
@@ -454,6 +462,7 @@ async function exerciseDetailEditing(page) {
       noteBeforeSave,
       slashTodoValue,
       clickedTodoValue,
+      tabEditCheck,
       lunchTrackedSeconds: lunch?.trackedSeconds,
       lunchStart: lunch?.firstStartedAt,
       lunchCompletedAt: lunch?.completedAt,
@@ -462,7 +471,7 @@ async function exerciseDetailEditing(page) {
       detailUsesCustomCalendar,
       doneDateMoveCheck,
     };
-  }, { taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteBeforeSave, slashTodoValue, clickedTodoValue });
+  }, { taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteBeforeSave, slashTodoValue, clickedTodoValue, tabEditCheck });
 
   return { ...editChecks, initialTitlePresentation, detailLayout, outsideClickKeepsDetailOpen };
 }
@@ -630,6 +639,14 @@ function assertDetailEditing(result) {
 
   if (editChecks.clickedTodoValue !== '- [x] Follow up with USCIS') {
     failures.push(`note todo checkbox did not toggle done: ${JSON.stringify(editChecks)}`);
+  }
+
+  if (
+    !editChecks.tabEditCheck?.noteValue?.startsWith('\t') ||
+    editChecks.tabEditCheck?.selectionStart !== 1 ||
+    editChecks.tabEditCheck?.activeElementId !== 'detail-note'
+  ) {
+    failures.push(`tab key did not insert a tab inside task details: ${JSON.stringify(editChecks.tabEditCheck)}`);
   }
 
   if (
