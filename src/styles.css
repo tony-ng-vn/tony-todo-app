@@ -1277,6 +1277,20 @@ h2 {
   gap: 12px;
 }
 
+.detail-note-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: -8px;
+}
+
+.detail-note-actions span {
+  color: var(--subtle);
+  font-size: 12px;
+  font-weight: 500;
+}
+
 .detail-save-note {
   min-height: 34px;
   border: 1px solid var(--border);
