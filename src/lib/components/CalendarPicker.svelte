@@ -181,6 +181,12 @@
       return null;
     }
 
+    const dateOnlyMatch = /^(\d{4})-(\d{2})-(\d{2})$/.exec(nextValue);
+    if (dateOnlyMatch) {
+      const [, year, month, day] = dateOnlyMatch;
+      return new Date(Number(year), Number(month) - 1, Number(day));
+    }
+
     const parsed = new Date(nextValue);
     return Number.isNaN(parsed.getTime()) ? null : parsed;
   }

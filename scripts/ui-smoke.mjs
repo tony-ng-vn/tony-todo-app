@@ -391,6 +391,7 @@ async function exerciseDetailEditing(page) {
     hasNativeDateTimeInput: Boolean(document.querySelector('#task-detail input[type="datetime-local"]')),
     hasStartPicker: Boolean(document.querySelector('.detail-start-picker')),
     hasEndPicker: Boolean(document.querySelector('.detail-end-picker')),
+    hasDoneDatePicker: Boolean(document.querySelector('.detail-done-date-picker')),
   }));
   const dayKey = await page.evaluate(() => window.__uiSmokeDayKey);
   await page.locator('.detail-start-picker').click();
@@ -409,6 +410,58 @@ async function exerciseDetailEditing(page) {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     return state.todos.find((item) => item.id === 'ui-smoke-lunch-task')?.trackedSeconds === 45 * 60;
   });
+  await page.locator('.detail-done-date-picker').click();
+  await page.waitForSelector('.calendar-popover');
+  await page.evaluate(() => {
+    const days = Array.from(document.querySelectorAll('.calendar-popover .calendar-day'));
+    const selectedIndex = days.findIndex((day) => day.classList.contains('is-selected'));
+    days[selectedIndex + 1]?.click();
+  });
+  await page.waitForFunction(
+    (previousDayKey) => {
+      const state = JSON.parse(localStorage.getItem('done-log-state'));
+      const todo = state.todos.find((item) => item.id === 'ui-smoke-lunch-task');
+      if (!todo?.completedAt) {
+        return false;
+      }
+
+      const completedAt = new Date(todo.completedAt);
+      const nextDayKey = `${completedAt.getFullYear()}-${String(completedAt.getMonth() + 1).padStart(2, '0')}-${String(completedAt.getDate()).padStart(2, '0')}`;
+      return nextDayKey !== previousDayKey && Boolean(document.querySelector('[data-summary-id="ui-smoke-lunch-task"]'));
+    },
+    dayKey,
+  );
+  const doneDateMoveCheck = await page.evaluate((previousDayKey) => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    const lunch = state.todos.find((item) => item.id === 'ui-smoke-lunch-task');
+    const completedAt = lunch?.completedAt ? new Date(lunch.completedAt) : null;
+    const completedDayKey = completedAt
+      ? `${completedAt.getFullYear()}-${String(completedAt.getMonth() + 1).padStart(2, '0')}-${String(completedAt.getDate()).padStart(2, '0')}`
+      : null;
+
+    return {
+      changedFromToday: completedDayKey !== previousDayKey,
+      stillVisibleOnMovedDay: Boolean(document.querySelector('[data-summary-id="ui-smoke-lunch-task"]')),
+    };
+  }, dayKey);
+  await page.locator('.detail-done-date-picker').click();
+  await page.waitForSelector('.calendar-popover');
+  await page.locator('.calendar-footer button', { hasText: 'Today' }).click();
+  await page.waitForFunction((previousDayKey) => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    const todo = state.todos.find((item) => item.id === 'ui-smoke-lunch-task');
+    if (!todo?.completedAt) {
+      return false;
+    }
+
+    const completedAt = new Date(todo.completedAt);
+    const completedDayKey = `${completedAt.getFullYear()}-${String(completedAt.getMonth() + 1).padStart(2, '0')}-${String(completedAt.getDate()).padStart(2, '0')}`;
+    return completedDayKey === previousDayKey;
+  }, dayKey);
+  await page.locator('#summary-date').click();
+  await page.waitForSelector('.calendar-popover');
+  await page.locator('.calendar-footer button', { hasText: 'Today' }).click();
+  await page.waitForSelector('[data-summary-id="ui-smoke-evening-task"]');
 
   await page.mouse.click(24, 24);
   await page.click('[data-summary-id="ui-smoke-evening-task"] .open-task-button');
@@ -418,7 +471,7 @@ async function exerciseDetailEditing(page) {
     return !state.todos.some((item) => item.id === 'ui-smoke-evening-task');
   });
 
-  const editChecks = await page.evaluate(({ taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, noteBeforeSave, slashTodoValue, clickedTodoValue }) => {
+  const editChecks = await page.evaluate(({ taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteBeforeSave, slashTodoValue, clickedTodoValue }) => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     const todo = state.todos.find((item) => item.id === 'ui-smoke-local-task');
     const session = state.todos.find((item) => item.parentTaskId === 'ui-smoke-local-task');
@@ -447,8 +500,9 @@ async function exerciseDetailEditing(page) {
       eveningDeleted: !state.todos.some((item) => item.id === 'ui-smoke-evening-task'),
       detailClosedAfterDelete: !document.querySelector('#task-detail')?.classList.contains('is-open'),
       detailUsesCustomCalendar,
+      doneDateMoveCheck,
     };
-  }, { taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, noteBeforeSave, slashTodoValue, clickedTodoValue });
+  }, { taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteBeforeSave, slashTodoValue, clickedTodoValue });
 
   return { ...editChecks, initialTitlePresentation, panelInteraction, outsideClickClosed, openingButtonRect };
 }
@@ -721,13 +775,18 @@ function assertDetailEditing(result) {
   if (
     editChecks.detailUsesCustomCalendar?.hasNativeDateTimeInput ||
     !editChecks.detailUsesCustomCalendar?.hasStartPicker ||
-    !editChecks.detailUsesCustomCalendar?.hasEndPicker
+    !editChecks.detailUsesCustomCalendar?.hasEndPicker ||
+    !editChecks.detailUsesCustomCalendar?.hasDoneDatePicker
   ) {
     failures.push(`detail timing still uses native browser pickers: ${JSON.stringify(editChecks.detailUsesCustomCalendar)}`);
   }
 
   if (editChecks.lunchTrackedSeconds !== 45 * 60) {
     failures.push(`completed task timing did not update duration: ${JSON.stringify(editChecks)}`);
+  }
+
+  if (!editChecks.doneDateMoveCheck?.changedFromToday || !editChecks.doneDateMoveCheck?.stillVisibleOnMovedDay) {
+    failures.push(`completed task done date did not move the task to the selected recap day: ${JSON.stringify(editChecks)}`);
   }
 
   const panelInteraction = editChecks.panelInteraction;

@@ -14,6 +14,7 @@
   export let onDetailTitleCommit;
   export let onProgressiveChange;
   export let onProgressInput;
+  export let onCompletedDateChange;
   export let onCompletedTimingChange;
   export let onDeleteTask;
   export let formatDuration;
@@ -382,6 +383,23 @@
     return todo?.completedAt ? toDateTimeLocalValue(todo.completedAt) : '';
   }
 
+  function completedDateValue(todo) {
+    return todo?.completedAt ? toDateValue(todo.completedAt) : '';
+  }
+
+  function completedTimeValue(todo) {
+    const dateTimeValue = completedEndValue(todo);
+    return dateTimeValue ? dateTimeValue.split('T')[1] : '';
+  }
+
+  function handleDoneDateChange(value) {
+    if (!selectedTask?.completedAt || !value) {
+      return;
+    }
+
+    onCompletedDateChange(selectedTask.id, value, completedTimeValue(selectedTask));
+  }
+
   function handleTimingChange(field, value) {
     if (!selectedTask?.completedAt) {
       return;
@@ -456,13 +474,20 @@
       return '';
     }
 
+    return `${toDateValue(date)}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+  }
+
+  function toDateValue(dateLike) {
+    const date = new Date(dateLike);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
-    const hour = String(date.getHours()).padStart(2, '0');
-    const minute = String(date.getMinutes()).padStart(2, '0');
 
-    return `${year}-${month}-${day}T${hour}:${minute}`;
+    return `${year}-${month}-${day}`;
   }
 </script>
 
@@ -596,6 +621,15 @@
     <p class="detail-meta" id="detail-meta">{detailMeta(selectedTask)}</p>
     {#if selectedTask.completedAt}
       <div class="detail-timing-controls" aria-label="Task timing">
+        <label>
+          <span>Done date</span>
+          <CalendarPicker
+            triggerClass="detail-done-date-picker"
+            label="Change task done date"
+            value={completedDateValue(selectedTask)}
+            onChange={handleDoneDateChange}
+          />
+        </label>
         <label>
           <span>Start time</span>
           <CalendarPicker

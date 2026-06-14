@@ -393,6 +393,7 @@
       return;
     }
 
+    selectedDay = formatDayKey(completedAt);
     saveLocalState(state);
     await syncRemoteChange('Saving finish time', () => persistCompletionChangedTodos(changedTodos));
   }
@@ -708,6 +709,7 @@
     onDetailTitleCommit={handleDetailTitleCommit}
     onProgressiveChange={handleProgressiveChange}
     onProgressInput={handleProgressInput}
+    onCompletedDateChange={handleCompletedAtChange}
     onCompletedTimingChange={handleCompletedTimingChange}
     onDeleteTask={handleDeleteTask}
     {formatDuration}
