@@ -524,6 +524,14 @@
       {#if selectedTask}
         <button
           type="button"
+          class="detail-save-note"
+          disabled={noteDraft === (selectedTask.note ?? '')}
+          on:click={() => onNoteSave(selectedTask.id, noteDraft)}
+        >
+          Save details
+        </button>
+        <button
+          type="button"
           class="detail-delete-task"
           aria-label={`Delete ${selectedTask.title}`}
           on:click={() => onDeleteTask(selectedTask.id)}
@@ -586,14 +594,7 @@
     {/if}
     <div class="detail-note-row">
       <label class="detail-note-label" for="detail-note">Notes</label>
-      <button
-        type="button"
-        class="detail-save-note"
-        disabled={noteDraft === (selectedTask.note ?? '')}
-        on:click={() => onNoteSave(selectedTask.id, noteDraft)}
-      >
-        Save note
-      </button>
+      <span>{noteDraft === (selectedTask.note ?? '') ? 'Details saved' : 'Unsaved details'}</span>
     </div>
     <textarea
       id="detail-note"
@@ -602,17 +603,6 @@
       value={noteDraft}
       on:input={handleNoteTextareaInput}
     ></textarea>
-    <div class="detail-note-actions">
-      <span>{noteDraft === (selectedTask.note ?? '') ? 'Details saved' : 'Unsaved details'}</span>
-      <button
-        type="button"
-        class="detail-save-note"
-        disabled={noteDraft === (selectedTask.note ?? '')}
-        on:click={() => onNoteSave(selectedTask.id, noteDraft)}
-      >
-        Save details
-      </button>
-    </div>
     {#if noteTodos.length}
       <div class="note-todo-list" aria-label="Note todos">
         {#each noteTodos as item (item.lineIndex)}

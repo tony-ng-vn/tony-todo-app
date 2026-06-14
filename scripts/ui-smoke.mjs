@@ -338,8 +338,8 @@ async function exerciseDetailEditing(page) {
     return {
       storedNote: todo?.note,
       saveVisible: Boolean(document.querySelector('.detail-save-note')),
-      footerSaveVisible: Boolean(document.querySelector('.detail-note-actions .detail-save-note')),
-      footerSaveText: document.querySelector('.detail-note-actions .detail-save-note')?.textContent.trim(),
+      headerSaveVisible: Boolean(document.querySelector('.detail-window-actions .detail-save-note')),
+      headerSaveText: document.querySelector('.detail-window-actions .detail-save-note')?.textContent.trim(),
       saveDisabled: document.querySelector('.detail-save-note')?.disabled ?? null,
     };
   });
@@ -744,8 +744,8 @@ function assertDetailEditing(result) {
   if (
     editChecks.noteBeforeSave?.storedNote === 'Smoke note' ||
     !editChecks.noteBeforeSave?.saveVisible ||
-    !editChecks.noteBeforeSave?.footerSaveVisible ||
-    editChecks.noteBeforeSave?.footerSaveText !== 'Save details' ||
+    !editChecks.noteBeforeSave?.headerSaveVisible ||
+    editChecks.noteBeforeSave?.headerSaveText !== 'Save details' ||
     editChecks.noteBeforeSave?.saveDisabled
   ) {
     failures.push(`detail notes did not wait for explicit save: ${JSON.stringify(editChecks.noteBeforeSave)}`);
