@@ -63,7 +63,6 @@
   let dayRolloverTimer = null;
   let progressSaveTimer = null;
   let titleSaveTimer = null;
-  let detailAnchor = null;
   let noteDraftTaskId = null;
   let draggedSummaryId = null;
   let dropTargetId = null;
@@ -92,7 +91,6 @@
     state = loadLocalState();
     themeMode = loadThemeMode();
     applyThemeMode(themeMode);
-    window.addEventListener('pointerdown', handleWindowPointerDown);
     window.addEventListener('focus', syncSelectedDayToToday);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     scheduleSelectedDayRefresh();
@@ -105,7 +103,6 @@
     window.clearTimeout(progressSaveTimer);
     window.clearTimeout(titleSaveTimer);
     window.clearTimeout(completionCueTimer);
-    window.removeEventListener('pointerdown', handleWindowPointerDown);
     window.removeEventListener('focus', syncSelectedDayToToday);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
   });
@@ -255,29 +252,14 @@
     }
   }
 
-  function openTask(todoId, triggerElement = null) {
-    detailAnchor = triggerElement ? rectSnapshot(triggerElement) : null;
+  function openTask(todoId) {
     selectedTaskId = todoId;
     tick().then(() => document.querySelector('#detail-note')?.focus());
   }
 
   function closeTask() {
     selectedTaskId = null;
-    detailAnchor = null;
     noteDraftTaskId = null;
-  }
-
-  function handleWindowPointerDown(event) {
-    if (!selectedTaskId) {
-      return;
-    }
-
-    const target = event.target;
-    if (target.closest('#task-detail') || target.closest('.open-task-button') || target.closest('.calendar-popover')) {
-      return;
-    }
-
-    closeTask();
   }
 
   function toggleThemeMode() {
@@ -611,18 +593,6 @@
     return state.todos.find((todo) => todo.id === todoId);
   }
 
-  function rectSnapshot(element) {
-    const rect = element.getBoundingClientRect();
-    return {
-      left: rect.left,
-      right: rect.right,
-      top: rect.top,
-      bottom: rect.bottom,
-      width: rect.width,
-      height: rect.height,
-    };
-  }
-
   function getTimerChangedTodos(beforeTodos, afterTodos) {
     return getTodosWithChangedFields(beforeTodos, afterTodos, TIMER_SYNC_FIELDS);
   }
@@ -655,7 +625,7 @@
   }
 </script>
 
-<main class="workspace" aria-label="Done Log todo app">
+<main class="workspace" class:has-detail={selectedTask} aria-label="Done Log todo app">
   <TaskPanel
     {syncMessage}
     {ongoingTodos}
@@ -699,7 +669,6 @@
 
   <TaskDetail
     {selectedTask}
-    {detailAnchor}
     {selectedTaskSessions}
     bind:noteDraft
     onClose={closeTask}

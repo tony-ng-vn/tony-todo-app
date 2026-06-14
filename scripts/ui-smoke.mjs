@@ -8,7 +8,6 @@ const browser = await chromium.launch({ headless: true });
 try {
   const mobile = await inspectViewport({ width: 390, height: 844 }, true);
   const desktop = await inspectViewport({ width: 1366, height: 900 }, false);
-  const wideDetailClick = await inspectWideDetailClick();
   const failures = [
     ...assertNoOverflow(mobile),
     ...assertNoOverflow(desktop),
@@ -26,7 +25,6 @@ try {
     ...assertFixedDocumentScroll(desktop),
     ...assertRecapRhythm(desktop),
     ...assertDetailEditing(desktop),
-    ...assertStableDetailClick(wideDetailClick),
     ...assertProgressiveSession(desktop),
     ...assertGlassSurface(desktop, '.task-panel', 'task panel'),
     ...assertGlassSurface(desktop, '.summary-panel', 'summary panel'),
@@ -242,36 +240,6 @@ async function inspectViewport(viewport, isMobile) {
   return { viewport, editChecks, summaryTimeEdit, ...metrics };
 }
 
-async function inspectWideDetailClick() {
-  const page = await browser.newPage({ viewport: { width: 1680, height: 950 } });
-  await page.addInitScript(() => {
-    localStorage.setItem('done-log-client-id', 'ui-smoke-wide');
-    localStorage.setItem(
-      'done-log-state',
-      JSON.stringify({
-        todos: [
-          {
-            id: 'ui-smoke-wide-task',
-            title: 'Wide viewport task',
-            createdAt: '2026-06-11T08:00:00.000Z',
-            completedAt: null,
-            note: '',
-          },
-        ],
-      }),
-    );
-  });
-  await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
-  await page.click('.todo-item .open-task-button');
-  await page.waitForTimeout(250);
-  const before = await detailPanelRect(page);
-  await page.mouse.click(before.left + 80, before.top + 42);
-  await page.waitForTimeout(120);
-  const after = await detailPanelRect(page);
-  await page.close();
-  return { before, after };
-}
-
 async function exerciseSummaryTimeEditing(page) {
   await page.locator('#summary-date').click();
   await page.waitForSelector('.calendar-popover');
@@ -305,18 +273,9 @@ async function exerciseSummaryTimeEditing(page) {
 
 async function exerciseDetailEditing(page) {
   const localTaskSelector = '[data-todo-id="ui-smoke-local-task"]';
-  const openingButtonRect = await page.locator(`${localTaskSelector} .open-task-button`).evaluate((element) => {
-    const rect = element.getBoundingClientRect();
-    return {
-      left: Math.round(rect.left),
-      right: Math.round(rect.right),
-      top: Math.round(rect.top),
-      bottom: Math.round(rect.bottom),
-    };
-  });
   await page.click(`${localTaskSelector} .open-task-button`);
-  await page.waitForTimeout(650);
-  const panelInteraction = await exerciseDetailPanelInteraction(page);
+  await page.waitForSelector('.detail-title-display');
+  const detailLayout = await captureDetailLayout(page);
   await page.evaluate(() => document.querySelector('#detail-close')?.click());
   await page.waitForTimeout(120);
   await page.click(`${localTaskSelector} .open-task-button`);
@@ -365,9 +324,8 @@ async function exerciseDetailEditing(page) {
 
   await page.mouse.click(24, 24);
   await page.waitForTimeout(120);
-  const outsideClickClosed = await page.evaluate(() => !document.querySelector('#task-detail')?.classList.contains('is-open'));
+  const outsideClickKeepsDetailOpen = await page.evaluate(() => Boolean(document.querySelector('#task-detail')));
 
-  await page.click(`${localTaskSelector} .open-task-button`);
   await page.locator('.progress-toggle input').check();
   await page.fill('#progress-label', 'pages 41-52');
   await page.click('#detail-close');
@@ -506,98 +464,31 @@ async function exerciseDetailEditing(page) {
     };
   }, { taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteBeforeSave, slashTodoValue, clickedTodoValue });
 
-  return { ...editChecks, initialTitlePresentation, panelInteraction, outsideClickClosed, openingButtonRect };
+  return { ...editChecks, initialTitlePresentation, detailLayout, outsideClickKeepsDetailOpen };
 }
 
-async function exerciseDetailPanelInteraction(page) {
-  await page.waitForTimeout(650);
-  const initial = await detailPanelRect(page);
-
-  const dragMotion = await exercisePanelDrag(page, initial);
-  const rightEdge = await exercisePanelResize(page, 'right');
-  const bottomEdge = await exercisePanelResize(page, 'bottom');
-  await exercisePanelResize(page, 'bottom-shrink');
-  const corner = await exercisePanelResize(page, 'bottom-right');
-  const afterAxisChecks = await detailPanelRect(page);
-
-  await page.mouse.move(afterAxisChecks.left + afterAxisChecks.width - 3, afterAxisChecks.top + afterAxisChecks.height - 3);
-  await page.mouse.down();
-  await page.mouse.move(afterAxisChecks.left + afterAxisChecks.width + 260, afterAxisChecks.top + afterAxisChecks.height + 180, { steps: 10 });
-  await page.mouse.up();
-  await page.waitForTimeout(120);
-  const expanded = await detailPanelRect(page);
-
-  await page.mouse.move(expanded.left + 70, expanded.top + 32);
-  await page.mouse.down();
-  await page.mouse.move(expanded.left - 120, expanded.top + 92, { steps: 8 });
-  await page.mouse.up();
-  await page.waitForTimeout(120);
-  const moved = await detailPanelRect(page);
-
-  await page.mouse.move(moved.left + moved.width - 3, moved.top + moved.height - 3);
-  await page.mouse.down();
-  await page.mouse.move(moved.left + initial.width - 10, moved.top + initial.height - 10, { steps: 10 });
-  await page.mouse.up();
-  await page.waitForTimeout(120);
-  const collapsed = await detailPanelRect(page);
-
-  return { initial, dragMotion, rightEdge, bottomEdge, corner, expanded, moved, collapsed };
-}
-
-async function detailPanelRect(page) {
+async function captureDetailLayout(page) {
   return page.locator('.task-detail').evaluate((element) => {
     const rect = element.getBoundingClientRect();
+    const taskPanel = document.querySelector('.task-panel').getBoundingClientRect();
+    const summaryPanel = document.querySelector('.summary-panel').getBoundingClientRect();
+    const workspace = document.querySelector('.workspace').getBoundingClientRect();
     return {
       left: Math.round(rect.left),
       top: Math.round(rect.top),
+      right: Math.round(rect.right),
+      bottom: Math.round(rect.bottom),
       width: Math.round(rect.width),
       height: Math.round(rect.height),
-      viewportWidth: window.innerWidth,
-      viewportHeight: window.innerHeight,
-      hasSizeButton: Boolean(document.querySelector('.detail-size-toggle')),
-      hasDragHandle: Boolean(document.querySelector('.detail-drag-handle')),
-      transitionProperty: getComputedStyle(element).transitionProperty,
-      transitionDuration: getComputedStyle(element).transitionDuration,
+      parentClass: element.parentElement?.className ?? '',
+      position: getComputedStyle(element).position,
+      workspaceHasDetail: document.querySelector('.workspace')?.classList.contains('has-detail'),
+      taskPanelRight: Math.round(taskPanel.right),
+      summaryLeft: Math.round(summaryPanel.left),
+      summaryRight: Math.round(summaryPanel.right),
+      workspaceRight: Math.round(workspace.right),
     };
   });
-}
-
-async function exercisePanelDrag(page, initial) {
-  await page.mouse.move(initial.left + 80, initial.top + 42);
-  await page.mouse.down();
-  await page.mouse.move(initial.left + 160, initial.top + 102, { steps: 8 });
-  await page.waitForTimeout(40);
-  const during = await detailPanelRect(page);
-  await page.mouse.up();
-  await page.waitForTimeout(80);
-  const after = await detailPanelRect(page);
-  return { during, after };
-}
-
-async function exercisePanelResize(page, edge) {
-  const before = await detailPanelRect(page);
-  const start = {
-    right: [before.left + before.width - 3, before.top + Math.round(before.height / 2)],
-    bottom: [before.left + Math.round(before.width / 2), before.top + before.height - 3],
-    'bottom-shrink': [before.left + Math.round(before.width / 2), before.top + before.height - 3],
-    'bottom-right': [before.left + before.width - 3, before.top + before.height - 3],
-  }[edge];
-  const end = {
-    right: [start[0] + 110, start[1] + 90],
-    bottom: [start[0] + 120, start[1] + 95],
-    'bottom-shrink': [start[0], start[1] - 120],
-    'bottom-right': [start[0] + 90, start[1] + 80],
-  }[edge];
-
-  await page.mouse.move(...start);
-  await page.mouse.down();
-  await page.mouse.move(...end, { steps: 8 });
-  await page.waitForTimeout(40);
-  const during = await detailPanelRect(page);
-  await page.mouse.up();
-  await page.waitForTimeout(80);
-  const after = await detailPanelRect(page);
-  return { before, during, after };
 }
 
 function assertNoOverflow(result) {
@@ -745,7 +636,7 @@ function assertDetailEditing(result) {
     editChecks.noteBeforeSave?.storedNote === 'Smoke note' ||
     !editChecks.noteBeforeSave?.saveVisible ||
     !editChecks.noteBeforeSave?.headerSaveVisible ||
-    editChecks.noteBeforeSave?.headerSaveText !== 'Save details' ||
+    editChecks.noteBeforeSave?.headerSaveText !== 'Save' ||
     editChecks.noteBeforeSave?.saveDisabled
   ) {
     failures.push(`detail notes did not wait for explicit save: ${JSON.stringify(editChecks.noteBeforeSave)}`);
@@ -760,8 +651,8 @@ function assertDetailEditing(result) {
     failures.push(`detail title links were not platform labeled: ${JSON.stringify(editChecks.initialTitlePresentation)}`);
   }
 
-  if (!editChecks.outsideClickClosed) {
-    failures.push('outside click did not close task detail');
+  if (!editChecks.outsideClickKeepsDetailOpen) {
+    failures.push('outside click closed the in-flow task detail panel');
   }
 
   if (
@@ -793,59 +684,18 @@ function assertDetailEditing(result) {
     failures.push(`completed task done date did not move the task to the selected recap day: ${JSON.stringify(editChecks)}`);
   }
 
-  const panelInteraction = editChecks.panelInteraction;
-  if (!panelInteraction) {
-    failures.push('detail panel interaction was not exercised');
-    return failures;
-  }
-
-  const { initial, dragMotion, rightEdge, bottomEdge, corner, expanded, moved, collapsed } = panelInteraction;
-  if (initial.left > editChecks.openingButtonRect.right + 32) {
-    failures.push(`detail panel opened too far from the task trigger: ${JSON.stringify({ trigger: editChecks.openingButtonRect, initial })}`);
-  }
-  if (initial.hasSizeButton || initial.hasDragHandle) {
-    failures.push(`detail panel still exposes button-based resize/drag controls: ${JSON.stringify(initial)}`);
-  }
-  if (!dragMotion?.during?.transitionProperty.includes('none')) {
-    failures.push(`detail panel keeps CSS transitions during drag: ${JSON.stringify(dragMotion)}`);
-  }
-  if (Math.abs(dragMotion.after.left - initial.left) < 60 || Math.abs(dragMotion.after.top - initial.top) < 40) {
-    failures.push(`detail panel drag did not track both axes smoothly: ${JSON.stringify(dragMotion)}`);
-  }
-  if (!rightEdge?.during?.transitionProperty.includes('none')) {
-    failures.push(`detail panel keeps CSS transitions during resize: ${JSON.stringify(rightEdge)}`);
-  }
-  if (rightEdge.after.width <= rightEdge.before.width + 40 || Math.abs(rightEdge.after.height - rightEdge.before.height) > 8) {
-    failures.push(`right edge resize changed the wrong axes: ${JSON.stringify(rightEdge)}`);
-  }
-  if (bottomEdge.after.height <= bottomEdge.before.height + 35 || Math.abs(bottomEdge.after.width - bottomEdge.before.width) > 8) {
-    failures.push(`bottom edge resize changed the wrong axes: ${JSON.stringify(bottomEdge)}`);
-  }
-  if (corner.after.width <= corner.before.width + 25 || corner.after.height <= corner.before.height + 25) {
-    failures.push(`corner resize did not change both axes: ${JSON.stringify(corner)}`);
-  }
-  if (expanded.width <= initial.width || expanded.height <= initial.height) {
-    failures.push(`detail panel did not resize outward from border drag: ${JSON.stringify({ initial, expanded })}`);
-  }
-  if (expanded.width > Math.ceil(expanded.viewportWidth * 0.75) || expanded.height > Math.ceil(expanded.viewportHeight * 0.75)) {
-    failures.push(`detail panel exceeded 75% viewport cap: ${JSON.stringify(expanded)}`);
-  }
-  if (Math.abs(moved.left - expanded.left) < 80 && Math.abs(moved.top - expanded.top) < 40) {
-    failures.push(`detail panel did not move from empty-space drag: ${JSON.stringify({ expanded, moved })}`);
-  }
-  if (collapsed.width > initial.width + 8 || collapsed.height > initial.height + 8) {
-    failures.push(`detail panel did not resize inward near initial size: ${JSON.stringify({ initial, collapsed })}`);
+  const layout = editChecks.detailLayout;
+  if (
+    !layout?.workspaceHasDetail ||
+    !String(layout.parentClass).includes('workspace') ||
+    layout.position === 'fixed' ||
+    layout.left < layout.summaryRight - 2 ||
+    layout.right > layout.workspaceRight + 2
+  ) {
+    failures.push(`detail panel is not the right-side workspace block: ${JSON.stringify(layout)}`);
   }
 
   return failures;
-}
-
-function assertStableDetailClick(result) {
-  const deltaX = Math.abs(result.after.left - result.before.left);
-  const deltaY = Math.abs(result.after.top - result.before.top);
-  return deltaX <= 2 && deltaY <= 2
-    ? []
-    : [`detail panel moved on plain click without drag: ${JSON.stringify(result)}`];
 }
 
 function assertProgressiveSession(result) {
