@@ -107,6 +107,7 @@ async function inspectViewport(viewport, isMobile) {
   });
   await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
   const summaryTimeEdit = isMobile ? null : await exerciseSummaryTimeEditing(page);
+  const taskFlowChecks = isMobile ? null : await exerciseParallelAndReopen(page);
   const editChecks = isMobile ? null : await exerciseDetailEditing(page);
 
   const metrics = await page.evaluate(() => {
@@ -237,7 +238,7 @@ async function inspectViewport(viewport, isMobile) {
   });
 
   await page.close();
-  return { viewport, editChecks, summaryTimeEdit, ...metrics };
+  return { viewport, editChecks, summaryTimeEdit, taskFlowChecks, ...metrics };
 }
 
 async function exerciseSummaryTimeEditing(page) {
@@ -269,6 +270,58 @@ async function exerciseSummaryTimeEditing(page) {
       summaryCalendarPresentation,
     };
   }, summaryCalendarPresentation);
+}
+
+async function exerciseParallelAndReopen(page) {
+  await page.click('[data-todo-id="ui-smoke-overflow-task-1"] .timer-button');
+  await page.waitForFunction(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    return ['ui-smoke-overflow-task-0', 'ui-smoke-overflow-task-1'].every(
+      (id) => state.todos.find((item) => item.id === id)?.activeStartedAt,
+    );
+  });
+
+  const parallelCheck = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    return {
+      activeIds: state.todos.filter((item) => item.activeStartedAt && !item.completedAt).map((item) => item.id),
+      ongoingIds: Array.from(document.querySelectorAll('.task-list-section:first-child .todo-item')).map(
+        (item) => item.dataset.todoId,
+      ),
+    };
+  });
+
+  const dataTransfer = await page.evaluateHandle(() => new DataTransfer());
+  await page.dispatchEvent('[data-summary-id="ui-smoke-morning-task"]', 'dragstart', { dataTransfer });
+  await page.dispatchEvent('.task-panel', 'dragover', { dataTransfer });
+  await page.waitForFunction(() => document.querySelector('.task-panel')?.classList.contains('is-open-drop-target'));
+  const dropPresentation = await page.evaluate(() => ({
+    panelTargeted: document.querySelector('.task-panel')?.classList.contains('is-open-drop-target'),
+    countText: document.querySelector('#open-count')?.textContent.trim(),
+  }));
+  await page.dispatchEvent('.task-panel', 'drop', { dataTransfer });
+
+  await page.waitForFunction(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    return (
+      state.todos.find((item) => item.id === 'ui-smoke-morning-task')?.completedAt === null &&
+      Boolean(document.querySelector('[data-todo-id="ui-smoke-morning-task"]'))
+    );
+  });
+
+  const reopenDragCheck = await page.evaluate((dropPresentation) => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    const reopened = state.todos.find((item) => item.id === 'ui-smoke-morning-task');
+    return {
+      ...dropPresentation,
+      completedAt: reopened?.completedAt,
+      stillTrackedSeconds: reopened?.trackedSeconds,
+      visibleOpenTask: Boolean(document.querySelector('[data-todo-id="ui-smoke-morning-task"]')),
+      stillInSummary: Boolean(document.querySelector('[data-summary-id="ui-smoke-morning-task"]')),
+    };
+  }, dropPresentation);
+
+  return { parallelCheck, reopenDragCheck };
 }
 
 async function exerciseDetailEditing(page) {
@@ -699,6 +752,26 @@ function assertDetailEditing(result) {
 
   if (!editChecks.doneDateMoveCheck?.changedFromToday || !editChecks.doneDateMoveCheck?.stillVisibleOnMovedDay) {
     failures.push(`completed task done date did not move the task to the selected recap day: ${JSON.stringify(editChecks)}`);
+  }
+
+  if (
+    !result.taskFlowChecks?.parallelCheck?.activeIds?.includes('ui-smoke-overflow-task-0') ||
+    !result.taskFlowChecks?.parallelCheck?.activeIds?.includes('ui-smoke-overflow-task-1') ||
+    !result.taskFlowChecks?.parallelCheck?.ongoingIds?.includes('ui-smoke-overflow-task-0') ||
+    !result.taskFlowChecks?.parallelCheck?.ongoingIds?.includes('ui-smoke-overflow-task-1')
+  ) {
+    failures.push(`parallel task running failed: ${JSON.stringify(result.taskFlowChecks?.parallelCheck)}`);
+  }
+
+  if (
+    result.taskFlowChecks?.reopenDragCheck?.completedAt !== null ||
+    result.taskFlowChecks?.reopenDragCheck?.stillTrackedSeconds !== 25 * 60 ||
+    !result.taskFlowChecks?.reopenDragCheck?.visibleOpenTask ||
+    result.taskFlowChecks?.reopenDragCheck?.stillInSummary ||
+    !result.taskFlowChecks?.reopenDragCheck?.panelTargeted ||
+    result.taskFlowChecks?.reopenDragCheck?.countText !== 'Drop to reopen'
+  ) {
+    failures.push(`dragging a finished task back to open failed: ${JSON.stringify(result.taskFlowChecks?.reopenDragCheck)}`);
   }
 
   const layout = editChecks.detailLayout;

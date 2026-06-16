@@ -135,26 +135,16 @@ export function startTodoTimer(state, todoId, startedAt = new Date()) {
   return {
     ...state,
     todos: state.todos.map((todo) => {
-      if (todo.completedAt) {
+      if (todo.completedAt || todo.id !== todoId) {
         return todo;
       }
 
-      if (todo.id === todoId) {
-        return {
-          ...todo,
-          firstStartedAt: todo.firstStartedAt ?? startedAtIso,
-          activeStartedAt: startedAtIso,
-          trackedSeconds: normalizedTrackedSeconds(todo),
-        };
-      }
-
-      return todo.activeStartedAt
-        ? {
-            ...todo,
-            activeStartedAt: null,
-            trackedSeconds: getElapsedSeconds(todo, startedAt),
-          }
-        : todo;
+      return {
+        ...todo,
+        firstStartedAt: todo.firstStartedAt ?? startedAtIso,
+        activeStartedAt: startedAtIso,
+        trackedSeconds: normalizedTrackedSeconds(todo),
+      };
     }),
   };
 }
@@ -168,6 +158,23 @@ export function pauseTodoTimer(state, todoId, pausedAt = new Date()) {
             ...todo,
             activeStartedAt: null,
             trackedSeconds: getElapsedSeconds(todo, pausedAt),
+          }
+        : todo,
+    ),
+  };
+}
+
+export function reopenTodo(state, todoId) {
+  return {
+    ...state,
+    todos: state.todos.map((todo) =>
+      todo.id === todoId && todo.completedAt && !todo.isProgressSession
+        ? {
+            ...todo,
+            completedAt: null,
+            activeStartedAt: null,
+            notionStatus: null,
+            trackedSeconds: normalizedTrackedSeconds(todo),
           }
         : todo,
     ),

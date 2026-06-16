@@ -14,6 +14,7 @@ import {
   moveCompletedTodoToSummaryBucket,
   pauseTodoTimer,
   reorderCompletedTodosForDay,
+  reopenTodo,
   setTodoProgressive,
   startTodoTimer,
   deleteTodo,
@@ -252,7 +253,7 @@ describe('todo day summary', () => {
     expect(getMillisecondsUntilNextDay(new Date(2026, 5, 11, 0, 0, 0, 0))).toBe(24 * 60 * 60 * 1000);
   });
 
-  it('starts one running task at a time and pauses the previous one', () => {
+  it('allows multiple tasks to run at the same time', () => {
     let state = createInitialState();
     state = addTodo(state, 'First', new Date('2026-06-08T08:00:00'));
     state = addTodo(state, 'Second', new Date('2026-06-08T08:01:00'));
@@ -264,14 +265,48 @@ describe('todo day summary', () => {
 
     expect(state.todos.find((todo) => todo.id === firstId)).toMatchObject({
       firstStartedAt: '2026-06-08T08:10:00.000Z',
-      activeStartedAt: null,
-      trackedSeconds: 330,
+      activeStartedAt: '2026-06-08T08:10:00.000Z',
+      trackedSeconds: 0,
     });
     expect(state.todos.find((todo) => todo.id === secondId)).toMatchObject({
       firstStartedAt: '2026-06-08T08:15:30.000Z',
       activeStartedAt: '2026-06-08T08:15:30.000Z',
       trackedSeconds: 0,
     });
+  });
+
+  it('reopens a finished task without losing tracked duration', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Revise draft', new Date('2026-06-08T08:00:00'));
+    const todoId = state.todos[0].id;
+
+    state = startTodoTimer(state, todoId, new Date('2026-06-08T08:10:00.000Z'));
+    state = failTodo(state, todoId, new Date('2026-06-08T08:40:00.000Z'));
+    state = reopenTodo(state, todoId);
+
+    expect(state.todos[0]).toMatchObject({
+      completedAt: null,
+      activeStartedAt: null,
+      trackedSeconds: 30 * 60,
+      notionStatus: null,
+    });
+    expect(getPendingTodos(state).map((todo) => todo.id)).toEqual([todoId]);
+    expect(getDaySummary(state, '2026-06-08').flatMap((section) => section.items)).toEqual([]);
+  });
+
+  it('does not reopen progressive session history entries', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Read book', new Date('2026-06-09T08:00:00'));
+    const parentId = state.todos[0].id;
+    const sessionDoneAt = new Date('2026-06-09T20:00:00');
+    state = setTodoProgressive(state, parentId, true);
+    state = logProgressSession(state, parentId, sessionDoneAt);
+    const sessionId = getProgressSessions(state, parentId)[0].id;
+
+    state = reopenTodo(state, sessionId);
+
+    expect(state.todos.find((todo) => todo.id === sessionId).completedAt).toBe(sessionDoneAt.toISOString());
+    expect(getPendingTodos(state).map((todo) => todo.id)).toEqual([parentId]);
   });
 
   it('pauses a running task and reports elapsed seconds', () => {

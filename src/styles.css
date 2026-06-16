@@ -952,6 +952,13 @@ h2 {
   background: var(--drop-target-surface);
 }
 
+.task-panel.is-open-drop-target {
+  border-color: var(--strong);
+  background:
+    linear-gradient(135deg, var(--drop-target-surface), transparent 68%),
+    var(--surface);
+}
+
 .summary-section h3 {
   margin: 0;
   color: var(--subtle);

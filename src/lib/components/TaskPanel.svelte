@@ -11,6 +11,8 @@
   export let draftTitle = '';
   export let editingTaskId = null;
   export let newlyAddedTodoId = null;
+  export let draggedSummaryId = null;
+  export let isOpenDropTarget = false;
   export let themeMode = 'light';
   export let onSubmit;
   export let onDraftInput;
@@ -21,10 +23,18 @@
   export let onOpenTask;
   export let onComplete;
   export let onFail;
+  export let onOpenListDragOver;
+  export let onOpenListDrop;
   export let onToggleTheme;
 </script>
 
-<section class="task-panel" aria-labelledby="task-heading">
+<section
+  class="task-panel"
+  class:is-open-drop-target={isOpenDropTarget}
+  aria-labelledby="task-heading"
+  on:dragover={onOpenListDragOver}
+  on:drop={onOpenListDrop}
+>
   <div class="brand-row">
     <div>
       <p class="eyebrow">Done Log</p>
@@ -79,7 +89,7 @@
     <li class="task-list-section" aria-labelledby="open-heading">
       <div class="section-heading">
         <h2 id="open-heading">Open</h2>
-        <span class="section-count" id="open-count">{openCount} open</span>
+        <span class="section-count" id="open-count">{draggedSummaryId ? 'Drop to reopen' : `${openCount} open`}</span>
       </div>
       <ol class="task-section-list">
         {#each openTodos as todo (todo.id)}

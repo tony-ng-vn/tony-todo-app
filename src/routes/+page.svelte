@@ -22,6 +22,7 @@
     moveCompletedTodoToSummaryBucket,
     getPendingTodos,
     pauseTodoTimer,
+    reopenTodo,
     setTodoProgressive,
     startTodoTimer,
     updateCompletedTodoTiming,
@@ -67,6 +68,7 @@
   let draggedSummaryId = null;
   let dropTargetId = null;
   let dropTargetBucket = null;
+  let isOpenDropTarget = false;
   let completionCue = null;
   let completionCueTimer = null;
   let themeMode = 'light';
@@ -439,6 +441,7 @@
     draggedSummaryId = null;
     dropTargetId = null;
     dropTargetBucket = null;
+    isOpenDropTarget = false;
   }
 
   function handleDragOver(event, todoId, bucketLabel) {
@@ -475,6 +478,28 @@
     await moveSummaryTodo(draggedId, bucketLabel);
   }
 
+  function handleOpenListDragOver(event) {
+    if (!draggedSummaryId) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    dropTargetId = null;
+    dropTargetBucket = null;
+    isOpenDropTarget = true;
+  }
+
+  async function handleOpenListDrop(event) {
+    const draggedId = event.dataTransfer.getData('text/plain');
+    if (!draggedId) {
+      return;
+    }
+
+    event.preventDefault();
+    await reopenSummaryTodo(draggedId);
+  }
+
   async function moveSummaryTodo(draggedId, bucketLabel, targetId = null) {
     const beforeTodos = state.todos;
     state = moveCompletedTodoToSummaryBucket(state, selectedDay, draggedId, bucketLabel, targetId);
@@ -489,6 +514,23 @@
 
     saveLocalState(state);
     await syncRemoteChange('Saving order', () => persistCompletionChangedTodos(changedTodos));
+  }
+
+  async function reopenSummaryTodo(todoId) {
+    const beforeTodos = state.todos;
+    state = reopenTodo(state, todoId);
+    const changedTodos = getCompletionChangedTodos(beforeTodos, state.todos);
+    draggedSummaryId = null;
+    dropTargetId = null;
+    dropTargetBucket = null;
+    isOpenDropTarget = false;
+
+    if (changedTodos.length === 0) {
+      return;
+    }
+
+    saveLocalState(state);
+    await syncRemoteChange('Reopening task', () => persistCompletionChangedTodos(changedTodos));
   }
 
   async function hydrateRemoteTodos() {
@@ -635,6 +677,8 @@
     {draftTitle}
     {editingTaskId}
     {newlyAddedTodoId}
+    {draggedSummaryId}
+    {isOpenDropTarget}
     {themeMode}
     onSubmit={handleSubmit}
     onDraftInput={handleDraftInput}
@@ -645,6 +689,8 @@
     onOpenTask={openTask}
     onComplete={handleComplete}
     onFail={handleFail}
+    onOpenListDragOver={handleOpenListDragOver}
+    onOpenListDrop={handleOpenListDrop}
     onToggleTheme={toggleThemeMode}
   />
 
