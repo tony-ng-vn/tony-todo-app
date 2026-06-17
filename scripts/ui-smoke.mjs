@@ -63,6 +63,13 @@ async function inspectViewport(viewport, isMobile) {
             completedAt: null,
             note: 'Existing note',
           },
+          {
+            id: 'ui-smoke-today-task',
+            title: 'Today section task',
+            createdAt: completedAt(9, 5),
+            completedAt: null,
+            note: '',
+          },
           ...Array.from({ length: 14 }, (_, index) => ({
             id: `ui-smoke-overflow-task-${index}`,
             title: `Overflow task ${index + 1}`,
@@ -595,13 +602,17 @@ function assertTaskRowSpacing(result) {
 }
 
 function assertOngoingSection(result) {
-  const [ongoing, open] = result.taskSections;
+  const [ongoing, today, other] = result.taskSections;
   return ongoing?.heading === 'Ongoing' &&
     ongoing?.ids.includes('ui-smoke-overflow-task-0') &&
-    open?.heading === 'Open' &&
-    !open?.ids.includes('ui-smoke-overflow-task-0')
+    today?.heading === 'Today todos' &&
+    today.ids.includes('ui-smoke-today-task') &&
+    other?.heading === 'Other todos' &&
+    other.ids.includes('ui-smoke-local-task') &&
+    !today?.ids.includes('ui-smoke-overflow-task-0') &&
+    !other?.ids.includes('ui-smoke-overflow-task-0')
     ? []
-    : [`running tasks are not separated into an Ongoing section: ${JSON.stringify(result.taskSections)}`];
+    : [`running and dated tasks are not separated correctly: ${JSON.stringify(result.taskSections)}`];
 }
 
 function assertExists(result, selector, label) {

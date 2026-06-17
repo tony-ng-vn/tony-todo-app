@@ -10,6 +10,7 @@ import {
   getProgressSessions,
   formatDuration,
   getElapsedSeconds,
+  getOpenTodoSections,
   logProgressSession,
   moveCompletedTodoToSummaryBucket,
   pauseTodoTimer,
@@ -34,6 +35,50 @@ describe('todo day summary', () => {
     expect(getPendingTodos(state).map((todo) => todo.title)).toEqual([
       'Send invoice',
       'Draft landing page',
+    ]);
+  });
+
+  it('groups open todos into today and other sections', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Yesterday task', new Date('2026-06-16T08:00:00'));
+    state = addTodo(state, 'Today task', new Date('2026-06-17T09:00:00'));
+    state = addTodo(state, 'Tomorrow task', new Date('2026-06-18T10:00:00'));
+
+    const sections = getOpenTodoSections(getPendingTodos(state), new Date('2026-06-17T12:00:00'));
+
+    expect(sections).toEqual([
+      {
+        id: 'today',
+        label: 'Today todos',
+        items: [expect.objectContaining({ title: 'Today task' })],
+      },
+      {
+        id: 'other',
+        label: 'Other todos',
+        items: [
+          expect.objectContaining({ title: 'Yesterday task' }),
+          expect.objectContaining({ title: 'Tomorrow task' }),
+        ],
+      },
+    ]);
+  });
+
+  it('puts open todos without a valid created date in other todos', () => {
+    const state = createInitialState([
+      {
+        id: 'legacy-task',
+        title: 'Legacy task',
+        createdAt: '',
+        completedAt: null,
+      },
+    ]);
+
+    expect(getOpenTodoSections(getPendingTodos(state), new Date('2026-06-17T12:00:00'))).toEqual([
+      {
+        id: 'other',
+        label: 'Other todos',
+        items: [expect.objectContaining({ id: 'legacy-task' })],
+      },
     ]);
   });
 

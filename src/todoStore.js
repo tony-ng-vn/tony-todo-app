@@ -187,6 +187,22 @@ export function getPendingTodos(state) {
     .toSorted((first, second) => new Date(first.createdAt) - new Date(second.createdAt));
 }
 
+export function getOpenTodoSections(todos, currentDate = new Date()) {
+  const currentDayKey = formatDayKey(currentDate);
+  const sections = [
+    { id: 'today', label: 'Today todos', items: [] },
+    { id: 'other', label: 'Other todos', items: [] },
+  ];
+
+  for (const todo of todos) {
+    const createdAt = new Date(todo.createdAt);
+    const section = !Number.isNaN(createdAt.getTime()) && formatDayKey(createdAt) === currentDayKey ? sections[0] : sections[1];
+    section.items.push(todo);
+  }
+
+  return sections.filter((section) => section.items.length > 0);
+}
+
 export function getCompletedTodos(state) {
   return state.todos
     .filter((todo) => todo.completedAt)

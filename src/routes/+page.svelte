@@ -17,6 +17,7 @@
     getDaySummary,
     getElapsedSeconds,
     getMillisecondsUntilNextDay,
+    getOpenTodoSections,
     getProgressSessions,
     logProgressSession,
     moveCompletedTodoToSummaryBucket,
@@ -72,11 +73,13 @@
   let completionCue = null;
   let completionCueTimer = null;
   let themeMode = 'light';
+  let currentDayKey = formatDayKey(new Date());
 
   $: pendingTodos = getPendingTodos(state);
   $: pendingViewTodos = withLatestProgressSession(pendingTodos);
   $: ongoingTodos = pendingViewTodos.filter((todo) => todo.activeStartedAt);
   $: openTodos = pendingViewTodos.filter((todo) => !todo.activeStartedAt);
+  $: openTodoSections = getOpenTodoSections(openTodos, new Date(`${currentDayKey}T00:00:00`));
   $: openCount = openTodos.length;
   $: summary = getDaySummary(state, selectedDay);
   $: completedToday = summary.reduce(
@@ -277,6 +280,7 @@
 
   function syncSelectedDayToToday() {
     const today = formatDayKey(new Date());
+    currentDayKey = today;
     if (selectedDay !== today) {
       selectedDay = today;
     }
@@ -671,7 +675,7 @@
   <TaskPanel
     {syncMessage}
     {ongoingTodos}
-    {openTodos}
+    {openTodoSections}
     {openCount}
     bind:titleDraft
     {draftTitle}

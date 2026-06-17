@@ -5,7 +5,7 @@
 
   export let syncMessage = 'Local only';
   export let ongoingTodos = [];
-  export let openTodos = [];
+  export let openTodoSections = [];
   export let openCount = 0;
   export let titleDraft = '';
   export let draftTitle = '';
@@ -86,17 +86,21 @@
       </li>
     {/if}
 
-    <li class="task-list-section" aria-labelledby="open-heading">
-      <div class="section-heading">
-        <h2 id="open-heading">Open</h2>
-        <span class="section-count" id="open-count">{draggedSummaryId ? 'Drop to reopen' : `${openCount} open`}</span>
-      </div>
-      <ol class="task-section-list">
-        {#each openTodos as todo (todo.id)}
-          {@render taskRow(todo)}
-        {/each}
-      </ol>
-    </li>
+    {#each openTodoSections as section, index (section.id)}
+      <li class="task-list-section" aria-labelledby={`open-${section.id}-heading`}>
+        <div class="section-heading">
+          <h2 id={`open-${section.id}-heading`}>{section.label}</h2>
+          <span class="section-count" id={index === 0 ? 'open-count' : undefined}>
+            {draggedSummaryId && index === 0 ? 'Drop to reopen' : `${section.items.length} open`}
+          </span>
+        </div>
+        <ol class="task-section-list">
+          {#each section.items as todo (todo.id)}
+            {@render taskRow(todo)}
+          {/each}
+        </ol>
+      </li>
+    {/each}
 
     {#if draftTitle}
       <li class="block-insertion-cue" aria-live="polite">
