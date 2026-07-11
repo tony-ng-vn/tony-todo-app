@@ -16,6 +16,10 @@ export function saveLocalState(state, storage = localStorage) {
   storage.setItem(STORAGE_KEY, JSON.stringify(state));
 }
 
+export function reconcileRemoteState(_cachedState, remoteTodos) {
+  return createInitialState(remoteTodos);
+}
+
 export function getOrCreateClientId(storage = localStorage, createId = () => crypto.randomUUID()) {
   const existing = storage.getItem(CLIENT_ID_KEY);
   if (existing) {

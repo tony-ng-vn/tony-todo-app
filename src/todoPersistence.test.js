@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addTodo, createInitialState } from './todoStore.js';
-import { getOrCreateClientId, loadLocalState, saveLocalState } from './todoPersistence.js';
+import { getOrCreateClientId, loadLocalState, reconcileRemoteState, saveLocalState } from './todoPersistence.js';
 
 describe('todo persistence', () => {
   it('loads todos from local storage', () => {
@@ -28,6 +28,12 @@ describe('todo persistence', () => {
     saveLocalState(state, storage);
 
     expect(JSON.parse(storage.getItem('done-log-state'))).toEqual(state);
+  });
+
+  it('replaces cached todos with an empty authoritative remote snapshot', () => {
+    const cachedState = createInitialState([{ id: 'todo-1', title: 'Cached task' }]);
+
+    expect(reconcileRemoteState(cachedState, [])).toEqual(createInitialState());
   });
 
   it('reuses an existing client id', () => {

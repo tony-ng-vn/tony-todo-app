@@ -44,7 +44,7 @@
     updateRemoteTodoTimer,
     updateRemoteTodoTitle,
   } from '../todoRemote.js';
-  import { getOrCreateClientId, loadLocalState, saveLocalState } from '../todoPersistence.js';
+  import { getOrCreateClientId, loadLocalState, reconcileRemoteState, saveLocalState } from '../todoPersistence.js';
 
   const TIMER_SYNC_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds'];
   const COMPLETION_SYNC_FIELDS = ['completedAt'];
@@ -545,16 +545,9 @@
     syncMessage = 'Loading cloud';
 
     try {
-      const cachedTodos = state.todos;
       const remoteTodos = await loadRemoteTodos(insforge, clientId);
 
-      if (remoteTodos.length === 0 && cachedTodos.length > 0) {
-        await Promise.all(cachedTodos.map((todo) => insertRemoteTodo(insforge, clientId, todo)));
-        renderRemoteStatus(cachedTodos.length);
-        return;
-      }
-
-      state = createInitialState(remoteTodos);
+      state = reconcileRemoteState(state, remoteTodos);
       saveLocalState(state);
       renderRemoteStatus(remoteTodos.length);
     } catch (error) {
