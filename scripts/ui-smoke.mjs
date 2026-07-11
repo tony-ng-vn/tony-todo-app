@@ -8,6 +8,7 @@ const browser = await chromium.launch({ headless: true });
 try {
   const mobile = await inspectViewport({ width: 390, height: 844 }, true);
   const desktop = await inspectViewport({ width: 1366, height: 900 }, false);
+  const draftCue = await inspectDraftInsertionCue({ width: 1366, height: 900 });
   const failures = [
     ...assertNoOverflow(mobile),
     ...assertNoOverflow(desktop),
@@ -32,6 +33,7 @@ try {
     ...assertExists(desktop, '.theme-toggle', 'theme toggle'),
     ...assertBucketLabels(desktop),
     ...assertIncludes(desktop.summaryDurations, '45m', 'summary duration text'),
+    ...assertDraftInsertionCue(draftCue),
   ];
 
   if (failures.length) {
@@ -40,6 +42,49 @@ try {
   }
 } finally {
   await browser.close();
+}
+
+async function inspectDraftInsertionCue(viewport) {
+  const page = await browser.newPage({ viewport });
+  await page.addInitScript(() => {
+    localStorage.setItem('done-log-client-id', 'ui-smoke-draft-cue');
+    localStorage.setItem('done-log-state', JSON.stringify({ todos: [] }));
+  });
+  await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
+  await page.fill('#todo-title', 'Fix');
+  await page.waitForSelector('.block-insertion-cue');
+
+  const draftMetrics = await page.evaluate(() => {
+    const cue = document.querySelector('.block-insertion-cue');
+    const line = document.querySelector('.block-insertion-line');
+    const label = document.querySelector('.block-insertion-label');
+    const cueRect = cue?.getBoundingClientRect();
+    const lineRect = line?.getBoundingClientRect();
+    const labelRect = label?.getBoundingClientRect();
+
+    return {
+      visible: Boolean(cue),
+      cueHeight: Math.round(cueRect?.height ?? 0),
+      lineLabelGap: Math.round((labelRect?.top ?? 0) - (lineRect?.bottom ?? 0)),
+      alignContent: getComputedStyle(document.querySelector('.todo-list')).alignContent,
+    };
+  });
+
+  await page.click('.input-row button[type="submit"]');
+  await page.waitForSelector('.todo-item');
+  await page.waitForTimeout(750);
+
+  const taskMetrics = await page.evaluate(() => {
+    const item = document.querySelector('.todo-item');
+    const itemRect = item?.getBoundingClientRect();
+    return {
+      itemHeight: Math.round(itemRect?.height ?? 0),
+      itemAlignSelf: item ? getComputedStyle(item).alignSelf : null,
+    };
+  });
+
+  await page.close();
+  return { ...draftMetrics, ...taskMetrics };
 }
 
 async function inspectViewport(viewport, isMobile) {
@@ -810,4 +855,24 @@ function assertProgressiveSession(result) {
     editChecks.recapProgress.includes('pages 41-52')
     ? []
     : [`progressive session failed: ${JSON.stringify(editChecks)}`];
+}
+
+function assertDraftInsertionCue(result) {
+  const failures = [];
+  if (!result?.visible) {
+    failures.push(`draft insertion cue missing while typing a new task: ${JSON.stringify(result)}`);
+  }
+  if (result?.cueHeight > 48) {
+    failures.push(`draft insertion cue stretched while typing: height ${result.cueHeight}`);
+  }
+  if (result?.lineLabelGap > 12) {
+    failures.push(`draft insertion cue line and label separated: gap ${result.lineLabelGap}`);
+  }
+  if (result?.alignContent !== 'start') {
+    failures.push(`todo list align-content is ${result?.alignContent}; expected start`);
+  }
+  if (!result?.itemHeight || result.itemHeight > 120) {
+    failures.push(`single open task block stretched: height ${result?.itemHeight}`);
+  }
+  return failures;
 }
