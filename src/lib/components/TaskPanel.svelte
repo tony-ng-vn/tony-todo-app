@@ -26,6 +26,7 @@
   export let onOpenListDragOver;
   export let onOpenListDrop;
   export let onToggleTheme;
+  export let onViewChange;
 </script>
 
 <section
@@ -43,6 +44,12 @@
     </div>
     <div class="header-actions">
       <output class="sync-status" id="sync-status" aria-live="polite">{syncMessage}</output>
+      <div class="view-toggle" role="group" aria-label="Workspace view">
+        <button type="button" class="view-toggle-button is-active" aria-current="page">Flow</button>
+        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('board')}>
+          Board
+        </button>
+      </div>
       <button
         type="button"
         class="theme-toggle"
