@@ -5,6 +5,12 @@ const SUMMARY_BUCKETS = [
   { label: 'Night', start: 21, end: 5 },
 ];
 
+export const BOARD_COLUMNS = [
+  { id: 'not_started', label: 'Not started' },
+  { id: 'in_progress', label: 'In progress' },
+  { id: 'done', label: 'Done' },
+];
+
 export function createInitialState(todos = []) {
   return { todos: todos.map(normalizeTodo) };
 }
@@ -185,6 +191,99 @@ export function getPendingTodos(state) {
   return state.todos
     .filter((todo) => !todo.completedAt && !todo.isProgressSession)
     .toSorted((first, second) => new Date(first.createdAt) - new Date(second.createdAt));
+}
+
+export function getBoardColumnId(todo) {
+  if (todo.completedAt) {
+    return 'done';
+  }
+
+  if (todo.activeStartedAt) {
+    return 'in_progress';
+  }
+
+  return 'not_started';
+}
+
+export function getBoardColumns(state, { dayKey, now = new Date() } = {}) {
+  const pending = getPendingTodos(state);
+  const doneDayKey = dayKey ?? formatDayKey(now);
+  const notStarted = [];
+  const inProgress = [];
+
+  for (const todo of pending) {
+    if (todo.activeStartedAt) {
+      inProgress.push(enrichBoardItem(todo, now));
+    } else {
+      notStarted.push(enrichBoardItem(todo, now));
+    }
+  }
+
+  const done = getCompletedTodos(state)
+    .filter((todo) => formatDayKey(new Date(todo.completedAt)) === doneDayKey)
+    .map((todo) => enrichBoardItem(todo, now));
+
+  return BOARD_COLUMNS.map((column) => {
+    if (column.id === 'not_started') {
+      return { ...column, items: notStarted };
+    }
+
+    if (column.id === 'in_progress') {
+      return { ...column, items: inProgress };
+    }
+
+    return { ...column, items: done };
+  });
+}
+
+export function moveTodoToBoardColumn(state, todoId, columnId, at = new Date()) {
+  const todo = state.todos.find((entry) => entry.id === todoId);
+
+  if (!todo || todo.isProgressSession || !BOARD_COLUMNS.some((column) => column.id === columnId)) {
+    return state;
+  }
+
+  const currentColumnId = getBoardColumnId(todo);
+  if (currentColumnId === columnId) {
+    return state;
+  }
+
+  if (columnId === 'not_started') {
+    if (currentColumnId === 'in_progress') {
+      return pauseTodoTimer(state, todoId, at);
+    }
+
+    if (currentColumnId === 'done') {
+      return reopenTodo(state, todoId);
+    }
+
+    return state;
+  }
+
+  if (columnId === 'in_progress') {
+    if (currentColumnId === 'done') {
+      return startTodoTimer(reopenTodo(state, todoId), todoId, at);
+    }
+
+    return startTodoTimer(state, todoId, at);
+  }
+
+  if (columnId === 'done') {
+    return logProgressSession(state, todoId, at);
+  }
+
+  return state;
+}
+
+function enrichBoardItem(todo, now) {
+  const durationSeconds = getElapsedSeconds(todo, now);
+
+  return {
+    ...todo,
+    durationSeconds,
+    durationLabel: formatDuration(durationSeconds),
+    outcome: todo.notionStatus === 'Failed' ? 'failed' : todo.completedAt ? 'done' : null,
+  };
 }
 
 export function getOpenTodoSections(todos, currentDate = new Date()) {

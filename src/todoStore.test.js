@@ -4,6 +4,7 @@ import {
   completeTodo,
   createInitialState,
   failTodo,
+  getBoardColumns,
   getDaySummary,
   getMillisecondsUntilNextDay,
   getPendingTodos,
@@ -13,6 +14,7 @@ import {
   getOpenTodoSections,
   logProgressSession,
   moveCompletedTodoToSummaryBucket,
+  moveTodoToBoardColumn,
   pauseTodoTimer,
   reorderCompletedTodosForDay,
   reopenTodo,
@@ -462,5 +464,126 @@ describe('todo day summary', () => {
 
     expect(state.todos).toHaveLength(1);
     expect(state.todos[0].completedAt).toBe(doneAt.toISOString());
+  });
+});
+
+describe('board view columns', () => {
+  it('splits todos into not started, in progress, and done columns', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Backlog task', new Date('2026-06-08T08:00:00'));
+    state = addTodo(state, 'Active task', new Date('2026-06-08T08:05:00'));
+    state = addTodo(state, 'Finished task', new Date('2026-06-08T08:10:00'));
+    const [, activeId, finishedId] = state.todos.map((todo) => todo.id);
+
+    state = startTodoTimer(state, activeId, new Date('2026-06-08T09:00:00'));
+    state = completeTodo(state, finishedId, new Date('2026-06-08T10:00:00'));
+
+    const columns = getBoardColumns(state, { dayKey: '2026-06-08' });
+
+    expect(columns.map((column) => column.id)).toEqual(['not_started', 'in_progress', 'done']);
+    expect(columns[0].items.map((todo) => todo.title)).toEqual(['Backlog task']);
+    expect(columns[1].items.map((todo) => todo.title)).toEqual(['Active task']);
+    expect(columns[2].items.map((todo) => todo.title)).toEqual(['Finished task']);
+    expect(columns[2].items[0].durationLabel).toBe('0m');
+  });
+
+  it('only shows done tasks for the selected day on the board', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Yesterday done', new Date('2026-06-07T08:00:00'));
+    state = addTodo(state, 'Today done', new Date('2026-06-08T08:00:00'));
+    const [yesterdayId, todayId] = state.todos.map((todo) => todo.id);
+
+    state = completeTodo(state, yesterdayId, new Date('2026-06-07T12:00:00'));
+    state = completeTodo(state, todayId, new Date('2026-06-08T12:00:00'));
+
+    const columns = getBoardColumns(state, { dayKey: '2026-06-08' });
+    expect(columns[2].items.map((todo) => todo.title)).toEqual(['Today done']);
+  });
+
+  it('starts the timer when a task moves from not started to in progress', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Write brief', new Date('2026-06-08T08:00:00'));
+    const todoId = state.todos[0].id;
+    const startedAt = new Date('2026-06-08T09:15:00');
+
+    state = moveTodoToBoardColumn(state, todoId, 'in_progress', startedAt);
+
+    expect(state.todos[0]).toMatchObject({
+      activeStartedAt: startedAt.toISOString(),
+      firstStartedAt: startedAt.toISOString(),
+      completedAt: null,
+    });
+  });
+
+  it('ends the timer and records duration when a task moves to done', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Ship fix', new Date('2026-06-08T08:00:00'));
+    const todoId = state.todos[0].id;
+    state = startTodoTimer(state, todoId, new Date('2026-06-08T09:00:00'));
+    const doneAt = new Date('2026-06-08T09:45:00');
+
+    state = moveTodoToBoardColumn(state, todoId, 'done', doneAt);
+
+    expect(state.todos[0]).toMatchObject({
+      completedAt: doneAt.toISOString(),
+      activeStartedAt: null,
+      trackedSeconds: 45 * 60,
+    });
+  });
+
+  it('pauses the timer when a task moves back to not started', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Pause me', new Date('2026-06-08T08:00:00'));
+    const todoId = state.todos[0].id;
+    state = startTodoTimer(state, todoId, new Date('2026-06-08T09:00:00'));
+    const pausedAt = new Date('2026-06-08T09:20:00');
+
+    state = moveTodoToBoardColumn(state, todoId, 'not_started', pausedAt);
+
+    expect(state.todos[0]).toMatchObject({
+      activeStartedAt: null,
+      completedAt: null,
+      trackedSeconds: 20 * 60,
+    });
+  });
+
+  it('reopens a done task into in progress and starts a fresh timer segment', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Reopen me', new Date('2026-06-08T08:00:00'));
+    const todoId = state.todos[0].id;
+    state = startTodoTimer(state, todoId, new Date('2026-06-08T09:00:00'));
+    state = completeTodo(state, todoId, new Date('2026-06-08T09:30:00'));
+    const restartedAt = new Date('2026-06-08T11:00:00');
+
+    state = moveTodoToBoardColumn(state, todoId, 'in_progress', restartedAt);
+
+    expect(state.todos[0]).toMatchObject({
+      completedAt: null,
+      activeStartedAt: restartedAt.toISOString(),
+      trackedSeconds: 30 * 60,
+    });
+  });
+
+  it('logs a progressive session when moving a progressive task to done', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Read book', new Date('2026-06-08T08:00:00'));
+    const parentId = state.todos[0].id;
+    state = setTodoProgressive(state, parentId, true);
+    state = startTodoTimer(state, parentId, new Date('2026-06-08T09:00:00'));
+    const doneAt = new Date('2026-06-08T09:25:00');
+
+    state = moveTodoToBoardColumn(state, parentId, 'done', doneAt);
+
+    const parent = state.todos.find((todo) => todo.id === parentId);
+    const sessions = getProgressSessions(state, parentId);
+    expect(parent).toMatchObject({
+      completedAt: null,
+      activeStartedAt: null,
+      trackedSeconds: 0,
+    });
+    expect(sessions[0]).toMatchObject({
+      trackedSeconds: 25 * 60,
+      completedAt: doneAt.toISOString(),
+    });
   });
 });
