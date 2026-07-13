@@ -34,6 +34,15 @@
   --space-4: 16px;
   --space-5: 20px;
   --space-6: 24px;
+  --board-not-started: #9065d0;
+  --board-not-started-soft: rgba(144, 101, 208, 0.14);
+  --board-not-started-surface: rgba(144, 101, 208, 0.08);
+  --board-in-progress: #c9a227;
+  --board-in-progress-soft: rgba(201, 162, 39, 0.16);
+  --board-in-progress-surface: rgba(201, 162, 39, 0.08);
+  --board-done: #4f9d6a;
+  --board-done-soft: rgba(79, 157, 106, 0.16);
+  --board-done-surface: rgba(79, 157, 106, 0.08);
   color: var(--strong);
   background: var(--canvas);
   color-scheme: light;
@@ -76,6 +85,15 @@
     --shadow: rgba(0, 0, 0, 0.45);
     --shadow-soft: 0 16px 34px rgba(0, 0, 0, 0.34);
     --shadow-raised: 0 12px 28px rgba(0, 0, 0, 0.36), 0 1px 0 rgba(255, 255, 255, 0.07) inset;
+    --board-not-started: #b794f0;
+    --board-not-started-soft: rgba(183, 148, 240, 0.22);
+    --board-not-started-surface: rgba(183, 148, 240, 0.1);
+    --board-in-progress: #e2c15a;
+    --board-in-progress-soft: rgba(226, 193, 90, 0.22);
+    --board-in-progress-surface: rgba(226, 193, 90, 0.1);
+    --board-done: #6fbf88;
+    --board-done-soft: rgba(111, 191, 136, 0.22);
+    --board-done-surface: rgba(111, 191, 136, 0.1);
     color-scheme: dark;
   }
 }
@@ -110,6 +128,15 @@
   --shadow: rgba(0, 0, 0, 0.45);
   --shadow-soft: 0 16px 34px rgba(0, 0, 0, 0.34);
   --shadow-raised: 0 12px 28px rgba(0, 0, 0, 0.36), 0 1px 0 rgba(255, 255, 255, 0.07) inset;
+  --board-not-started: #b794f0;
+  --board-not-started-soft: rgba(183, 148, 240, 0.22);
+  --board-not-started-surface: rgba(183, 148, 240, 0.1);
+  --board-in-progress: #e2c15a;
+  --board-in-progress-soft: rgba(226, 193, 90, 0.22);
+  --board-in-progress-surface: rgba(226, 193, 90, 0.1);
+  --board-done: #6fbf88;
+  --board-done-soft: rgba(111, 191, 136, 0.22);
+  --board-done-surface: rgba(111, 191, 136, 0.1);
   color-scheme: dark;
 }
 

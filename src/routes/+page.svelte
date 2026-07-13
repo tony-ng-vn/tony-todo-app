@@ -3,17 +3,18 @@
   import '../styles.css';
   import FlowRail from '../lib/components/FlowRail.svelte';
   import LottieAnimation from '../lib/components/LottieAnimation.svelte';
+  import BoardPanel from '../lib/components/BoardPanel.svelte';
   import SummaryPanel from '../lib/components/SummaryPanel.svelte';
   import TaskDetail from '../lib/components/TaskDetail.svelte';
   import TaskPanel from '../lib/components/TaskPanel.svelte';
   import {
     addTodo,
-    completeTodo,
     createInitialState,
     deleteTodo,
     failTodo,
     formatDayKey,
     formatDuration,
+    getBoardColumns,
     getDaySummary,
     getElapsedSeconds,
     getMillisecondsUntilNextDay,
@@ -21,6 +22,7 @@
     getProgressSessions,
     logProgressSession,
     moveCompletedTodoToSummaryBucket,
+    moveTodoToBoardColumn,
     getPendingTodos,
     pauseTodoTimer,
     reopenTodo,
@@ -49,6 +51,7 @@
   const TIMER_SYNC_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds'];
   const COMPLETION_SYNC_FIELDS = ['completedAt'];
   const THEME_STORAGE_KEY = 'done-log-theme';
+  const VIEW_STORAGE_KEY = 'done-log-view';
 
   let state = createInitialState();
   let selectedDay = formatDayKey(new Date());
@@ -70,9 +73,12 @@
   let dropTargetId = null;
   let dropTargetBucket = null;
   let isOpenDropTarget = false;
+  let draggedBoardTodoId = null;
+  let dropTargetColumnId = null;
   let completionCue = null;
   let completionCueTimer = null;
   let themeMode = 'light';
+  let viewMode = 'flow';
   let currentDayKey = formatDayKey(new Date());
 
   $: pendingTodos = getPendingTodos(state);
@@ -82,6 +88,7 @@
   $: openTodoSections = getOpenTodoSections(openTodos, new Date(`${currentDayKey}T00:00:00`));
   $: openCount = openTodos.length;
   $: summary = getDaySummary(state, selectedDay);
+  $: boardColumns = getBoardColumns(state, { dayKey: selectedDay });
   $: completedToday = summary.reduce(
     (total, section) => total + section.items.filter((item) => item.outcome !== 'failed').length,
     0,
@@ -95,6 +102,7 @@
     clientId = getOrCreateClientId();
     state = loadLocalState();
     themeMode = loadThemeMode();
+    viewMode = loadViewMode();
     applyThemeMode(themeMode);
     window.addEventListener('focus', syncSelectedDayToToday);
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -270,6 +278,141 @@
   function toggleThemeMode() {
     themeMode = themeMode === 'dark' ? 'light' : 'dark';
     applyThemeMode(themeMode);
+  }
+
+  function setViewMode(nextViewMode) {
+    viewMode = nextViewMode === 'board' ? 'board' : 'flow';
+    localStorage.setItem(VIEW_STORAGE_KEY, viewMode);
+    draggedBoardTodoId = null;
+    dropTargetColumnId = null;
+  }
+
+  function handleBoardSelectedDayChange(nextDay) {
+    if (!nextDay) {
+      return;
+    }
+
+    selectedDay = nextDay;
+  }
+
+  function handleBoardDragStart(event, todoId) {
+    draggedBoardTodoId = todoId;
+    event.dataTransfer.effectAllowed = 'move';
+    event.dataTransfer.setData('text/plain', todoId);
+  }
+
+  function handleBoardDragEnd() {
+    draggedBoardTodoId = null;
+    dropTargetColumnId = null;
+  }
+
+  function handleBoardDragOver(event, columnId) {
+    if (!draggedBoardTodoId) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'move';
+    dropTargetColumnId = columnId;
+  }
+
+  async function handleBoardDrop(event, columnId) {
+    event.preventDefault();
+    const todoId = draggedBoardTodoId || event.dataTransfer.getData('text/plain');
+    draggedBoardTodoId = null;
+    dropTargetColumnId = null;
+
+    if (!todoId) {
+      return;
+    }
+
+    await moveBoardTodo(todoId, columnId);
+  }
+
+  async function moveBoardTodo(todoId, columnId) {
+    const beforeTodos = state.todos;
+    const beforeTodo = findTodo(todoId);
+    state = moveTodoToBoardColumn(state, todoId, columnId);
+    const afterTodo = findTodo(todoId);
+    const createdTodo = state.todos.find((todo) => !beforeTodos.some((before) => before.id === todo.id));
+    const changedTimerTodos = getTimerChangedTodos(beforeTodos, state.todos);
+    const changedCompletionTodos = getCompletionChangedTodos(beforeTodos, state.todos);
+
+    if (
+      beforeTodo &&
+      afterTodo &&
+      beforeTodo.completedAt === afterTodo.completedAt &&
+      beforeTodo.activeStartedAt === afterTodo.activeStartedAt &&
+      beforeTodo.trackedSeconds === afterTodo.trackedSeconds &&
+      !createdTodo
+    ) {
+      return;
+    }
+
+    if (columnId === 'done') {
+      const completedTodo = createdTodo ?? afterTodo;
+      triggerCompletionCue(completedTodo);
+      if (!beforeTodo?.isProgressive && selectedTaskId === todoId) {
+        selectedTaskId = null;
+      }
+      selectedDay = formatDayKey(new Date());
+    }
+
+    saveLocalState(state);
+
+    if (beforeTodo?.isProgressive && columnId === 'done') {
+      await syncRemoteChange('Saving session', async () => {
+        await persistTodoTimer(afterTodo);
+        await persistTodoProgress(afterTodo);
+        await persistNewTodo(createdTodo);
+      });
+      return;
+    }
+
+    if (changedCompletionTodos.length > 0) {
+      await syncRemoteChange('Saving', () => persistCompletionChangedTodos(changedCompletionTodos));
+      return;
+    }
+
+    if (changedTimerTodos.length > 0) {
+      await syncRemoteChange('Saving time', () =>
+        Promise.all(changedTimerTodos.map((todo) => persistTodoTimer(todo))),
+      );
+    }
+  }
+
+  async function handleCreateTaskInColumn(columnId, title) {
+    const existingIds = new Set(state.todos.map((todo) => todo.id));
+    state = addTodo(state, title);
+
+    if (columnId === 'in_progress' || columnId === 'done') {
+      const created = state.todos.find((todo) => !existingIds.has(todo.id));
+      if (created) {
+        state = moveTodoToBoardColumn(state, created.id, columnId);
+      }
+    }
+
+    const createdTodo = state.todos.find((todo) => !existingIds.has(todo.id));
+    if (!createdTodo) {
+      return;
+    }
+
+    newlyAddedTodoId = createdTodo.id;
+    saveLocalState(state);
+    window.setTimeout(() => {
+      if (newlyAddedTodoId === createdTodo.id) {
+        newlyAddedTodoId = null;
+      }
+    }, 700);
+
+    if (columnId === 'done') {
+      triggerCompletionCue(createdTodo);
+      selectedDay = formatDayKey(new Date());
+      await syncRemoteChange('Saving', () => persistNewTodo(createdTodo));
+      return;
+    }
+
+    await syncRemoteChange('Saving', () => persistNewTodo(createdTodo));
   }
 
   function handleVisibilityChange() {
@@ -623,6 +766,11 @@
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   }
 
+  function loadViewMode() {
+    const storedView = localStorage.getItem(VIEW_STORAGE_KEY);
+    return storedView === 'board' ? 'board' : 'flow';
+  }
+
   function applyThemeMode(nextThemeMode) {
     document.documentElement.dataset.theme = nextThemeMode;
     localStorage.setItem(THEME_STORAGE_KEY, nextThemeMode);
@@ -664,51 +812,78 @@
   }
 </script>
 
-<main class="workspace" class:has-detail={selectedTask} aria-label="Done Log todo app">
-  <TaskPanel
-    {syncMessage}
-    {ongoingTodos}
-    {openTodoSections}
-    {openCount}
-    bind:titleDraft
-    {draftTitle}
-    {editingTaskId}
-    {newlyAddedTodoId}
-    {draggedSummaryId}
-    {isOpenDropTarget}
-    {themeMode}
-    onSubmit={handleSubmit}
-    onDraftInput={handleDraftInput}
-    onStartTitleEdit={startTitleEdit}
-    onTitleKeydown={handleTitleKeydown}
-    onCommitTitleEdit={commitTitleEdit}
-    onTimerAction={handleTimerAction}
-    onOpenTask={openTask}
-    onComplete={handleComplete}
-    onFail={handleFail}
-    onOpenListDragOver={handleOpenListDragOver}
-    onOpenListDrop={handleOpenListDrop}
-    onToggleTheme={toggleThemeMode}
-  />
+<main
+  class="workspace"
+  class:has-detail={selectedTask}
+  class:is-board-view={viewMode === 'board'}
+  aria-label="Done Log todo app"
+>
+  {#if viewMode === 'board'}
+    <BoardPanel
+      {syncMessage}
+      columns={boardColumns}
+      {selectedDay}
+      {themeMode}
+      {newlyAddedTodoId}
+      {draggedBoardTodoId}
+      {dropTargetColumnId}
+      onToggleTheme={toggleThemeMode}
+      onViewChange={setViewMode}
+      onSelectedDayChange={handleBoardSelectedDayChange}
+      onOpenTask={openTask}
+      onBoardDragStart={handleBoardDragStart}
+      onBoardDragEnd={handleBoardDragEnd}
+      onBoardDragOver={handleBoardDragOver}
+      onBoardDrop={handleBoardDrop}
+      onCreateTaskInColumn={handleCreateTaskInColumn}
+    />
+  {:else}
+    <TaskPanel
+      {syncMessage}
+      {ongoingTodos}
+      {openTodoSections}
+      {openCount}
+      bind:titleDraft
+      {draftTitle}
+      {editingTaskId}
+      {newlyAddedTodoId}
+      {draggedSummaryId}
+      {isOpenDropTarget}
+      {themeMode}
+      onSubmit={handleSubmit}
+      onDraftInput={handleDraftInput}
+      onStartTitleEdit={startTitleEdit}
+      onTitleKeydown={handleTitleKeydown}
+      onCommitTitleEdit={commitTitleEdit}
+      onTimerAction={handleTimerAction}
+      onOpenTask={openTask}
+      onComplete={handleComplete}
+      onFail={handleFail}
+      onOpenListDragOver={handleOpenListDragOver}
+      onOpenListDrop={handleOpenListDrop}
+      onToggleTheme={toggleThemeMode}
+      onViewChange={setViewMode}
+    />
 
-  <FlowRail {completedToday} />
+    <FlowRail {completedToday} />
 
-  <SummaryPanel
-    {summary}
-    bind:selectedDay
-    {draggedSummaryId}
-    {dropTargetId}
-    {dropTargetBucket}
-    onOpenTask={openTask}
-    onDragStart={handleDragStart}
-    onDragEnd={handleDragEnd}
-    onDragOver={handleDragOver}
-    onDrop={handleDrop}
-    onBucketDragOver={handleBucketDragOver}
-    onBucketDrop={handleBucketDrop}
-    onCompletedTimeChange={handleSummaryCompletedTimeChange}
-    {completedTime}
-  />
+    <SummaryPanel
+      {summary}
+      bind:selectedDay
+      {draggedSummaryId}
+      {dropTargetId}
+      {dropTargetBucket}
+      onOpenTask={openTask}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+      onDragOver={handleDragOver}
+      onDrop={handleDrop}
+      onBucketDragOver={handleBucketDragOver}
+      onBucketDrop={handleBucketDrop}
+      onCompletedTimeChange={handleSummaryCompletedTimeChange}
+      {completedTime}
+    />
+  {/if}
 
   <TaskDetail
     {selectedTask}

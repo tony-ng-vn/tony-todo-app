@@ -66,3 +66,12 @@ export function iconSun() {
     </svg>
   `;
 }
+
+export function iconPlus() {
+  return `
+    <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M8 3.25v9.5" />
+      <path d="M3.25 8h9.5" />
+    </svg>
+  `;
+}
