@@ -600,7 +600,7 @@ h2 {
   min-height: 28px;
   padding: 0 10px 0 8px;
   border-radius: 999px;
-  color: #fff;
+  color: #14120f;
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.01em;
@@ -820,8 +820,9 @@ h2 {
   font: inherit;
 }
 
-.board-draft-input:focus {
-  outline: none;
+.board-draft-input:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
 }
 
 .board-draft-actions {
