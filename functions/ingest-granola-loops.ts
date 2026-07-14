@@ -210,8 +210,13 @@ export default async function (req: Request): Promise<Response> {
       let maxCreatedAt = sinceIso;
 
       for (const noteSummary of notes) {
-        const note = await getNoteWithTranscript(source.apiKey, noteSummary.id);
-        if (!note) continue;
+        let note;
+        try {
+          note = await getNoteWithTranscript(source.apiKey, noteSummary.id);
+        } catch (error) {
+          results.errors.push(`${source.name}: ${error.message}`);
+          continue;
+        }
 
         results.notesProcessed += 1;
         if (note.created_at && (!maxCreatedAt || note.created_at > maxCreatedAt)) {
@@ -351,7 +356,8 @@ async function listNewNotes(apiKey, sinceIso) {
 
     const response = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
     if (!response.ok) {
-      throw new Error(`Granola /notes failed: ${response.status}`);
+      const errorBody = await response.text();
+      throw new Error(`Granola /notes failed: ${response.status} ${errorBody.slice(0, 300)}`);
     }
     const payload = await response.json();
     notes.push(...(payload.notes ?? []));
@@ -366,7 +372,8 @@ async function getNoteWithTranscript(apiKey, noteId) {
     headers: { Authorization: `Bearer ${apiKey}` },
   });
   if (!response.ok) {
-    return null;
+    const errorBody = await response.text();
+    throw new Error(`Granola /notes/${noteId} failed: ${response.status} ${errorBody.slice(0, 300)}`);
   }
   return response.json();
 }

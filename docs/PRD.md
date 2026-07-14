@@ -31,6 +31,7 @@ This section is updated as work lands; it is the fast way to check what's real v
 - A disposable test account (`extraclaude+e2e-test@twango.dev`) was used for all live verification in PRs #3-#11 and was never deleted (no safe path to delete an `auth.users` row was available without writing to an InsForge-managed schema). It holds no data as of this writing — it's cleaned up after every test — but it still exists as an account and should be removed via the InsForge dashboard when convenient.
 - No recurring ingestion schedule exists yet. It should be created once a real account exists to attribute loops to (`npx @insforge/cli schedules create`, calling `ingest-granola-loops` with the shared secret and the real `ownerUserId`).
 - Granola's public API rate limit (300 req/min) was hit repeatedly during this session's live testing; a production ingestion schedule should pace itself well under that, especially combined with `maxNotes` batching.
+- `ingest-granola-loops` previously returned a bare `Granola /notes failed: 400` twice during testing with no captured response body, making the cause undiagnosable. Both `/notes` and `/notes/{id}` calls now capture and surface the response body on failure, and a note that fails to fetch its transcript is reported in `results.errors` instead of silently skipped. Five follow-up reproduction attempts against the live API all returned HTTP 200 with no error, so the original 400 looks like a transient one-off rather than a persistent bug -- if it recurs, the real error body will now be visible.
 
 ---
 
