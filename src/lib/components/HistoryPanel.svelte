@@ -1,68 +1,59 @@
 <script>
   export let loops = [];
+  export let inboxCount = 0;
   export let waitingCount = 0;
-  export let checkingForLoops = false;
-  export let checkStatus = '';
-  export let onAccept;
-  export let onDismiss;
-  export let onSnooze;
+  export let onRestore;
   export let onViewChange;
-  export let onCheckForNewLoops;
 </script>
 
-<section class="inbox-panel" aria-labelledby="inbox-heading">
+<section class="history-panel" aria-labelledby="history-heading">
   <div class="panel-heading">
     <div>
-      <h2 id="inbox-heading">Inbox</h2>
-      <span class="panel-count">{loops.length} awaiting review</span>
+      <h2 id="history-heading">History</h2>
+      <span class="panel-count">{loops.length} dismissed</span>
     </div>
     <div class="view-toggle" role="group" aria-label="Workspace view">
       <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('flow')}>Flow</button>
       <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('board')}>Board</button>
-      <button type="button" class="view-toggle-button is-active" aria-current="page">Inbox</button>
+      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('inbox')}>
+        Inbox{inboxCount ? ` (${inboxCount})` : ''}
+      </button>
       <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('waiting')}>
         Waiting{waitingCount ? ` (${waitingCount})` : ''}
       </button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('history')}>History</button>
+      <button type="button" class="view-toggle-button is-active" aria-current="page">History</button>
     </div>
   </div>
-  <div class="inbox-actions-row">
-    <p class="panel-note">Medium-confidence loops Thread isn't sure about yet. Accept to promote to Focus, dismiss to teach it.</p>
-    <button type="button" class="check-loops-button" on:click={onCheckForNewLoops} disabled={checkingForLoops}>
-      {checkingForLoops ? 'Checking...' : 'Check for new loops'}
-    </button>
-  </div>
-  {#if checkStatus}
-    <p class="check-status" role="status">{checkStatus}</p>
-  {/if}
+  <p class="panel-note">Loops you dismissed as not-a-task. Restore one if it was a mistake.</p>
 
   <ol class="loop-list">
     {#each loops as loop (loop.id)}
       <li class="loop-card">
         <div class="loop-card-header">
-          <span class="priority-badge" data-priority={loop.priorityLabel}>{loop.priorityLabel}</span>
-          <span class="confidence-badge">{Math.round(loop.confidence * 100)}% confident</span>
+          {#if loop.priorityLabel}
+            <span class="priority-badge" data-priority={loop.priorityLabel}>{loop.priorityLabel}</span>
+          {/if}
+          <span class="dismissed-at">
+            Dismissed {new Intl.DateTimeFormat([], { dateStyle: 'medium' }).format(new Date(loop.updatedAt))}
+          </span>
         </div>
         <h3 class="loop-title">{loop.title}</h3>
-        <p class="why-priority">{loop.whyPriority}</p>
         <blockquote class="evidence">
           <p>&ldquo;{loop.evidence.excerpt}&rdquo;</p>
           <cite>{loop.evidence.author} &middot; {loop.evidence.sourceApp}</cite>
         </blockquote>
         <div class="loop-actions">
-          <button type="button" class="accept-button" on:click={() => onAccept?.(loop.id)}>Accept</button>
-          <button type="button" class="dismiss-button" on:click={() => onSnooze?.(loop.id)}>Snooze 1 day</button>
-          <button type="button" class="dismiss-button" on:click={() => onDismiss?.(loop.id)}>Not a task</button>
+          <button type="button" class="restore-button" on:click={() => onRestore?.(loop.id)}>Restore</button>
         </div>
       </li>
     {:else}
-      <li class="empty-state">Nothing waiting on review.</li>
+      <li class="empty-state">Nothing dismissed yet.</li>
     {/each}
   </ol>
 </section>
 
 <style>
-  .inbox-panel {
+  .history-panel {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
@@ -98,36 +89,6 @@
     color: var(--subtle);
   }
 
-  .inbox-actions-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: var(--space-3);
-  }
-
-  .check-loops-button {
-    flex-shrink: 0;
-    padding: 6px 12px;
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    background: var(--surface-strong);
-    color: var(--default);
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-  }
-
-  .check-loops-button:disabled {
-    opacity: 0.6;
-    cursor: default;
-  }
-
-  .check-status {
-    margin: 0;
-    font-size: 12px;
-    color: var(--subtle);
-  }
-
   .loop-list {
     display: flex;
     flex-direction: column;
@@ -145,12 +106,14 @@
     border: 1px solid var(--border);
     border-radius: 14px;
     background: var(--field-surface);
+    opacity: 0.85;
   }
 
   .loop-card-header {
     display: flex;
-    gap: var(--space-2);
     align-items: center;
+    justify-content: space-between;
+    gap: var(--space-2);
   }
 
   .priority-badge {
@@ -162,7 +125,7 @@
     background: var(--strong);
   }
 
-  .confidence-badge {
+  .dismissed-at {
     font-size: 11px;
     color: var(--subtle);
   }
@@ -172,12 +135,8 @@
     font-size: 14px;
     font-weight: 600;
     color: var(--strong);
-  }
-
-  .why-priority {
-    margin: 0;
-    font-size: 12px;
-    color: var(--default);
+    text-decoration: line-through;
+    text-decoration-color: var(--border);
   }
 
   .evidence {
@@ -200,25 +159,15 @@
     gap: var(--space-2);
   }
 
-  .accept-button,
-  .dismiss-button {
+  .restore-button {
     padding: 6px 12px;
     border: 1px solid var(--border);
     border-radius: 10px;
+    background: transparent;
+    color: var(--default);
     font-size: 12px;
     font-weight: 600;
     cursor: pointer;
-  }
-
-  .accept-button {
-    background: var(--button-bg);
-    color: var(--button-fg);
-    border: none;
-  }
-
-  .dismiss-button {
-    background: transparent;
-    color: var(--subtle);
   }
 
   .empty-state {

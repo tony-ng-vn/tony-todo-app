@@ -7,6 +7,7 @@
   import BoardPanel from '../lib/components/BoardPanel.svelte';
   import InboxPanel from '../lib/components/InboxPanel.svelte';
   import WaitingPanel from '../lib/components/WaitingPanel.svelte';
+  import HistoryPanel from '../lib/components/HistoryPanel.svelte';
   import SummaryPanel from '../lib/components/SummaryPanel.svelte';
   import TaskDetail from '../lib/components/TaskDetail.svelte';
   import TaskPanel from '../lib/components/TaskPanel.svelte';
@@ -51,7 +52,15 @@
     updateRemoteTodoTitle,
   } from '../todoRemote.js';
   import { loadLocalState, reconcileRemoteState, saveLocalState } from '../todoPersistence.js';
-  import { acceptLoop, dismissLoop, loadInboxLoops, loadWaitingLoops, snoozeLoop } from '../loopRemote.js';
+  import {
+    acceptLoop,
+    dismissLoop,
+    loadDismissedLoops,
+    loadInboxLoops,
+    loadWaitingLoops,
+    restoreLoop,
+    snoozeLoop,
+  } from '../loopRemote.js';
 
   const TIMER_SYNC_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds'];
   const COMPLETION_SYNC_FIELDS = ['completedAt'];
@@ -92,6 +101,7 @@
   let viewMode = 'flow';
   let inboxLoops = [];
   let waitingLoops = [];
+  let historyLoops = [];
   let checkingForLoops = false;
   let checkStatus = '';
   let currentDayKey = formatDayKey(new Date());
@@ -294,7 +304,7 @@
     applyThemeMode(themeMode);
   }
 
-  const VIEW_MODES = ['flow', 'board', 'inbox', 'waiting'];
+  const VIEW_MODES = ['flow', 'board', 'inbox', 'waiting', 'history'];
 
   function setViewMode(nextViewMode) {
     viewMode = VIEW_MODES.includes(nextViewMode) ? nextViewMode : 'flow';
@@ -798,6 +808,12 @@
     } catch {
       waitingLoops = [];
     }
+
+    try {
+      historyLoops = await loadDismissedLoops(insforge, authUser.id);
+    } catch {
+      historyLoops = [];
+    }
   }
 
   async function handleAcceptLoop(loopId) {
@@ -814,6 +830,17 @@
     inboxLoops = inboxLoops.filter((loop) => loop.id !== loopId);
     try {
       await dismissLoop(insforge, authUser.id, loopId);
+      await loadLoopSurfaces();
+    } catch (error) {
+      showOfflineCache(error);
+    }
+  }
+
+  async function handleRestoreLoop(loopId) {
+    historyLoops = historyLoops.filter((loop) => loop.id !== loopId);
+    try {
+      await restoreLoop(insforge, authUser.id, loopId);
+      await loadLoopSurfaces();
     } catch (error) {
       showOfflineCache(error);
     }
@@ -987,7 +1014,7 @@
 <main
   class="workspace"
   class:has-detail={selectedTask}
-  class:is-board-view={viewMode === 'board' || viewMode === 'inbox' || viewMode === 'waiting'}
+  class:is-board-view={viewMode === 'board' || viewMode === 'inbox' || viewMode === 'waiting' || viewMode === 'history'}
   aria-label="Done Log todo app"
 >
   {#if viewMode === 'board'}
@@ -1028,6 +1055,14 @@
       loops={waitingLoops}
       inboxCount={inboxLoops.length}
       onDraftFollowUp={handleDraftFollowUp}
+      onViewChange={setViewMode}
+    />
+  {:else if viewMode === 'history'}
+    <HistoryPanel
+      loops={historyLoops}
+      inboxCount={inboxLoops.length}
+      waitingCount={waitingLoops.length}
+      onRestore={handleRestoreLoop}
       onViewChange={setViewMode}
     />
   {:else}

@@ -21,6 +21,7 @@
         Inbox{inboxCount ? ` (${inboxCount})` : ''}
       </button>
       <button type="button" class="view-toggle-button is-active" aria-current="page">Waiting</button>
+      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('history')}>History</button>
     </div>
   </div>
   <p class="panel-note">Work you're not blocked on, but should know is aging.</p>
