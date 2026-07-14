@@ -2,12 +2,13 @@ const INBOX_SELECT_COLUMNS = 'id,title,loop_type,confidence,priority_label,why_p
 const WAITING_SELECT_COLUMNS = 'id,title,loop_type,created_at';
 const EVIDENCE_SELECT_COLUMNS = 'todo_id,source_app,author,excerpt';
 
-export async function loadInboxLoops(client, userId) {
+export async function loadInboxLoops(client, userId, now = new Date()) {
   const { data: todos, error: todosError } = await client.database
     .from('todos')
     .select(INBOX_SELECT_COLUMNS)
     .eq('user_id', userId)
-    .eq('loop_status', 'inbox');
+    .eq('loop_status', 'inbox')
+    .or(`next_review_at.is.null,next_review_at.lte.${now.toISOString()}`);
   throwIfError(todosError);
 
   const evidenceByTodoId = await loadEvidenceByTodoId(client, userId, todos);
@@ -53,6 +54,15 @@ export async function acceptLoop(client, userId, loopId) {
 
 export async function dismissLoop(client, userId, loopId) {
   await updateLoopStatus(client, userId, loopId, 'dismissed');
+}
+
+export async function snoozeLoop(client, userId, loopId, until) {
+  const { error } = await client.database
+    .from('todos')
+    .update({ next_review_at: until.toISOString(), loop_status: 'inbox' })
+    .eq('id', loopId)
+    .eq('user_id', userId);
+  throwIfError(error);
 }
 
 async function updateLoopStatus(client, userId, loopId, loopStatus) {
