@@ -7,6 +7,31 @@
 
 ---
 
+## Implementation status (as of 2026-07-13, PRs #3-#11)
+
+This section is updated as work lands; it is the fast way to check what's real versus still planned, without re-reading the whole document.
+
+### Built, deployed, and verified against the live project
+
+- **Auth + schema foundation.** Real InsForge auth (replacing the anonymous client_id), RLS on `todos`, and the full loop/evidence/people/learned_rules schema from Section 6.
+- **Real Granola ingestion.** A deployed edge function pulls new meeting notes from Granola's public API, extracts commitments/decisions/follow-ups via an LLM call, scores and routes them per the Section 7 formula, dedupes per FR-5, and writes evidence + loop rows. Dual-auth: a shared secret for schedule/internal use, or a real user's session token (self-serve, via a "Check for new loops" button).
+- **Primary navigation, 6 of 8 surfaces:** Focus (Flow view), Inbox (medium-confidence review tray with Accept/Dismiss/Snooze), Waiting, History (dismissed loops, with Restore), Meetings (loops grouped by source meeting), Settings (connector sync status). All six are wired to real data and were manually verified end to end in the browser against the live backend, not just unit tested.
+- **Deliberately not built yet:** Routines and Chat. Both are explicitly Phase 3 in this PRD's own sequencing (Section 41: earn trust in capture and prioritization before execution/chat surfaces) — their absence is a scope decision, not a gap.
+
+### Still blocked on external action (not resolvable by an agent)
+
+- **Gmail + Calendar ingestion.** Needs a Google Cloud OAuth consent screen and, for Gmail's restricted scopes, a CASA security assessment — an external, weeks-long process tied to the account owner's Google account.
+- **A real signed-up account.** All live verification above used a disposable test account (created and later abandoned, not cleaned up — see Section-adjacent note below) because account creation is something an agent must never do on a user's behalf, authorization notwithstanding. The 8 original pre-auth todos remain safely orphaned under the old anonymous `client_id`, waiting to be reclaimed once the real owner signs up.
+- **SMTP / email verification.** Not configured on the live project; `require_email_verification` was temporarily disabled to unblock sign-in. Re-enable once SMTP is set up or before any other real user is invited.
+
+### Known follow-ups, not yet scheduled
+
+- A disposable test account (`extraclaude+e2e-test@twango.dev`) was used for all live verification in PRs #3-#11 and was never deleted (no safe path to delete an `auth.users` row was available without writing to an InsForge-managed schema). It holds no data as of this writing — it's cleaned up after every test — but it still exists as an account and should be removed via the InsForge dashboard when convenient.
+- No recurring ingestion schedule exists yet. It should be created once a real account exists to attribute loops to (`npx @insforge/cli schedules create`, calling `ingest-granola-loops` with the shared secret and the real `ownerUserId`).
+- Granola's public API rate limit (300 req/min) was hit repeatedly during this session's live testing; a production ingestion schedule should pace itself well under that, especially combined with `maxNotes` batching.
+
+---
+
 ## 0. What changed from the v1.0 draft, and why
 
 The v1.0 draft assumed we could learn from Bond's user complaints.
