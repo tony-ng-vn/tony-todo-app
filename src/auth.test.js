@@ -12,7 +12,28 @@ describe('auth', () => {
 
     const result = await signUp(client, { email: 'tony@example.com', password: 'hunter22' });
 
-    expect(result).toEqual({ user: { id: 'user-1', email: 'tony@example.com' }, error: null });
+    expect(result).toEqual({
+      user: { id: 'user-1', email: 'tony@example.com' },
+      requireEmailVerification: false,
+      error: null,
+    });
+  });
+
+  it('flags when sign up requires email verification before a session exists', async () => {
+    const client = fakeAuthClient({
+      signUp: async () => ({
+        data: {
+          user: { id: 'user-1', email: 'tony@example.com', emailVerified: false },
+          accessToken: null,
+          requireEmailVerification: true,
+        },
+        error: null,
+      }),
+    });
+
+    const result = await signUp(client, { email: 'tony@example.com', password: 'hunter22' });
+
+    expect(result.requireEmailVerification).toBe(true);
   });
 
   it('returns a mapped error when sign up fails', async () => {
@@ -22,7 +43,11 @@ describe('auth', () => {
 
     const result = await signUp(client, { email: 'tony@example.com', password: 'hunter22' });
 
-    expect(result).toEqual({ user: null, error: { message: 'Email already registered' } });
+    expect(result).toEqual({
+      user: null,
+      requireEmailVerification: false,
+      error: { message: 'Email already registered' },
+    });
   });
 
   it('signs in a user with password and returns a mapped user on success', async () => {

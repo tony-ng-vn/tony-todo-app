@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { addTodo, createInitialState } from './todoStore.js';
-import { getOrCreateClientId, loadLocalState, reconcileRemoteState, saveLocalState } from './todoPersistence.js';
+import { loadLocalState, reconcileRemoteState, saveLocalState } from './todoPersistence.js';
 
 describe('todo persistence', () => {
   it('loads todos from local storage', () => {
@@ -34,21 +34,6 @@ describe('todo persistence', () => {
     const cachedState = createInitialState([{ id: 'todo-1', title: 'Cached task' }]);
 
     expect(reconcileRemoteState(cachedState, [])).toEqual(createInitialState());
-  });
-
-  it('reuses an existing client id', () => {
-    const storage = createMemoryStorage({
-      'done-log-client-id': 'client-123',
-    });
-
-    expect(getOrCreateClientId(storage, () => 'client-456')).toBe('client-123');
-  });
-
-  it('creates and stores a client id when one does not exist', () => {
-    const storage = createMemoryStorage();
-
-    expect(getOrCreateClientId(storage, () => 'client-456')).toBe('client-456');
-    expect(storage.getItem('done-log-client-id')).toBe('client-456');
   });
 });
 

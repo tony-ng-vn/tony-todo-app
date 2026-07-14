@@ -1,6 +1,10 @@
 export async function signUp(client, { email, password }) {
   const { data, error } = await client.auth.signUp({ email, password });
-  return { user: data?.user ? mapAuthUser(data.user) : null, error: mapAuthError(error) };
+  return {
+    user: data?.user ? mapAuthUser(data.user) : null,
+    requireEmailVerification: Boolean(data?.requireEmailVerification),
+    error: mapAuthError(error),
+  };
 }
 
 export async function signInWithPassword(client, { email, password }) {
