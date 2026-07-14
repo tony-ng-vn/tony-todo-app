@@ -102,7 +102,12 @@ export default async function (req: Request): Promise<Response> {
   const dryRun = Boolean((body as any).dryRun ?? true);
   const ownerUserId = (body as any).ownerUserId ?? null;
   const sourceFilter = (body as any).source ?? 'both';
-  const maxNotes = Number((body as any).maxNotes ?? 5);
+  // Write mode does two extra existing-loop queries plus per-candidate
+  // inserts on top of the Granola + LLM calls dry-run already does, so it
+  // needs a smaller default to stay under the gateway's response timeout
+  // (observed: 5 notes with real writes -> 504, even though the work
+  // completed server-side after the client gave up).
+  const maxNotes = Number((body as any).maxNotes ?? (dryRun ? 5 : 3));
 
   if (!dryRun && !ownerUserId) {
     return json({ error: 'ownerUserId is required unless dryRun is true' }, 400);
@@ -250,7 +255,7 @@ export default async function (req: Request): Promise<Response> {
               todo_id: todoId,
               source_app: 'granola',
               source_object_id: note.id,
-              author: note.owner ?? null,
+              author: noteOwnerName(note.owner),
               occurred_at: enriched.createdAt,
               excerpt: candidate.evidenceExcerpt ?? note.summary ?? '',
               extractor_version: 'ingest-granola-loops-v1',
@@ -399,6 +404,15 @@ function parseCandidates(content) {
   } catch {
     return [];
   }
+}
+
+// Granola's /notes owner field is an object ({name, email, ...}), not a
+// string -- stringifying it directly would store a JSON blob in the
+// text `author` column instead of a readable name.
+function noteOwnerName(owner) {
+  if (!owner) return null;
+  if (typeof owner === 'string') return owner;
+  return owner.name ?? owner.email ?? null;
 }
 
 // Mirrors src/todoStore.js's createTodoId slug logic (tested there).

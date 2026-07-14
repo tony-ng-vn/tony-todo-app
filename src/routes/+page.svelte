@@ -5,6 +5,8 @@
   import LottieAnimation from '../lib/components/LottieAnimation.svelte';
   import AuthGate from '../lib/components/AuthGate.svelte';
   import BoardPanel from '../lib/components/BoardPanel.svelte';
+  import InboxPanel from '../lib/components/InboxPanel.svelte';
+  import WaitingPanel from '../lib/components/WaitingPanel.svelte';
   import SummaryPanel from '../lib/components/SummaryPanel.svelte';
   import TaskDetail from '../lib/components/TaskDetail.svelte';
   import TaskPanel from '../lib/components/TaskPanel.svelte';
@@ -49,6 +51,7 @@
     updateRemoteTodoTitle,
   } from '../todoRemote.js';
   import { loadLocalState, reconcileRemoteState, saveLocalState } from '../todoPersistence.js';
+  import { acceptLoop, dismissLoop, loadInboxLoops, loadWaitingLoops } from '../loopRemote.js';
 
   const TIMER_SYNC_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds'];
   const COMPLETION_SYNC_FIELDS = ['completedAt'];
@@ -87,6 +90,8 @@
   let completionCueTimer = null;
   let themeMode = 'light';
   let viewMode = 'flow';
+  let inboxLoops = [];
+  let waitingLoops = [];
   let currentDayKey = formatDayKey(new Date());
 
   $: pendingTodos = getPendingTodos(state);
@@ -287,8 +292,10 @@
     applyThemeMode(themeMode);
   }
 
+  const VIEW_MODES = ['flow', 'board', 'inbox', 'waiting'];
+
   function setViewMode(nextViewMode) {
-    viewMode = nextViewMode === 'board' ? 'board' : 'flow';
+    viewMode = VIEW_MODES.includes(nextViewMode) ? nextViewMode : 'flow';
     localStorage.setItem(VIEW_STORAGE_KEY, viewMode);
     draggedBoardTodoId = null;
     dropTargetColumnId = null;
@@ -769,6 +776,51 @@
     } catch (error) {
       showOfflineCache(error);
     }
+
+    await loadLoopSurfaces();
+  }
+
+  async function loadLoopSurfaces() {
+    if (!useRemote || !authUser) {
+      return;
+    }
+
+    try {
+      inboxLoops = await loadInboxLoops(insforge, authUser.id);
+    } catch {
+      inboxLoops = [];
+    }
+
+    try {
+      waitingLoops = await loadWaitingLoops(insforge, authUser.id);
+    } catch {
+      waitingLoops = [];
+    }
+  }
+
+  async function handleAcceptLoop(loopId) {
+    inboxLoops = inboxLoops.filter((loop) => loop.id !== loopId);
+    try {
+      await acceptLoop(insforge, authUser.id, loopId);
+      await hydrateRemoteTodos();
+    } catch (error) {
+      showOfflineCache(error);
+    }
+  }
+
+  async function handleDismissLoop(loopId) {
+    inboxLoops = inboxLoops.filter((loop) => loop.id !== loopId);
+    try {
+      await dismissLoop(insforge, authUser.id, loopId);
+    } catch (error) {
+      showOfflineCache(error);
+    }
+  }
+
+  function handleDraftFollowUp() {
+    // Drafting isn't wired up yet (PRD FR-10, still Phase 1): nothing is
+    // sent or persisted here, this only acknowledges the click.
+    syncMessage = 'Drafting is not wired up yet';
   }
 
   async function syncRemoteChange(statusMessage, syncAction) {
@@ -841,7 +893,7 @@
 
   function loadViewMode() {
     const storedView = localStorage.getItem(VIEW_STORAGE_KEY);
-    return storedView === 'board' ? 'board' : 'flow';
+    return VIEW_MODES.includes(storedView) ? storedView : 'flow';
   }
 
   function applyThemeMode(nextThemeMode) {
@@ -899,7 +951,7 @@
 <main
   class="workspace"
   class:has-detail={selectedTask}
-  class:is-board-view={viewMode === 'board'}
+  class:is-board-view={viewMode === 'board' || viewMode === 'inbox' || viewMode === 'waiting'}
   aria-label="Done Log todo app"
 >
   {#if viewMode === 'board'}
@@ -911,6 +963,8 @@
       {newlyAddedTodoId}
       {draggedBoardTodoId}
       {dropTargetColumnId}
+      inboxCount={inboxLoops.length}
+      waitingCount={waitingLoops.length}
       onToggleTheme={toggleThemeMode}
       onViewChange={setViewMode}
       onSelectedDayChange={handleBoardSelectedDayChange}
@@ -920,6 +974,21 @@
       onBoardDragOver={handleBoardDragOver}
       onBoardDrop={handleBoardDrop}
       onCreateTaskInColumn={handleCreateTaskInColumn}
+    />
+  {:else if viewMode === 'inbox'}
+    <InboxPanel
+      loops={inboxLoops}
+      waitingCount={waitingLoops.length}
+      onAccept={handleAcceptLoop}
+      onDismiss={handleDismissLoop}
+      onViewChange={setViewMode}
+    />
+  {:else if viewMode === 'waiting'}
+    <WaitingPanel
+      loops={waitingLoops}
+      inboxCount={inboxLoops.length}
+      onDraftFollowUp={handleDraftFollowUp}
+      onViewChange={setViewMode}
     />
   {:else}
     <TaskPanel
@@ -934,6 +1003,9 @@
       {draggedSummaryId}
       {isOpenDropTarget}
       {themeMode}
+      {viewMode}
+      inboxCount={inboxLoops.length}
+      waitingCount={waitingLoops.length}
       onSubmit={handleSubmit}
       onDraftInput={handleDraftInput}
       onStartTitleEdit={startTitleEdit}
