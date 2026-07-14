@@ -72,6 +72,25 @@ export async function loadDismissedLoops(client, userId) {
   }));
 }
 
+export async function loadAuditLog(client, userId, limit = 20) {
+  const { data, error } = await client.database
+    .from('audit_log')
+    .select('id,action_type,loop_id,model,summary,created_at')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  throwIfError(error);
+
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    actionType: row.action_type,
+    loopId: row.loop_id,
+    model: row.model,
+    summary: row.summary,
+    createdAt: row.created_at,
+  }));
+}
+
 export async function loadSyncStatus(client, userId) {
   const { data, error } = await client.database
     .from('ingestion_cursor')
