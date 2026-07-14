@@ -233,6 +233,7 @@ export default async function (req: Request): Promise<Response> {
               confidence: candidate.confidence,
               priority_label: priorityLabel,
               priority_score: priorityScore,
+              loop_status: surface === 'focus' ? 'accepted' : 'inbox',
               due_source: candidate.dueDate ? 'inferred' : null,
               why_priority: candidate.whyPriority ?? null,
             },
