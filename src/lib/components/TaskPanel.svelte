@@ -14,6 +14,9 @@
   export let draggedSummaryId = null;
   export let isOpenDropTarget = false;
   export let themeMode = 'light';
+  export let viewMode = 'flow';
+  export let inboxCount = 0;
+  export let waitingCount = 0;
   export let onSubmit;
   export let onDraftInput;
   export let onStartTitleEdit;
@@ -45,9 +48,23 @@
     <div class="header-actions">
       <output class="sync-status" id="sync-status" aria-live="polite">{syncMessage}</output>
       <div class="view-toggle" role="group" aria-label="Workspace view">
-        <button type="button" class="view-toggle-button is-active" aria-current="page">Flow</button>
+        <button
+          type="button"
+          class="view-toggle-button"
+          class:is-active={viewMode === 'flow'}
+          aria-current={viewMode === 'flow' ? 'page' : undefined}
+          on:click={() => onViewChange?.('flow')}
+        >
+          Flow
+        </button>
         <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('board')}>
           Board
+        </button>
+        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('inbox')}>
+          Inbox{inboxCount ? ` (${inboxCount})` : ''}
+        </button>
+        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('waiting')}>
+          Waiting{waitingCount ? ` (${waitingCount})` : ''}
         </button>
       </div>
       <button

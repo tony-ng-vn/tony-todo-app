@@ -3,13 +3,25 @@
 
   export let loops = [];
   export let now = new Date();
+  export let inboxCount = 0;
   export let onDraftFollowUp;
+  export let onViewChange;
 </script>
 
 <section class="waiting-panel" aria-labelledby="waiting-heading">
   <div class="panel-heading">
-    <h2 id="waiting-heading">Waiting</h2>
-    <span class="panel-count">{loops.length} owned by someone else</span>
+    <div>
+      <h2 id="waiting-heading">Waiting</h2>
+      <span class="panel-count">{loops.length} owned by someone else</span>
+    </div>
+    <div class="view-toggle" role="group" aria-label="Workspace view">
+      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('flow')}>Flow</button>
+      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('board')}>Board</button>
+      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('inbox')}>
+        Inbox{inboxCount ? ` (${inboxCount})` : ''}
+      </button>
+      <button type="button" class="view-toggle-button is-active" aria-current="page">Waiting</button>
+    </div>
   </div>
   <p class="panel-note">Work you're not blocked on, but should know is aging.</p>
 

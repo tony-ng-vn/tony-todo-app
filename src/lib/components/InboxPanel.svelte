@@ -1,13 +1,25 @@
 <script>
   export let loops = [];
+  export let waitingCount = 0;
   export let onAccept;
   export let onDismiss;
+  export let onViewChange;
 </script>
 
 <section class="inbox-panel" aria-labelledby="inbox-heading">
   <div class="panel-heading">
-    <h2 id="inbox-heading">Inbox</h2>
-    <span class="panel-count">{loops.length} awaiting review</span>
+    <div>
+      <h2 id="inbox-heading">Inbox</h2>
+      <span class="panel-count">{loops.length} awaiting review</span>
+    </div>
+    <div class="view-toggle" role="group" aria-label="Workspace view">
+      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('flow')}>Flow</button>
+      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('board')}>Board</button>
+      <button type="button" class="view-toggle-button is-active" aria-current="page">Inbox</button>
+      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('waiting')}>
+        Waiting{waitingCount ? ` (${waitingCount})` : ''}
+      </button>
+    </div>
   </div>
   <p class="panel-note">Medium-confidence loops Thread isn't sure about yet. Accept to promote to Focus, dismiss to teach it.</p>
 

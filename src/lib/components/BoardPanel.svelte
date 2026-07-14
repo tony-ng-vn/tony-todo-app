@@ -10,6 +10,8 @@
   export let newlyAddedTodoId = null;
   export let draggedBoardTodoId = null;
   export let dropTargetColumnId = null;
+  export let inboxCount = 0;
+  export let waitingCount = 0;
   export let onToggleTheme;
   export let onViewChange;
   export let onSelectedDayChange;
@@ -83,6 +85,12 @@
           Flow
         </button>
         <button type="button" class="view-toggle-button is-active" aria-current="page">Board</button>
+        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('inbox')}>
+          Inbox{inboxCount ? ` (${inboxCount})` : ''}
+        </button>
+        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('waiting')}>
+          Waiting{waitingCount ? ` (${waitingCount})` : ''}
+        </button>
       </div>
       <button
         type="button"
