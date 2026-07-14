@@ -57,6 +57,7 @@
   import {
     acceptLoop,
     dismissLoop,
+    loadAuditLog,
     loadDismissedLoops,
     loadInboxLoops,
     loadMeetings,
@@ -108,6 +109,7 @@
   let historyLoops = [];
   let meetings = [];
   let syncStatusList = [];
+  let auditLogEntries = [];
   let draftingLoopId = null;
   let draftsByLoopId = {};
   let checkingForLoops = false;
@@ -834,6 +836,12 @@
     } catch {
       syncStatusList = [];
     }
+
+    try {
+      auditLogEntries = await loadAuditLog(insforge, authUser.id);
+    } catch {
+      auditLogEntries = [];
+    }
   }
 
   async function handleAcceptLoop(loopId) {
@@ -884,6 +892,9 @@
     try {
       const data = await insforge.getHttpClient().post('/functions/draft-follow-up', { loopId });
       draftsByLoopId = { ...draftsByLoopId, [loopId]: data?.draft ?? '' };
+      // Refresh so Settings' audit log picks up the draft_generated entry
+      // the function just wrote, without waiting for an unrelated action.
+      await loadLoopSurfaces();
     } catch (error) {
       showOfflineCache(error);
     } finally {
@@ -1106,6 +1117,7 @@
   {:else if viewMode === 'settings'}
     <SettingsPanel
       syncStatus={syncStatusList}
+      auditLog={auditLogEntries}
       userEmail={authUser?.email ?? ''}
       inboxCount={inboxLoops.length}
       waitingCount={waitingLoops.length}
