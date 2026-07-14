@@ -47,35 +47,6 @@
     </div>
     <div class="header-actions">
       <output class="sync-status" id="sync-status" aria-live="polite">{syncMessage}</output>
-      <div class="view-toggle" role="group" aria-label="Workspace view">
-        <button
-          type="button"
-          class="view-toggle-button"
-          class:is-active={viewMode === 'flow'}
-          aria-current={viewMode === 'flow' ? 'page' : undefined}
-          on:click={() => onViewChange?.('flow')}
-        >
-          Flow
-        </button>
-        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('board')}>
-          Board
-        </button>
-        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('inbox')}>
-          Inbox{inboxCount ? ` (${inboxCount})` : ''}
-        </button>
-        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('waiting')}>
-          Waiting{waitingCount ? ` (${waitingCount})` : ''}
-        </button>
-        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('history')}>
-          History
-        </button>
-        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('meetings')}>
-          Meetings
-        </button>
-        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('settings')}>
-          Settings
-        </button>
-      </div>
       <button
         type="button"
         class="theme-toggle"
@@ -86,6 +57,36 @@
         <span>{themeMode === 'dark' ? 'Light' : 'Dark'}</span>
       </button>
     </div>
+  </div>
+
+  <div class="view-toggle" role="group" aria-label="Workspace view">
+    <button
+      type="button"
+      class="view-toggle-button"
+      class:is-active={viewMode === 'flow'}
+      aria-current={viewMode === 'flow' ? 'page' : undefined}
+      on:click={() => onViewChange?.('flow')}
+    >
+      Flow
+    </button>
+    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('board')}>
+      Board
+    </button>
+    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('inbox')}>
+      Inbox{inboxCount ? ` (${inboxCount})` : ''}
+    </button>
+    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('waiting')}>
+      Waiting{waitingCount ? ` (${waitingCount})` : ''}
+    </button>
+    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('history')}>
+      History
+    </button>
+    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('meetings')}>
+      Meetings
+    </button>
+    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('settings')}>
+      Settings
+    </button>
   </div>
 
   <form class="new-task-form" id="new-task-form" on:submit|preventDefault={onSubmit}>
