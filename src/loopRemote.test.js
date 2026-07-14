@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { acceptLoop, dismissLoop, loadInboxLoops, loadWaitingLoops } from './loopRemote.js';
+import { acceptLoop, dismissLoop, loadInboxLoops, loadWaitingLoops, snoozeLoop } from './loopRemote.js';
 
 describe('loadInboxLoops', () => {
   it('loads inbox-status loops for a user and attaches evidence', async () => {
@@ -20,7 +20,7 @@ describe('loadInboxLoops', () => {
       ],
     });
 
-    const loops = await loadInboxLoops(client, 'user-123');
+    const loops = await loadInboxLoops(client, 'user-123', new Date('2026-07-14T00:00:00.000Z'));
 
     expect(loops).toEqual([
       {
@@ -35,6 +35,7 @@ describe('loadInboxLoops', () => {
     ]);
     expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
     expect(calls).toContainEqual(['eq', 'loop_status', 'inbox']);
+    expect(calls).toContainEqual(['or', 'next_review_at.is.null,next_review_at.lte.2026-07-14T00:00:00.000Z']);
   });
 
   it('falls back to an empty evidence excerpt when none exists', async () => {
@@ -119,6 +120,20 @@ describe('dismissLoop', () => {
   });
 });
 
+describe('snoozeLoop', () => {
+  it('sets next_review_at and keeps loop_status as inbox, scoped by user id', async () => {
+    const calls = [];
+    const client = fakeUpdateClient(calls);
+
+    await snoozeLoop(client, 'user-123', 'loop-1', new Date('2026-07-15T09:00:00.000Z'));
+
+    expect(calls[0]).toEqual(['from', 'todos']);
+    expect(calls[1]).toEqual(['update', { next_review_at: '2026-07-15T09:00:00.000Z', loop_status: 'inbox' }]);
+    expect(calls).toContainEqual(['eq', 'id', 'loop-1']);
+    expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
+  });
+});
+
 function fakeSelectClient(calls, { todos, evidence }) {
   return {
     database: {
@@ -136,6 +151,10 @@ function fakeSelectClient(calls, { todos, evidence }) {
           },
           is(column, value) {
             calls.push(['is', column, value]);
+            return builder;
+          },
+          or(expression) {
+            calls.push(['or', expression]);
             return builder;
           },
           then(resolve) {

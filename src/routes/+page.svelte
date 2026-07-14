@@ -51,7 +51,7 @@
     updateRemoteTodoTitle,
   } from '../todoRemote.js';
   import { loadLocalState, reconcileRemoteState, saveLocalState } from '../todoPersistence.js';
-  import { acceptLoop, dismissLoop, loadInboxLoops, loadWaitingLoops } from '../loopRemote.js';
+  import { acceptLoop, dismissLoop, loadInboxLoops, loadWaitingLoops, snoozeLoop } from '../loopRemote.js';
 
   const TIMER_SYNC_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds'];
   const COMPLETION_SYNC_FIELDS = ['completedAt'];
@@ -819,6 +819,16 @@
     }
   }
 
+  async function handleSnoozeLoop(loopId) {
+    inboxLoops = inboxLoops.filter((loop) => loop.id !== loopId);
+    try {
+      const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      await snoozeLoop(insforge, authUser.id, loopId, tomorrow);
+    } catch (error) {
+      showOfflineCache(error);
+    }
+  }
+
   function handleDraftFollowUp() {
     // Drafting isn't wired up yet (PRD FR-10, still Phase 1): nothing is
     // sent or persisted here, this only acknowledges the click.
@@ -1009,6 +1019,7 @@
       {checkStatus}
       onAccept={handleAcceptLoop}
       onDismiss={handleDismissLoop}
+      onSnooze={handleSnoozeLoop}
       onViewChange={setViewMode}
       onCheckForNewLoops={handleCheckForNewLoops}
     />

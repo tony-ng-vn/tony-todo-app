@@ -5,6 +5,7 @@
   export let checkStatus = '';
   export let onAccept;
   export let onDismiss;
+  export let onSnooze;
   export let onViewChange;
   export let onCheckForNewLoops;
 </script>
@@ -49,6 +50,7 @@
         </blockquote>
         <div class="loop-actions">
           <button type="button" class="accept-button" on:click={() => onAccept?.(loop.id)}>Accept</button>
+          <button type="button" class="dismiss-button" on:click={() => onSnooze?.(loop.id)}>Snooze 1 day</button>
           <button type="button" class="dismiss-button" on:click={() => onDismiss?.(loop.id)}>Not a task</button>
         </div>
       </li>
