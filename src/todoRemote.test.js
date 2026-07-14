@@ -3,6 +3,7 @@ import {
   completeRemoteTodo,
   deleteRemoteTodo,
   fromRemoteRecord,
+  loadRemoteTodos,
   toRemoteRecord,
   updateRemoteTodoProgress,
   updateRemoteTodoTimer,
@@ -10,6 +11,44 @@ import {
 } from './todoRemote.js';
 
 describe('todo remote mapping', () => {
+  it('excludes unreviewed inbox-status loops from the main list', async () => {
+    const calls = [];
+    const client = {
+      database: {
+        from(table) {
+          calls.push(['from', table]);
+          return {
+            select(columns) {
+              calls.push(['select', columns]);
+              return this;
+            },
+            eq(column, value) {
+              calls.push(['eq', column, value]);
+              return this;
+            },
+            neq(column, value) {
+              calls.push(['neq', column, value]);
+              return this;
+            },
+            order(column, options) {
+              calls.push(['order', column, options]);
+              return this;
+            },
+            then(resolve) {
+              resolve({ data: [], error: null });
+            },
+          };
+        },
+      },
+    };
+
+    await loadRemoteTodos(client, 'user-123');
+
+    expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
+    expect(calls).toContainEqual(['neq', 'loop_status', 'inbox']);
+  });
+
+
   it('maps local todos to InsForge records with a user scope', () => {
     expect(
       toRemoteRecord(

@@ -49,6 +49,7 @@ export async function loadRemoteTodos(client, userId) {
     .from('todos')
     .select(TODO_SELECT_COLUMNS)
     .eq('user_id', userId)
+    .neq('loop_status', 'inbox')
     .order('created_at', { ascending: true });
 
   throwIfError(error);
