@@ -108,6 +108,8 @@
   let historyLoops = [];
   let meetings = [];
   let syncStatusList = [];
+  let draftingLoopId = null;
+  let draftsByLoopId = {};
   let checkingForLoops = false;
   let checkStatus = '';
   let currentDayKey = formatDayKey(new Date());
@@ -874,10 +876,19 @@
     }
   }
 
-  function handleDraftFollowUp() {
-    // Drafting isn't wired up yet (PRD FR-10, still Phase 1): nothing is
-    // sent or persisted here, this only acknowledges the click.
-    syncMessage = 'Drafting is not wired up yet';
+  async function handleDraftFollowUp(loopId) {
+    if (!useRemote || !authUser || draftingLoopId) return;
+
+    draftingLoopId = loopId;
+
+    try {
+      const data = await insforge.getHttpClient().post('/functions/draft-follow-up', { loopId });
+      draftsByLoopId = { ...draftsByLoopId, [loopId]: data?.draft ?? '' };
+    } catch (error) {
+      showOfflineCache(error);
+    } finally {
+      draftingLoopId = null;
+    }
   }
 
   async function handleCheckForNewLoops() {
@@ -1072,6 +1083,8 @@
     <WaitingPanel
       loops={waitingLoops}
       inboxCount={inboxLoops.length}
+      {draftingLoopId}
+      {draftsByLoopId}
       onDraftFollowUp={handleDraftFollowUp}
       onViewChange={setViewMode}
     />

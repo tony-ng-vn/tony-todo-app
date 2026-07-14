@@ -4,8 +4,28 @@
   export let loops = [];
   export let now = new Date();
   export let inboxCount = 0;
+  export let draftingLoopId = null;
+  export let draftsByLoopId = {};
   export let onDraftFollowUp;
   export let onViewChange;
+
+  let copiedLoopId = null;
+  let copyErrorLoopId = null;
+
+  async function copyDraft(loopId, text) {
+    try {
+      await navigator.clipboard.writeText(text);
+      copiedLoopId = loopId;
+      copyErrorLoopId = null;
+    } catch {
+      copyErrorLoopId = loopId;
+      copiedLoopId = null;
+    }
+    setTimeout(() => {
+      if (copiedLoopId === loopId) copiedLoopId = null;
+      if (copyErrorLoopId === loopId) copyErrorLoopId = null;
+    }, 1500);
+  }
 </script>
 
 <section class="waiting-panel" aria-labelledby="waiting-heading">
@@ -44,10 +64,35 @@
           <p class="due-note">Expected {new Intl.DateTimeFormat([], { dateStyle: 'medium' }).format(new Date(loop.dueAt))}</p>
         {/if}
         <div class="loop-actions">
-          <button type="button" class="draft-button" on:click={() => onDraftFollowUp?.(loop.id)}>
-            Draft follow-up
+          <button
+            type="button"
+            class="draft-button"
+            on:click={() => onDraftFollowUp?.(loop.id)}
+            disabled={draftingLoopId === loop.id}
+          >
+            {draftingLoopId === loop.id ? 'Drafting...' : 'Draft follow-up'}
           </button>
         </div>
+        {#if draftsByLoopId[loop.id]}
+          <div class="draft-box">
+            <textarea
+              class="draft-text"
+              readonly
+              rows="4"
+              value={draftsByLoopId[loop.id]}
+              on:focus={(event) => event.currentTarget.select()}
+            ></textarea>
+            <button type="button" class="copy-button" on:click={() => copyDraft(loop.id, draftsByLoopId[loop.id])}>
+              {#if copiedLoopId === loop.id}
+                Copied
+              {:else if copyErrorLoopId === loop.id}
+                Couldn't copy -- select the text above
+              {:else}
+                Copy
+              {/if}
+            </button>
+          </div>
+        {/if}
       </li>
     {:else}
       <li class="empty-state">Nothing waiting on anyone else right now.</li>
@@ -171,6 +216,46 @@
     background: transparent;
     color: var(--default);
     font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .draft-button:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  .draft-box {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+    padding: var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--surface-strong);
+  }
+
+  .draft-text {
+    width: 100%;
+    margin: 0;
+    padding: var(--space-2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--field-surface);
+    color: var(--strong);
+    font: inherit;
+    font-size: 12px;
+    resize: vertical;
+  }
+
+  .copy-button {
+    align-self: flex-start;
+    padding: 4px 10px;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: transparent;
+    color: var(--default);
+    font-size: 11px;
     font-weight: 600;
     cursor: pointer;
   }
