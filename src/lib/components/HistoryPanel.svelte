@@ -22,6 +22,7 @@
         Waiting{waitingCount ? ` (${waitingCount})` : ''}
       </button>
       <button type="button" class="view-toggle-button is-active" aria-current="page">History</button>
+      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('meetings')}>Meetings</button>
     </div>
   </div>
   <p class="panel-note">Loops you dismissed as not-a-task. Restore one if it was a mistake.</p>

@@ -276,6 +276,7 @@ export default async function (req: Request): Promise<Response> {
               todo_id: todoId,
               source_app: 'granola',
               source_object_id: note.id,
+              source_title: note.title ?? null,
               author: noteOwnerName(note.owner),
               occurred_at: enriched.createdAt,
               excerpt: candidate.evidenceExcerpt ?? note.summary ?? '',

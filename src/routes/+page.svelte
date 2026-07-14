@@ -8,6 +8,7 @@
   import InboxPanel from '../lib/components/InboxPanel.svelte';
   import WaitingPanel from '../lib/components/WaitingPanel.svelte';
   import HistoryPanel from '../lib/components/HistoryPanel.svelte';
+  import MeetingsPanel from '../lib/components/MeetingsPanel.svelte';
   import SummaryPanel from '../lib/components/SummaryPanel.svelte';
   import TaskDetail from '../lib/components/TaskDetail.svelte';
   import TaskPanel from '../lib/components/TaskPanel.svelte';
@@ -57,6 +58,7 @@
     dismissLoop,
     loadDismissedLoops,
     loadInboxLoops,
+    loadMeetings,
     loadWaitingLoops,
     restoreLoop,
     snoozeLoop,
@@ -102,6 +104,7 @@
   let inboxLoops = [];
   let waitingLoops = [];
   let historyLoops = [];
+  let meetings = [];
   let checkingForLoops = false;
   let checkStatus = '';
   let currentDayKey = formatDayKey(new Date());
@@ -304,7 +307,7 @@
     applyThemeMode(themeMode);
   }
 
-  const VIEW_MODES = ['flow', 'board', 'inbox', 'waiting', 'history'];
+  const VIEW_MODES = ['flow', 'board', 'inbox', 'waiting', 'history', 'meetings'];
 
   function setViewMode(nextViewMode) {
     viewMode = VIEW_MODES.includes(nextViewMode) ? nextViewMode : 'flow';
@@ -814,6 +817,12 @@
     } catch {
       historyLoops = [];
     }
+
+    try {
+      meetings = await loadMeetings(insforge, authUser.id);
+    } catch {
+      meetings = [];
+    }
   }
 
   async function handleAcceptLoop(loopId) {
@@ -1014,7 +1023,7 @@
 <main
   class="workspace"
   class:has-detail={selectedTask}
-  class:is-board-view={viewMode === 'board' || viewMode === 'inbox' || viewMode === 'waiting' || viewMode === 'history'}
+  class:is-board-view={viewMode === 'board' || viewMode === 'inbox' || viewMode === 'waiting' || viewMode === 'history' || viewMode === 'meetings'}
   aria-label="Done Log todo app"
 >
   {#if viewMode === 'board'}
@@ -1063,6 +1072,13 @@
       inboxCount={inboxLoops.length}
       waitingCount={waitingLoops.length}
       onRestore={handleRestoreLoop}
+      onViewChange={setViewMode}
+    />
+  {:else if viewMode === 'meetings'}
+    <MeetingsPanel
+      {meetings}
+      inboxCount={inboxLoops.length}
+      waitingCount={waitingLoops.length}
       onViewChange={setViewMode}
     />
   {:else}

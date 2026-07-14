@@ -4,6 +4,7 @@ import {
   dismissLoop,
   loadDismissedLoops,
   loadInboxLoops,
+  loadMeetings,
   loadWaitingLoops,
   restoreLoop,
   snoozeLoop,
@@ -181,6 +182,119 @@ describe('loadDismissedLoops', () => {
     expect(calls).toContainEqual(['order', 'updated_at', { ascending: false }]);
   });
 });
+
+describe('loadMeetings', () => {
+  it('groups loops by their source meeting, most recent first', async () => {
+    const calls = [];
+    const client = fakeMeetingsClient(calls, {
+      evidence: [
+        {
+          todo_id: 'loop-2',
+          source_app: 'granola',
+          source_object_id: 'note-b',
+          source_title: 'Founder sync',
+          occurred_at: '2026-07-12T09:00:00.000Z',
+          author: 'Tony',
+        },
+        {
+          todo_id: 'loop-1',
+          source_app: 'granola',
+          source_object_id: 'note-a',
+          source_title: 'Investor update',
+          occurred_at: '2026-07-10T09:00:00.000Z',
+          author: 'Tony',
+        },
+      ],
+      todos: [
+        { id: 'loop-1', title: 'Send the deck', loop_status: 'accepted', priority_label: 'P1' },
+        { id: 'loop-2', title: 'Follow up on hiring', loop_status: 'inbox', priority_label: 'P2' },
+      ],
+    });
+
+    const meetings = await loadMeetings(client, 'user-123');
+
+    expect(meetings).toEqual([
+      {
+        sourceObjectId: 'note-b',
+        title: 'Founder sync',
+        occurredAt: '2026-07-12T09:00:00.000Z',
+        author: 'Tony',
+        loops: [{ id: 'loop-2', title: 'Follow up on hiring', loopStatus: 'inbox', priorityLabel: 'P2' }],
+      },
+      {
+        sourceObjectId: 'note-a',
+        title: 'Investor update',
+        occurredAt: '2026-07-10T09:00:00.000Z',
+        author: 'Tony',
+        loops: [{ id: 'loop-1', title: 'Send the deck', loopStatus: 'accepted', priorityLabel: 'P1' }],
+      },
+    ]);
+    expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
+    expect(calls).toContainEqual(['order', 'occurred_at', { ascending: false }]);
+  });
+
+  it('groups multiple loops from the same meeting together', async () => {
+    const client = fakeMeetingsClient([], {
+      evidence: [
+        {
+          todo_id: 'loop-1',
+          source_app: 'granola',
+          source_object_id: 'note-a',
+          source_title: 'Founder sync',
+          occurred_at: '2026-07-12T09:00:00.000Z',
+          author: 'Tony',
+        },
+        {
+          todo_id: 'loop-2',
+          source_app: 'granola',
+          source_object_id: 'note-a',
+          source_title: 'Founder sync',
+          occurred_at: '2026-07-12T09:00:00.000Z',
+          author: 'Tony',
+        },
+      ],
+      todos: [
+        { id: 'loop-1', title: 'Send the deck', loop_status: 'accepted', priority_label: 'P1' },
+        { id: 'loop-2', title: 'Follow up on hiring', loop_status: 'inbox', priority_label: 'P2' },
+      ],
+    });
+
+    const meetings = await loadMeetings(client, 'user-123');
+
+    expect(meetings).toHaveLength(1);
+    expect(meetings[0].loops).toHaveLength(2);
+  });
+});
+
+function fakeMeetingsClient(calls, { evidence, todos }) {
+  return {
+    database: {
+      from(table) {
+        calls.push(['from', table]);
+        const state = { table };
+        const builder = {
+          select(columns) {
+            calls.push(['select', columns]);
+            return builder;
+          },
+          eq(column, value) {
+            calls.push(['eq', column, value]);
+            return builder;
+          },
+          order(column, options) {
+            calls.push(['order', column, options]);
+            return builder;
+          },
+          then(resolve) {
+            const data = state.table === 'evidence' ? evidence : todos;
+            resolve({ data, error: null });
+          },
+        };
+        return builder;
+      },
+    },
+  };
+}
 
 describe('restoreLoop', () => {
   it('sets loop_status back to inbox, scoped by user id', async () => {
