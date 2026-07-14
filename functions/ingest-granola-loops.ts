@@ -80,6 +80,18 @@ export default async function (req: Request): Promise<Response> {
     return json({ error: 'Use POST' }, 405);
   }
 
+  // This function reads private Granola content and writes on behalf of
+  // ownerUserId with an admin (RLS-bypassing) client, so it must never be
+  // callable by an unauthenticated caller -- even a dryRun response would
+  // leak extracted meeting content. A shared secret (not a per-user token,
+  // since this is invoked by an internal schedule, not a signed-in browser)
+  // is the simplest correct gate here.
+  const expectedToken = Deno.env.get('INGEST_FUNCTION_TOKEN');
+  const providedToken = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
+  if (!expectedToken || providedToken !== expectedToken) {
+    return json({ error: 'Unauthorized' }, 401);
+  }
+
   let body = {};
   try {
     body = await req.json();
@@ -90,6 +102,7 @@ export default async function (req: Request): Promise<Response> {
   const dryRun = Boolean((body as any).dryRun ?? true);
   const ownerUserId = (body as any).ownerUserId ?? null;
   const sourceFilter = (body as any).source ?? 'both';
+  const maxNotes = Number((body as any).maxNotes ?? 5);
 
   if (!dryRun && !ownerUserId) {
     return json({ error: 'ownerUserId is required unless dryRun is true' }, 400);
@@ -119,7 +132,14 @@ export default async function (req: Request): Promise<Response> {
     return json({ error: 'OPENROUTER_API_KEY is not configured' }, 500);
   }
 
-  const results = { notesProcessed: 0, loopsCreated: [], candidates: [], skippedDuplicates: 0, errors: [] };
+  const results = {
+    notesProcessed: 0,
+    loopsCreated: [],
+    candidates: [],
+    skippedDuplicates: 0,
+    errors: [],
+    hasMore: false,
+  };
 
   let existingLoops = [];
   if (!dryRun) {
@@ -156,7 +176,11 @@ export default async function (req: Request): Promise<Response> {
   for (const source of sources) {
     try {
       const sinceIso = await resolveSinceTimestamp(client, dryRun, ownerUserId, source.name);
-      const notes = await listNewNotes(source.apiKey, sinceIso);
+      const allNotes = await listNewNotes(source.apiKey, sinceIso);
+      const notes = allNotes.slice(0, maxNotes);
+      if (allNotes.length > notes.length) {
+        results.hasMore = true;
+      }
       let maxCreatedAt = sinceIso;
 
       for (const noteSummary of notes) {
@@ -169,6 +193,9 @@ export default async function (req: Request): Promise<Response> {
         }
 
         const candidates = await extractLoopCandidates(openRouterKey, note);
+        // Structural signal only -- never log meeting titles/content here,
+        // this function processes private Granola notes.
+        console.log(`[ingest-granola-loops] processed note id=${note.id} candidates=${candidates.length}`);
 
         for (const candidate of candidates) {
           const priorityScore = scorePriority(candidate);
@@ -327,6 +354,8 @@ async function extractLoopCandidates(openRouterKey, note) {
   });
 
   if (!response.ok) {
+    const errorBody = await response.text();
+    console.log(`[ingest-granola-loops] OpenRouter error ${response.status}: ${errorBody.slice(0, 500)}`);
     throw new Error(`OpenRouter extraction failed: ${response.status}`);
   }
 
