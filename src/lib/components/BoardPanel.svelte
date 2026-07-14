@@ -80,27 +80,6 @@
           on:change={(event) => onSelectedDayChange?.(event.currentTarget.value)}
         />
       </label>
-      <div class="view-toggle" role="group" aria-label="Workspace view">
-        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('flow')}>
-          Flow
-        </button>
-        <button type="button" class="view-toggle-button is-active" aria-current="page">Board</button>
-        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('inbox')}>
-          Inbox{inboxCount ? ` (${inboxCount})` : ''}
-        </button>
-        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('waiting')}>
-          Waiting{waitingCount ? ` (${waitingCount})` : ''}
-        </button>
-        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('history')}>
-          History
-        </button>
-        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('meetings')}>
-          Meetings
-        </button>
-        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('settings')}>
-          Settings
-        </button>
-      </div>
       <button
         type="button"
         class="theme-toggle"
@@ -112,6 +91,28 @@
       </button>
     </div>
   </header>
+
+  <div class="view-toggle" role="group" aria-label="Workspace view">
+    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('flow')}>
+      Flow
+    </button>
+    <button type="button" class="view-toggle-button is-active" aria-current="page">Board</button>
+    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('inbox')}>
+      Inbox{inboxCount ? ` (${inboxCount})` : ''}
+    </button>
+    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('waiting')}>
+      Waiting{waitingCount ? ` (${waitingCount})` : ''}
+    </button>
+    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('history')}>
+      History
+    </button>
+    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('meetings')}>
+      Meetings
+    </button>
+    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('settings')}>
+      Settings
+    </button>
+  </div>
 
   <div class="board-columns" role="list">
     {#each columns as column (column.id)}

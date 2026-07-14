@@ -478,13 +478,23 @@ h2 {
 .view-toggle {
   display: inline-flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 2px;
   padding: 2px;
   border: 1px solid var(--border);
-  border-radius: 999px;
+  border-radius: 16px;
   background: var(--surface-strong);
-  max-width: min(300px, 40vw);
-  overflow-x: auto;
+}
+
+/* In the Flow and Board headers the toggle sits on its own row under the
+   title, so it never competes with the intro copy for horizontal space. */
+.task-panel > .view-toggle,
+.board-panel > .view-toggle {
+  align-self: flex-start;
+}
+
+.task-panel > .view-toggle {
+  margin-top: 16px;
 }
 
 .view-toggle-button {
