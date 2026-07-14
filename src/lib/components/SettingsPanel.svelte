@@ -1,5 +1,6 @@
 <script>
   export let syncStatus = [];
+  export let auditLog = [];
   export let userEmail = '';
   export let inboxCount = 0;
   export let waitingCount = 0;
@@ -10,9 +11,18 @@
     'granola-workspace': 'Granola (workspace notes)',
   };
 
+  const ACTION_LABELS = {
+    loop_created: 'Created a loop',
+    draft_generated: 'Drafted a follow-up',
+  };
+
   function formatLastSynced(iso) {
     if (!iso) return 'Never synced yet';
     return `Last synced ${new Intl.DateTimeFormat([], { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso))}`;
+  }
+
+  function formatLogTime(iso) {
+    return new Intl.DateTimeFormat([], { dateStyle: 'medium', timeStyle: 'short' }).format(new Date(iso));
   }
 </script>
 
@@ -47,6 +57,23 @@
           <li class="source-row">
             <span class="source-name">{SOURCE_LABELS[source.source] ?? source.source}</span>
             <span class="source-status">{formatLastSynced(source.lastSyncedAt)}</span>
+          </li>
+        {/each}
+      </ul>
+    {/if}
+  </div>
+
+  <div class="settings-section">
+    <h3 class="section-title">Recent AI activity</h3>
+    {#if auditLog.length === 0}
+      <p class="empty-note">Nothing logged yet.</p>
+    {:else}
+      <ul class="audit-list">
+        {#each auditLog as entry (entry.id)}
+          <li class="audit-row">
+            <span class="audit-action">{ACTION_LABELS[entry.actionType] ?? entry.actionType}</span>
+            <span class="audit-summary">{entry.summary}</span>
+            <span class="audit-time">{formatLogTime(entry.createdAt)}</span>
           </li>
         {/each}
       </ul>
@@ -131,5 +158,42 @@
 
   .source-status {
     color: var(--subtle);
+  }
+
+  .audit-list {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .audit-row {
+    display: flex;
+    align-items: baseline;
+    gap: var(--space-2);
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--field-surface);
+    font-size: 12px;
+  }
+
+  .audit-action {
+    flex-shrink: 0;
+    font-weight: 600;
+    color: var(--strong);
+  }
+
+  .audit-summary {
+    flex: 1;
+    color: var(--default);
+  }
+
+  .audit-time {
+    flex-shrink: 0;
+    color: var(--subtle);
+    font-size: 11px;
   }
 </style>

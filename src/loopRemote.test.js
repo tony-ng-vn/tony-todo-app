@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   acceptLoop,
   dismissLoop,
+  loadAuditLog,
   loadDismissedLoops,
   loadInboxLoops,
   loadMeetings,
@@ -181,6 +182,69 @@ describe('loadDismissedLoops', () => {
     expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
     expect(calls).toContainEqual(['eq', 'loop_status', 'dismissed']);
     expect(calls).toContainEqual(['order', 'updated_at', { ascending: false }]);
+  });
+});
+
+describe('loadAuditLog', () => {
+  it('loads recent audit log entries for a user, most recent first', async () => {
+    const calls = [];
+    const client = {
+      database: {
+        from(table) {
+          calls.push(['from', table]);
+          return {
+            select(columns) {
+              calls.push(['select', columns]);
+              return this;
+            },
+            eq(column, value) {
+              calls.push(['eq', column, value]);
+              return this;
+            },
+            order(column, options) {
+              calls.push(['order', column, options]);
+              return this;
+            },
+            limit(count) {
+              calls.push(['limit', count]);
+              return this;
+            },
+            then(resolve) {
+              resolve({
+                data: [
+                  {
+                    id: 'log-1',
+                    action_type: 'draft_generated',
+                    loop_id: 'loop-1',
+                    model: 'anthropic/claude-haiku-4.5',
+                    summary: 'Drafted a follow-up for "Q2 numbers".',
+                    created_at: '2026-07-13T20:00:00.000Z',
+                  },
+                ],
+                error: null,
+              });
+            },
+          };
+        },
+      },
+    };
+
+    const entries = await loadAuditLog(client, 'user-123');
+
+    expect(entries).toEqual([
+      {
+        id: 'log-1',
+        actionType: 'draft_generated',
+        loopId: 'loop-1',
+        model: 'anthropic/claude-haiku-4.5',
+        summary: 'Drafted a follow-up for "Q2 numbers".',
+        createdAt: '2026-07-13T20:00:00.000Z',
+      },
+    ]);
+    expect(calls).toContainEqual(['from', 'audit_log']);
+    expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
+    expect(calls).toContainEqual(['order', 'created_at', { ascending: false }]);
+    expect(calls).toContainEqual(['limit', 20]);
   });
 });
 

@@ -93,6 +93,17 @@ export default async function (req: Request): Promise<Response> {
 
   try {
     const draft = await draftFollowUp(openRouterKey, loop, evidence);
+
+    await client.database.from('audit_log').insert([
+      {
+        user_id: ownerUserId,
+        action_type: 'draft_generated',
+        loop_id: loopId,
+        model: 'anthropic/claude-haiku-4.5',
+        summary: `Drafted a follow-up for "${loop.title}".`,
+      },
+    ]);
+
     return json({ draft }, 200);
   } catch (error) {
     return json({ error: error.message }, 500);

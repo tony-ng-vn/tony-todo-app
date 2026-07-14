@@ -288,6 +288,16 @@ export default async function (req: Request): Promise<Response> {
             results.errors.push(`Evidence insert failed for "${candidate.title}": ${evidenceError.message}`);
           }
 
+          await client.database.from('audit_log').insert([
+            {
+              user_id: ownerUserId,
+              action_type: 'loop_created',
+              loop_id: todoId,
+              model: 'anthropic/claude-haiku-4.5',
+              summary: `Created "${candidate.title}" (${priorityLabel}) from a Granola meeting.`,
+            },
+          ]);
+
           results.loopsCreated.push({ id: todoId, title: candidate.title, priorityLabel });
           existingLoops.push({
             id: todoId,
