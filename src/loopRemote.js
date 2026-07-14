@@ -1,5 +1,6 @@
 const INBOX_SELECT_COLUMNS = 'id,title,loop_type,confidence,priority_label,why_priority';
 const WAITING_SELECT_COLUMNS = 'id,title,loop_type,created_at';
+const DISMISSED_SELECT_COLUMNS = 'id,title,loop_type,priority_label,updated_at';
 const EVIDENCE_SELECT_COLUMNS = 'todo_id,source_app,author,excerpt';
 
 export async function loadInboxLoops(client, userId, now = new Date()) {
@@ -48,12 +49,37 @@ export async function loadWaitingLoops(client, userId) {
   });
 }
 
-export async function acceptLoop(client, userId, loopId) {
-  await updateLoopStatus(client, userId, loopId, 'accepted');
+export async function loadDismissedLoops(client, userId) {
+  const { data: todos, error: todosError } = await client.database
+    .from('todos')
+    .select(DISMISSED_SELECT_COLUMNS)
+    .eq('user_id', userId)
+    .eq('loop_status', 'dismissed')
+    .order('updated_at', { ascending: false });
+  throwIfError(todosError);
+
+  const evidenceByTodoId = await loadEvidenceByTodoId(client, userId, todos);
+
+  return todos.map((todo) => ({
+    id: todo.id,
+    title: todo.title,
+    loopType: todo.loop_type,
+    priorityLabel: todo.priority_label,
+    updatedAt: todo.updated_at,
+    evidence: evidenceByTodoId.get(todo.id) ?? { sourceApp: null, author: null, excerpt: '' },
+  }));
 }
 
-export async function dismissLoop(client, userId, loopId) {
-  await updateLoopStatus(client, userId, loopId, 'dismissed');
+export async function acceptLoop(client, userId, loopId, now = new Date()) {
+  await updateLoopStatus(client, userId, loopId, 'accepted', now);
+}
+
+export async function dismissLoop(client, userId, loopId, now = new Date()) {
+  await updateLoopStatus(client, userId, loopId, 'dismissed', now);
+}
+
+export async function restoreLoop(client, userId, loopId, now = new Date()) {
+  await updateLoopStatus(client, userId, loopId, 'inbox', now);
 }
 
 export async function snoozeLoop(client, userId, loopId, until) {
@@ -65,10 +91,10 @@ export async function snoozeLoop(client, userId, loopId, until) {
   throwIfError(error);
 }
 
-async function updateLoopStatus(client, userId, loopId, loopStatus) {
+async function updateLoopStatus(client, userId, loopId, loopStatus, now) {
   const { error } = await client.database
     .from('todos')
-    .update({ loop_status: loopStatus })
+    .update({ loop_status: loopStatus, updated_at: now.toISOString() })
     .eq('id', loopId)
     .eq('user_id', userId);
   throwIfError(error);

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { acceptLoop, dismissLoop, loadInboxLoops, loadWaitingLoops, snoozeLoop } from './loopRemote.js';
+import {
+  acceptLoop,
+  dismissLoop,
+  loadDismissedLoops,
+  loadInboxLoops,
+  loadWaitingLoops,
+  restoreLoop,
+  snoozeLoop,
+} from './loopRemote.js';
 
 describe('loadInboxLoops', () => {
   it('loads inbox-status loops for a user and attaches evidence', async () => {
@@ -94,27 +102,33 @@ describe('loadWaitingLoops', () => {
 });
 
 describe('acceptLoop', () => {
-  it('sets loop_status to accepted, scoped by user id', async () => {
+  it('sets loop_status to accepted and bumps updated_at, scoped by user id', async () => {
     const calls = [];
     const client = fakeUpdateClient(calls);
 
-    await acceptLoop(client, 'user-123', 'loop-1');
+    await acceptLoop(client, 'user-123', 'loop-1', new Date('2026-07-14T10:00:00.000Z'));
 
     expect(calls[0]).toEqual(['from', 'todos']);
-    expect(calls[1]).toEqual(['update', { loop_status: 'accepted' }]);
+    expect(calls[1]).toEqual([
+      'update',
+      { loop_status: 'accepted', updated_at: '2026-07-14T10:00:00.000Z' },
+    ]);
     expect(calls).toContainEqual(['eq', 'id', 'loop-1']);
     expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
   });
 });
 
 describe('dismissLoop', () => {
-  it('sets loop_status to dismissed, scoped by user id', async () => {
+  it('sets loop_status to dismissed and bumps updated_at, scoped by user id', async () => {
     const calls = [];
     const client = fakeUpdateClient(calls);
 
-    await dismissLoop(client, 'user-123', 'loop-1');
+    await dismissLoop(client, 'user-123', 'loop-1', new Date('2026-07-14T10:00:00.000Z'));
 
-    expect(calls[1]).toEqual(['update', { loop_status: 'dismissed' }]);
+    expect(calls[1]).toEqual([
+      'update',
+      { loop_status: 'dismissed', updated_at: '2026-07-14T10:00:00.000Z' },
+    ]);
     expect(calls).toContainEqual(['eq', 'id', 'loop-1']);
     expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
   });
@@ -129,6 +143,56 @@ describe('snoozeLoop', () => {
 
     expect(calls[0]).toEqual(['from', 'todos']);
     expect(calls[1]).toEqual(['update', { next_review_at: '2026-07-15T09:00:00.000Z', loop_status: 'inbox' }]);
+    expect(calls).toContainEqual(['eq', 'id', 'loop-1']);
+    expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
+  });
+});
+
+describe('loadDismissedLoops', () => {
+  it('loads dismissed loops for a user, most recently updated first, with evidence', async () => {
+    const calls = [];
+    const client = fakeSelectClient(calls, {
+      todos: [
+        {
+          id: 'loop-1',
+          title: 'Explore a new social media concept',
+          loop_type: 'follow-up',
+          priority_label: 'P2',
+          updated_at: '2026-07-13T10:00:00.000Z',
+        },
+      ],
+      evidence: [{ todo_id: 'loop-1', source_app: 'granola', author: 'Tony', excerpt: 'not relevant' }],
+    });
+
+    const loops = await loadDismissedLoops(client, 'user-123');
+
+    expect(loops).toEqual([
+      {
+        id: 'loop-1',
+        title: 'Explore a new social media concept',
+        loopType: 'follow-up',
+        priorityLabel: 'P2',
+        updatedAt: '2026-07-13T10:00:00.000Z',
+        evidence: { sourceApp: 'granola', author: 'Tony', excerpt: 'not relevant' },
+      },
+    ]);
+    expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
+    expect(calls).toContainEqual(['eq', 'loop_status', 'dismissed']);
+    expect(calls).toContainEqual(['order', 'updated_at', { ascending: false }]);
+  });
+});
+
+describe('restoreLoop', () => {
+  it('sets loop_status back to inbox, scoped by user id', async () => {
+    const calls = [];
+    const client = fakeUpdateClient(calls);
+
+    await restoreLoop(client, 'user-123', 'loop-1', new Date('2026-07-14T10:00:00.000Z'));
+
+    expect(calls[1]).toEqual([
+      'update',
+      { loop_status: 'inbox', updated_at: '2026-07-14T10:00:00.000Z' },
+    ]);
     expect(calls).toContainEqual(['eq', 'id', 'loop-1']);
     expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
   });
@@ -155,6 +219,10 @@ function fakeSelectClient(calls, { todos, evidence }) {
           },
           or(expression) {
             calls.push(['or', expression]);
+            return builder;
+          },
+          order(column, options) {
+            calls.push(['order', column, options]);
             return builder;
           },
           then(resolve) {

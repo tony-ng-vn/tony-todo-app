@@ -91,6 +91,9 @@
         <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('waiting')}>
           Waiting{waitingCount ? ` (${waitingCount})` : ''}
         </button>
+        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('history')}>
+          History
+        </button>
       </div>
       <button
         type="button"
