@@ -1,9 +1,12 @@
 <script>
   export let loops = [];
   export let waitingCount = 0;
+  export let checkingForLoops = false;
+  export let checkStatus = '';
   export let onAccept;
   export let onDismiss;
   export let onViewChange;
+  export let onCheckForNewLoops;
 </script>
 
 <section class="inbox-panel" aria-labelledby="inbox-heading">
@@ -21,7 +24,15 @@
       </button>
     </div>
   </div>
-  <p class="panel-note">Medium-confidence loops Thread isn't sure about yet. Accept to promote to Focus, dismiss to teach it.</p>
+  <div class="inbox-actions-row">
+    <p class="panel-note">Medium-confidence loops Thread isn't sure about yet. Accept to promote to Focus, dismiss to teach it.</p>
+    <button type="button" class="check-loops-button" on:click={onCheckForNewLoops} disabled={checkingForLoops}>
+      {checkingForLoops ? 'Checking...' : 'Check for new loops'}
+    </button>
+  </div>
+  {#if checkStatus}
+    <p class="check-status" role="status">{checkStatus}</p>
+  {/if}
 
   <ol class="loop-list">
     {#each loops as loop (loop.id)}
@@ -79,6 +90,36 @@
   }
 
   .panel-note {
+    margin: 0;
+    font-size: 12px;
+    color: var(--subtle);
+  }
+
+  .inbox-actions-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+  }
+
+  .check-loops-button {
+    flex-shrink: 0;
+    padding: 6px 12px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-strong);
+    color: var(--default);
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+
+  .check-loops-button:disabled {
+    opacity: 0.6;
+    cursor: default;
+  }
+
+  .check-status {
     margin: 0;
     font-size: 12px;
     color: var(--subtle);
