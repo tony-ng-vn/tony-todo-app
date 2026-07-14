@@ -72,6 +72,9 @@
         <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('meetings')}>
           Meetings
         </button>
+        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('settings')}>
+          Settings
+        </button>
       </div>
       <button
         type="button"

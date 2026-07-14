@@ -25,6 +25,7 @@
       </button>
       <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('history')}>History</button>
       <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('meetings')}>Meetings</button>
+      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('settings')}>Settings</button>
     </div>
   </div>
   <div class="inbox-actions-row">

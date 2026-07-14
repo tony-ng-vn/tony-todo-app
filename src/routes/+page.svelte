@@ -9,6 +9,7 @@
   import WaitingPanel from '../lib/components/WaitingPanel.svelte';
   import HistoryPanel from '../lib/components/HistoryPanel.svelte';
   import MeetingsPanel from '../lib/components/MeetingsPanel.svelte';
+  import SettingsPanel from '../lib/components/SettingsPanel.svelte';
   import SummaryPanel from '../lib/components/SummaryPanel.svelte';
   import TaskDetail from '../lib/components/TaskDetail.svelte';
   import TaskPanel from '../lib/components/TaskPanel.svelte';
@@ -59,6 +60,7 @@
     loadDismissedLoops,
     loadInboxLoops,
     loadMeetings,
+    loadSyncStatus,
     loadWaitingLoops,
     restoreLoop,
     snoozeLoop,
@@ -105,6 +107,7 @@
   let waitingLoops = [];
   let historyLoops = [];
   let meetings = [];
+  let syncStatusList = [];
   let checkingForLoops = false;
   let checkStatus = '';
   let currentDayKey = formatDayKey(new Date());
@@ -307,7 +310,7 @@
     applyThemeMode(themeMode);
   }
 
-  const VIEW_MODES = ['flow', 'board', 'inbox', 'waiting', 'history', 'meetings'];
+  const VIEW_MODES = ['flow', 'board', 'inbox', 'waiting', 'history', 'meetings', 'settings'];
 
   function setViewMode(nextViewMode) {
     viewMode = VIEW_MODES.includes(nextViewMode) ? nextViewMode : 'flow';
@@ -823,6 +826,12 @@
     } catch {
       meetings = [];
     }
+
+    try {
+      syncStatusList = await loadSyncStatus(insforge, authUser.id);
+    } catch {
+      syncStatusList = [];
+    }
   }
 
   async function handleAcceptLoop(loopId) {
@@ -1023,7 +1032,7 @@
 <main
   class="workspace"
   class:has-detail={selectedTask}
-  class:is-board-view={viewMode === 'board' || viewMode === 'inbox' || viewMode === 'waiting' || viewMode === 'history' || viewMode === 'meetings'}
+  class:is-board-view={viewMode === 'board' || viewMode === 'inbox' || viewMode === 'waiting' || viewMode === 'history' || viewMode === 'meetings' || viewMode === 'settings'}
   aria-label="Done Log todo app"
 >
   {#if viewMode === 'board'}
@@ -1077,6 +1086,14 @@
   {:else if viewMode === 'meetings'}
     <MeetingsPanel
       {meetings}
+      inboxCount={inboxLoops.length}
+      waitingCount={waitingLoops.length}
+      onViewChange={setViewMode}
+    />
+  {:else if viewMode === 'settings'}
+    <SettingsPanel
+      syncStatus={syncStatusList}
+      userEmail={authUser?.email ?? ''}
       inboxCount={inboxLoops.length}
       waitingCount={waitingLoops.length}
       onViewChange={setViewMode}

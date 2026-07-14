@@ -28,6 +28,7 @@
       </button>
       <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('history')}>History</button>
       <button type="button" class="view-toggle-button is-active" aria-current="page">Meetings</button>
+      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('settings')}>Settings</button>
     </div>
   </div>
   <p class="panel-note">Loops grouped by the meeting they were extracted from.</p>
