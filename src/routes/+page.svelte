@@ -3,6 +3,7 @@
   import '../styles.css';
   import FlowRail from '../lib/components/FlowRail.svelte';
   import LottieAnimation from '../lib/components/LottieAnimation.svelte';
+  import AuthGate from '../lib/components/AuthGate.svelte';
   import BoardPanel from '../lib/components/BoardPanel.svelte';
   import SummaryPanel from '../lib/components/SummaryPanel.svelte';
   import TaskDetail from '../lib/components/TaskDetail.svelte';
@@ -35,6 +36,7 @@
     updateTodoTitle,
   } from '../todoStore.js';
   import { insforge, isInsForgeConfigured } from '../insforgeClient.js';
+  import { getCurrentUser, signInWithPassword, signOut, signUp } from '../auth.js';
   import {
     completeRemoteTodo,
     deleteRemoteTodo,
@@ -46,7 +48,7 @@
     updateRemoteTodoTimer,
     updateRemoteTodoTitle,
   } from '../todoRemote.js';
-  import { getOrCreateClientId, loadLocalState, reconcileRemoteState, saveLocalState } from '../todoPersistence.js';
+  import { loadLocalState, reconcileRemoteState, saveLocalState } from '../todoPersistence.js';
 
   const TIMER_SYNC_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds'];
   const COMPLETION_SYNC_FIELDS = ['completedAt'];
@@ -56,8 +58,14 @@
   let state = createInitialState();
   let selectedDay = formatDayKey(new Date());
   let syncMessage = 'Local only';
-  let clientId = '';
   let useRemote = false;
+  let authUser = null;
+  let authChecked = false;
+  let authMode = 'sign-in';
+  let authEmail = '';
+  let authPassword = '';
+  let authError = '';
+  let authLoading = false;
   let titleDraft = '';
   let draftTitle = '';
   let selectedTaskId = null;
@@ -99,7 +107,6 @@
   onMount(() => {
     useRemote = isInsForgeConfigured && !new URLSearchParams(window.location.search).has('local');
     syncMessage = useRemote ? 'Connecting' : 'Local only';
-    clientId = getOrCreateClientId();
     state = loadLocalState();
     themeMode = loadThemeMode();
     viewMode = loadViewMode();
@@ -107,7 +114,7 @@
     window.addEventListener('focus', syncSelectedDayToToday);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     scheduleSelectedDayRefresh();
-    hydrateRemoteTodos();
+    initializeAuth();
   });
 
   onDestroy(() => {
@@ -680,15 +687,81 @@
     await syncRemoteChange('Reopening task', () => persistCompletionChangedTodos(changedTodos));
   }
 
-  async function hydrateRemoteTodos() {
+  async function initializeAuth() {
     if (!useRemote) {
+      authChecked = true;
+      return;
+    }
+
+    try {
+      const { user } = await getCurrentUser(insforge);
+      authUser = user;
+      authChecked = true;
+
+      if (authUser) {
+        await hydrateRemoteTodos();
+      } else {
+        syncMessage = 'Signed out';
+      }
+    } catch (error) {
+      authUser = null;
+      authChecked = true;
+      showOfflineCache(error);
+    }
+  }
+
+  async function handleAuthSubmit({ email, password, mode }) {
+    authError = '';
+    authLoading = true;
+
+    try {
+      const authAction = mode === 'sign-up' ? signUp : signInWithPassword;
+      const result = await authAction(insforge, { email, password });
+
+      if (result.error) {
+        authError = result.error.message;
+        return;
+      }
+
+      if (mode === 'sign-up' && result.requireEmailVerification) {
+        authError = 'Check your email to verify your account, then sign in.';
+        authMode = 'sign-in';
+        return;
+      }
+
+      authUser = result.user;
+      authEmail = '';
+      authPassword = '';
+      await hydrateRemoteTodos();
+    } catch (error) {
+      authError = error.message ?? 'Something went wrong. Please try again.';
+    } finally {
+      authLoading = false;
+    }
+  }
+
+  function handleAuthToggleMode(nextMode) {
+    authMode = nextMode;
+    authError = '';
+  }
+
+  async function handleSignOut() {
+    await signOut(insforge);
+    authUser = null;
+    state = createInitialState();
+    saveLocalState(state);
+    syncMessage = 'Signed out';
+  }
+
+  async function hydrateRemoteTodos() {
+    if (!useRemote || !authUser) {
       return;
     }
 
     syncMessage = 'Loading cloud';
 
     try {
-      const remoteTodos = await loadRemoteTodos(insforge, clientId);
+      const remoteTodos = await loadRemoteTodos(insforge, authUser.id);
 
       state = reconcileRemoteState(state, remoteTodos);
       saveLocalState(state);
@@ -710,43 +783,43 @@
   }
 
   async function persistNewTodo(todo) {
-    if (!useRemote) return;
-    await insertRemoteTodo(insforge, clientId, todo);
+    if (!useRemote || !authUser) return;
+    await insertRemoteTodo(insforge, authUser.id, todo);
   }
 
   async function persistCompletedTodo(todo) {
-    if (!useRemote || !todo) return;
-    await completeRemoteTodo(insforge, clientId, todo);
+    if (!useRemote || !authUser || !todo) return;
+    await completeRemoteTodo(insforge, authUser.id, todo);
   }
 
   async function persistTodoNote(todo) {
-    if (!useRemote || !todo) return;
-    await updateRemoteTodoNote(insforge, clientId, todo);
+    if (!useRemote || !authUser || !todo) return;
+    await updateRemoteTodoNote(insforge, authUser.id, todo);
   }
 
   async function persistTodoTitle(todo) {
-    if (!useRemote || !todo) return;
-    await updateRemoteTodoTitle(insforge, clientId, todo);
+    if (!useRemote || !authUser || !todo) return;
+    await updateRemoteTodoTitle(insforge, authUser.id, todo);
   }
 
   async function persistTodoProgress(todo) {
-    if (!useRemote || !todo) return;
-    await updateRemoteTodoProgress(insforge, clientId, todo);
+    if (!useRemote || !authUser || !todo) return;
+    await updateRemoteTodoProgress(insforge, authUser.id, todo);
   }
 
   async function persistTodoTimer(todo) {
-    if (!useRemote || !todo) return;
-    await updateRemoteTodoTimer(insforge, clientId, todo);
+    if (!useRemote || !authUser || !todo) return;
+    await updateRemoteTodoTimer(insforge, authUser.id, todo);
   }
 
   async function persistCompletionChangedTodos(todosToUpdate) {
-    if (!useRemote) return;
-    await Promise.all(todosToUpdate.map((todo) => updateRemoteTodoCompletion(insforge, clientId, todo)));
+    if (!useRemote || !authUser) return;
+    await Promise.all(todosToUpdate.map((todo) => updateRemoteTodoCompletion(insforge, authUser.id, todo)));
   }
 
   async function persistDeletedTodos(todoIds) {
-    if (!useRemote) return;
-    await Promise.all(todoIds.map((todoId) => deleteRemoteTodo(insforge, clientId, todoId)));
+    if (!useRemote || !authUser) return;
+    await Promise.all(todoIds.map((todoId) => deleteRemoteTodo(insforge, authUser.id, todoId)));
   }
 
   function renderRemoteStatus(count = state.todos.length) {
@@ -812,6 +885,17 @@
   }
 </script>
 
+{#if useRemote && authChecked && !authUser}
+  <AuthGate
+    mode={authMode}
+    bind:email={authEmail}
+    bind:password={authPassword}
+    error={authError}
+    loading={authLoading}
+    onSubmit={handleAuthSubmit}
+    onToggleMode={handleAuthToggleMode}
+  />
+{:else}
 <main
   class="workspace"
   class:has-detail={selectedTask}
@@ -912,4 +996,9 @@
       <span>Done</span>
     </aside>
   {/if}
+
+  {#if useRemote && authUser}
+    <button type="button" class="sign-out-button" on:click={handleSignOut}>Sign out</button>
+  {/if}
 </main>
+{/if}

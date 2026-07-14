@@ -1,10 +1,10 @@
 const TODO_SELECT_COLUMNS =
   'id,title,created_at,completed_at,note,source,notion_page_id,notion_database_id,notion_status,first_started_at,active_started_at,tracked_seconds,is_progressive,parent_task_id,is_progress_session,progress_label';
 
-export function toRemoteRecord(todo, clientId) {
+export function toRemoteRecord(todo, userId) {
   return {
     id: todo.id,
-    client_id: clientId,
+    user_id: userId,
     title: todo.title,
     created_at: todo.createdAt,
     completed_at: todo.completedAt,
@@ -44,11 +44,11 @@ export function fromRemoteRecord(record) {
   };
 }
 
-export async function loadRemoteTodos(client, clientId) {
+export async function loadRemoteTodos(client, userId) {
   const { data, error } = await client.database
     .from('todos')
     .select(TODO_SELECT_COLUMNS)
-    .eq('client_id', clientId)
+    .eq('user_id', userId)
     .order('created_at', { ascending: true });
 
   throwIfError(error);
@@ -56,43 +56,43 @@ export async function loadRemoteTodos(client, clientId) {
   return data.map(fromRemoteRecord);
 }
 
-export async function insertRemoteTodo(client, clientId, todo) {
-  const { error } = await client.database.from('todos').insert([toRemoteRecord(todo, clientId)]);
+export async function insertRemoteTodo(client, userId, todo) {
+  const { error } = await client.database.from('todos').insert([toRemoteRecord(todo, userId)]);
 
   throwIfError(error);
 }
 
-export async function completeRemoteTodo(client, clientId, todo) {
-  await updateRemoteTodo(client, clientId, todo, completionFields(todo));
+export async function completeRemoteTodo(client, userId, todo) {
+  await updateRemoteTodo(client, userId, todo, completionFields(todo));
 }
 
-export async function updateRemoteTodoNote(client, clientId, todo) {
-  await updateRemoteTodo(client, clientId, todo, { note: todo.note ?? '' });
+export async function updateRemoteTodoNote(client, userId, todo) {
+  await updateRemoteTodo(client, userId, todo, { note: todo.note ?? '' });
 }
 
-export async function updateRemoteTodoTitle(client, clientId, todo) {
-  await updateRemoteTodo(client, clientId, todo, { title: todo.title });
+export async function updateRemoteTodoTitle(client, userId, todo) {
+  await updateRemoteTodo(client, userId, todo, { title: todo.title });
 }
 
-export async function updateRemoteTodoTimer(client, clientId, todo) {
-  await updateRemoteTodo(client, clientId, todo, timerFields(todo));
+export async function updateRemoteTodoTimer(client, userId, todo) {
+  await updateRemoteTodo(client, userId, todo, timerFields(todo));
 }
 
-export async function updateRemoteTodoProgress(client, clientId, todo) {
-  await updateRemoteTodo(client, clientId, todo, progressFields(todo));
+export async function updateRemoteTodoProgress(client, userId, todo) {
+  await updateRemoteTodo(client, userId, todo, progressFields(todo));
 }
 
-export async function updateRemoteTodoCompletion(client, clientId, todo) {
-  await updateRemoteTodo(client, clientId, todo, completionFields(todo));
+export async function updateRemoteTodoCompletion(client, userId, todo) {
+  await updateRemoteTodo(client, userId, todo, completionFields(todo));
 }
 
-export async function deleteRemoteTodo(client, clientId, todoId) {
-  const { error } = await client.database.from('todos').delete().eq('id', todoId).eq('client_id', clientId);
+export async function deleteRemoteTodo(client, userId, todoId) {
+  const { error } = await client.database.from('todos').delete().eq('id', todoId).eq('user_id', userId);
 
   throwIfError(error);
 }
 
-async function updateRemoteTodo(client, clientId, todo, fields) {
+async function updateRemoteTodo(client, userId, todo, fields) {
   const { error } = await client.database
     .from('todos')
     .update({
@@ -100,7 +100,7 @@ async function updateRemoteTodo(client, clientId, todo, fields) {
       updated_at: new Date().toISOString(),
     })
     .eq('id', todo.id)
-    .eq('client_id', clientId);
+    .eq('user_id', userId);
 
   throwIfError(error);
 }

@@ -10,7 +10,7 @@ import {
 } from './todoRemote.js';
 
 describe('todo remote mapping', () => {
-  it('maps local todos to InsForge records with a client scope', () => {
+  it('maps local todos to InsForge records with a user scope', () => {
     expect(
       toRemoteRecord(
         {
@@ -27,11 +27,11 @@ describe('todo remote mapping', () => {
           isProgressSession: false,
           progressLabel: 'pages 41-52',
         },
-        'client-123',
+        'user-123',
       ),
     ).toEqual({
       id: 'todo-1',
-      client_id: 'client-123',
+      user_id: 'user-123',
       title: 'Send invoice',
       created_at: '2026-06-08T08:00:00.000Z',
       completed_at: null,
@@ -90,7 +90,7 @@ describe('todo remote mapping', () => {
     });
   });
 
-  it('updates a remote todo title scoped by client id', async () => {
+  it('updates a remote todo title scoped by user id', async () => {
     const calls = [];
     const client = {
       database: {
@@ -114,16 +114,16 @@ describe('todo remote mapping', () => {
       },
     };
 
-    await updateRemoteTodoTitle(client, 'client-123', { id: 'todo-1', title: 'New title' });
+    await updateRemoteTodoTitle(client, 'user-123', { id: 'todo-1', title: 'New title' });
 
     expect(calls[0]).toEqual(['from', 'todos']);
     expect(calls[1][0]).toBe('update');
     expect(calls[1][1]).toMatchObject({ title: 'New title' });
     expect(calls).toContainEqual(['eq', 'id', 'todo-1']);
-    expect(calls).toContainEqual(['eq', 'client_id', 'client-123']);
+    expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
   });
 
-  it('updates remote timer fields scoped by client id', async () => {
+  it('updates remote timer fields scoped by user id', async () => {
     const calls = [];
     const client = {
       database: {
@@ -147,7 +147,7 @@ describe('todo remote mapping', () => {
       },
     };
 
-    await updateRemoteTodoTimer(client, 'client-123', {
+    await updateRemoteTodoTimer(client, 'user-123', {
       id: 'todo-1',
       firstStartedAt: '2026-06-08T08:10:00.000Z',
       activeStartedAt: '2026-06-08T08:20:00.000Z',
@@ -162,10 +162,10 @@ describe('todo remote mapping', () => {
       tracked_seconds: 600,
     });
     expect(calls).toContainEqual(['eq', 'id', 'todo-1']);
-    expect(calls).toContainEqual(['eq', 'client_id', 'client-123']);
+    expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
   });
 
-  it('updates remote progress fields scoped by client id', async () => {
+  it('updates remote progress fields scoped by user id', async () => {
     const calls = [];
     const client = {
       database: {
@@ -189,7 +189,7 @@ describe('todo remote mapping', () => {
       },
     };
 
-    await updateRemoteTodoProgress(client, 'client-123', {
+    await updateRemoteTodoProgress(client, 'user-123', {
       id: 'todo-1',
       isProgressive: true,
       progressLabel: 'pages 41-52',
@@ -202,7 +202,7 @@ describe('todo remote mapping', () => {
       progress_label: 'pages 41-52',
     });
     expect(calls).toContainEqual(['eq', 'id', 'todo-1']);
-    expect(calls).toContainEqual(['eq', 'client_id', 'client-123']);
+    expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
   });
 
   it('syncs a failed terminal outcome through remote completion fields', async () => {
@@ -229,7 +229,7 @@ describe('todo remote mapping', () => {
       },
     };
 
-    await completeRemoteTodo(client, 'client-123', {
+    await completeRemoteTodo(client, 'user-123', {
       id: 'todo-1',
       completedAt: '2026-06-08T09:00:00.000Z',
       firstStartedAt: null,
@@ -243,10 +243,10 @@ describe('todo remote mapping', () => {
       notion_status: 'Failed',
     });
     expect(calls).toContainEqual(['eq', 'id', 'todo-1']);
-    expect(calls).toContainEqual(['eq', 'client_id', 'client-123']);
+    expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
   });
 
-  it('deletes a remote todo scoped by client id', async () => {
+  it('deletes a remote todo scoped by user id', async () => {
     const calls = [];
     const client = {
       database: {
@@ -270,13 +270,13 @@ describe('todo remote mapping', () => {
       },
     };
 
-    await deleteRemoteTodo(client, 'client-123', 'todo-1');
+    await deleteRemoteTodo(client, 'user-123', 'todo-1');
 
     expect(calls).toEqual([
       ['from', 'todos'],
       ['delete'],
       ['eq', 'id', 'todo-1'],
-      ['eq', 'client_id', 'client-123'],
+      ['eq', 'user_id', 'user-123'],
     ]);
   });
 });
