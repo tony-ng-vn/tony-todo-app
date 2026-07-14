@@ -8,7 +8,7 @@
 // src/loopPriority.js / src/loopDedup.js exactly (kept in sync by hand: this
 // function deploys as a single file, so it cannot import the app's src/
 // modules directly). If those formulas change, update both places.
-import { createAdminClient } from 'npm:@insforge/sdk';
+import { createAdminClient, createClient } from 'npm:@insforge/sdk';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -80,15 +80,33 @@ export default async function (req: Request): Promise<Response> {
     return json({ error: 'Use POST' }, 405);
   }
 
-  // This function reads private Granola content and writes on behalf of
-  // ownerUserId with an admin (RLS-bypassing) client, so it must never be
-  // callable by an unauthenticated caller -- even a dryRun response would
-  // leak extracted meeting content. A shared secret (not a per-user token,
-  // since this is invoked by an internal schedule, not a signed-in browser)
-  // is the simplest correct gate here.
-  const expectedToken = Deno.env.get('INGEST_FUNCTION_TOKEN');
+  // This function reads private Granola content and writes with an admin
+  // (RLS-bypassing) client, so it must never be callable by an
+  // unauthenticated caller -- even a dryRun response would leak extracted
+  // meeting content. Two caller types are trusted, each resolving
+  // ownerUserId differently:
+  //   1. The shared secret (schedule/internal use): the caller declares
+  //      ownerUserId explicitly in the body.
+  //   2. A real signed-in user's own access token (the app's "check for
+  //      new loops" button, via client.functions.invoke which forwards it
+  //      automatically): ownerUserId is derived from the verified token
+  //      and any client-supplied ownerUserId is ignored, so a user can
+  //      never trigger ingestion into someone else's account.
   const providedToken = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
-  if (!expectedToken || providedToken !== expectedToken) {
+  const expectedToken = Deno.env.get('INGEST_FUNCTION_TOKEN');
+  const isTrustedInternalCaller = Boolean(expectedToken) && providedToken === expectedToken;
+
+  let verifiedUserId = null;
+  if (!isTrustedInternalCaller && providedToken) {
+    const userClient = createClient({
+      baseUrl: Deno.env.get('INSFORGE_BASE_URL'),
+      accessToken: providedToken,
+    });
+    const { data } = await userClient.auth.getCurrentUser();
+    verifiedUserId = data?.user?.id ?? null;
+  }
+
+  if (!isTrustedInternalCaller && !verifiedUserId) {
     return json({ error: 'Unauthorized' }, 401);
   }
 
@@ -99,8 +117,11 @@ export default async function (req: Request): Promise<Response> {
     // empty/absent body is fine, all fields are optional
   }
 
-  const dryRun = Boolean((body as any).dryRun ?? true);
-  const ownerUserId = (body as any).ownerUserId ?? null;
+  const ownerUserId = isTrustedInternalCaller ? ((body as any).ownerUserId ?? null) : verifiedUserId;
+  // A signed-in user hitting this always wants real results, not a preview
+  // they can't act on; the internal/schedule caller defaults to safe
+  // (dryRun) unless it explicitly opts into writing.
+  const dryRun = Boolean((body as any).dryRun ?? isTrustedInternalCaller);
   const sourceFilter = (body as any).source ?? 'both';
   // Write mode does two extra existing-loop queries plus per-candidate
   // inserts on top of the Granola + LLM calls dry-run already does, so it
