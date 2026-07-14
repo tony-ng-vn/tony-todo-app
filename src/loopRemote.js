@@ -2,6 +2,8 @@ const INBOX_SELECT_COLUMNS = 'id,title,loop_type,confidence,priority_label,why_p
 const WAITING_SELECT_COLUMNS = 'id,title,loop_type,created_at';
 const DISMISSED_SELECT_COLUMNS = 'id,title,loop_type,priority_label,updated_at';
 const EVIDENCE_SELECT_COLUMNS = 'todo_id,source_app,author,excerpt';
+const MEETING_EVIDENCE_SELECT_COLUMNS = 'todo_id,source_object_id,source_title,occurred_at,author';
+const MEETING_LOOP_SELECT_COLUMNS = 'id,title,loop_status,priority_label';
 
 export async function loadInboxLoops(client, userId, now = new Date()) {
   const { data: todos, error: todosError } = await client.database
@@ -68,6 +70,48 @@ export async function loadDismissedLoops(client, userId) {
     updatedAt: todo.updated_at,
     evidence: evidenceByTodoId.get(todo.id) ?? { sourceApp: null, author: null, excerpt: '' },
   }));
+}
+
+export async function loadMeetings(client, userId) {
+  const { data: evidenceRows, error: evidenceError } = await client.database
+    .from('evidence')
+    .select(MEETING_EVIDENCE_SELECT_COLUMNS)
+    .eq('user_id', userId)
+    .order('occurred_at', { ascending: false });
+  throwIfError(evidenceError);
+
+  const { data: todos, error: todosError } = await client.database
+    .from('todos')
+    .select(MEETING_LOOP_SELECT_COLUMNS)
+    .eq('user_id', userId);
+  throwIfError(todosError);
+
+  const todoById = new Map((todos ?? []).map((todo) => [todo.id, todo]));
+  const meetingsById = new Map();
+
+  for (const row of evidenceRows ?? []) {
+    if (!meetingsById.has(row.source_object_id)) {
+      meetingsById.set(row.source_object_id, {
+        sourceObjectId: row.source_object_id,
+        title: row.source_title,
+        occurredAt: row.occurred_at,
+        author: row.author,
+        loops: [],
+      });
+    }
+
+    const todo = todoById.get(row.todo_id);
+    if (todo) {
+      meetingsById.get(row.source_object_id).loops.push({
+        id: todo.id,
+        title: todo.title,
+        loopStatus: todo.loop_status,
+        priorityLabel: todo.priority_label,
+      });
+    }
+  }
+
+  return Array.from(meetingsById.values());
 }
 
 export async function acceptLoop(client, userId, loopId, now = new Date()) {
