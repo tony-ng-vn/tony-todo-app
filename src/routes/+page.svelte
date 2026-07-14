@@ -92,6 +92,8 @@
   let viewMode = 'flow';
   let inboxLoops = [];
   let waitingLoops = [];
+  let checkingForLoops = false;
+  let checkStatus = '';
   let currentDayKey = formatDayKey(new Date());
 
   $: pendingTodos = getPendingTodos(state);
@@ -823,6 +825,30 @@
     syncMessage = 'Drafting is not wired up yet';
   }
 
+  async function handleCheckForNewLoops() {
+    if (!useRemote || !authUser || checkingForLoops) return;
+
+    checkingForLoops = true;
+    checkStatus = 'Checking Granola for new loops...';
+
+    try {
+      // insforge.functions.invoke() derives a {appKey}.functions.insforge.app
+      // subhosting URL that 503s for this project, and the SDK only falls
+      // back to the working proxy path on a 404 (not a 503) -- so it never
+      // recovers. Going through the proxy path directly via the shared
+      // HttpClient still carries the signed-in user's auth header.
+      const data = await insforge.getHttpClient().post('/functions/ingest-granola-loops', { source: 'both' });
+
+      const created = data?.loopsCreated?.length ?? 0;
+      checkStatus = `Checked ${data?.notesProcessed ?? 0} meeting${data?.notesProcessed === 1 ? '' : 's'}, found ${created} new loop${created === 1 ? '' : 's'}.`;
+      await loadLoopSurfaces();
+    } catch (error) {
+      checkStatus = `Check failed: ${error.message}`;
+    } finally {
+      checkingForLoops = false;
+    }
+  }
+
   async function syncRemoteChange(statusMessage, syncAction) {
     syncMessage = statusMessage;
 
@@ -979,9 +1005,12 @@
     <InboxPanel
       loops={inboxLoops}
       waitingCount={waitingLoops.length}
+      {checkingForLoops}
+      {checkStatus}
       onAccept={handleAcceptLoop}
       onDismiss={handleDismissLoop}
       onViewChange={setViewMode}
+      onCheckForNewLoops={handleCheckForNewLoops}
     />
   {:else if viewMode === 'waiting'}
     <WaitingPanel
