@@ -94,6 +94,9 @@
         <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('history')}>
           History
         </button>
+        <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('meetings')}>
+          Meetings
+        </button>
       </div>
       <button
         type="button"
