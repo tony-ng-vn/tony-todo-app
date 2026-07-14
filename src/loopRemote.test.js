@@ -5,6 +5,7 @@ import {
   loadDismissedLoops,
   loadInboxLoops,
   loadMeetings,
+  loadSyncStatus,
   loadWaitingLoops,
   restoreLoop,
   snoozeLoop,
@@ -180,6 +181,47 @@ describe('loadDismissedLoops', () => {
     expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
     expect(calls).toContainEqual(['eq', 'loop_status', 'dismissed']);
     expect(calls).toContainEqual(['order', 'updated_at', { ascending: false }]);
+  });
+});
+
+describe('loadSyncStatus', () => {
+  it('loads ingestion cursor rows for a user', async () => {
+    const calls = [];
+    const client = {
+      database: {
+        from(table) {
+          calls.push(['from', table]);
+          return {
+            select(columns) {
+              calls.push(['select', columns]);
+              return this;
+            },
+            eq(column, value) {
+              calls.push(['eq', column, value]);
+              return this;
+            },
+            then(resolve) {
+              resolve({
+                data: [
+                  { source: 'granola-personal', last_synced_at: '2026-07-13T18:15:00.000Z' },
+                  { source: 'granola-workspace', last_synced_at: null },
+                ],
+                error: null,
+              });
+            },
+          };
+        },
+      },
+    };
+
+    const status = await loadSyncStatus(client, 'user-123');
+
+    expect(status).toEqual([
+      { source: 'granola-personal', lastSyncedAt: '2026-07-13T18:15:00.000Z' },
+      { source: 'granola-workspace', lastSyncedAt: null },
+    ]);
+    expect(calls).toContainEqual(['from', 'ingestion_cursor']);
+    expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
   });
 });
 

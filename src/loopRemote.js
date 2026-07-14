@@ -72,6 +72,16 @@ export async function loadDismissedLoops(client, userId) {
   }));
 }
 
+export async function loadSyncStatus(client, userId) {
+  const { data, error } = await client.database
+    .from('ingestion_cursor')
+    .select('source,last_synced_at')
+    .eq('user_id', userId);
+  throwIfError(error);
+
+  return (data ?? []).map((row) => ({ source: row.source, lastSyncedAt: row.last_synced_at }));
+}
+
 export async function loadMeetings(client, userId) {
   const { data: evidenceRows, error: evidenceError } = await client.database
     .from('evidence')
