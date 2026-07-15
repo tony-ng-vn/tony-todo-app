@@ -12,6 +12,7 @@
 }
 
 .workspace {
+  position: relative;
   display: grid;
   grid-template-columns: minmax(0, 1fr) clamp(84px, 7vw, 104px) minmax(0, 1fr);
   gap: 0;
@@ -1044,7 +1045,7 @@ h2 {
 }
 
 .completion-cue {
-  position: fixed;
+  position: absolute;
   right: 26px;
   bottom: 24px;
   z-index: 40;
@@ -1075,7 +1076,7 @@ h2 {
 }
 
 .sign-out-button {
-  position: fixed;
+  position: absolute;
   left: 26px;
   bottom: 24px;
   z-index: 40;
