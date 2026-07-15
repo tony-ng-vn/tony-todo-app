@@ -1047,7 +1047,8 @@ h2 {
 .completion-cue {
   position: absolute;
   right: 26px;
-  bottom: 24px;
+  /* Sits above the feedback widget in the bottom-right corner. */
+  bottom: 72px;
   z-index: 40;
   display: flex;
   align-items: center;
