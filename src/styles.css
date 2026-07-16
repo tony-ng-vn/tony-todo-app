@@ -477,21 +477,29 @@ h2 {
 }
 
 .view-toggle {
-  display: inline-flex;
+  display: flex;
   align-items: center;
-  flex-wrap: wrap;
+  flex: 0 0 auto;
+  flex-wrap: nowrap;
   gap: 2px;
+  max-width: 100%;
+  min-height: 34px;
   padding: 2px;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--surface-strong);
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 /* In the Flow and Board headers the toggle sits on its own row under the
    title, so it never competes with the intro copy for horizontal space. */
 .task-panel > .view-toggle,
 .board-panel > .view-toggle {
-  align-self: flex-start;
+  align-self: stretch;
+  width: 100%;
 }
 
 .task-panel > .view-toggle {
@@ -1333,48 +1341,19 @@ h2 {
   font-size: 16px;
 }
 
-.day-rhythm {
-  position: relative;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 10px;
-  margin: 28px 0 20px;
-  padding-top: 14px;
-  border-top: 1px solid var(--border);
-}
-
-.day-rhythm span {
-  position: relative;
-  min-height: 0;
-  display: block;
-  color: var(--subtle);
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
-}
-
-.day-rhythm span::before {
-  content: '';
-  position: absolute;
-  top: -18px;
-  left: 0;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--default);
-}
-
 .summary-list {
   flex: 1 1 auto;
   min-height: 0;
   display: grid;
   gap: var(--space-3);
   align-content: start;
+  margin-top: 20px;
   overflow-x: hidden;
   overflow-y: auto;
   overscroll-behavior: contain;
-  padding: 0 2px var(--space-5) 0;
+  padding: 18px 2px var(--space-5) 0;
   scroll-padding-block: var(--space-5);
+  border-top: 1px solid var(--border);
 }
 
 .summary-section {
@@ -1401,11 +1380,23 @@ h2 {
 }
 
 .summary-section h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
   margin: 0;
   color: var(--subtle);
   font-size: 12px;
   font-weight: 500;
   text-transform: uppercase;
+}
+
+.summary-section h3::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--default);
 }
 
 .summary-section ol {
@@ -1458,9 +1449,10 @@ h2 {
 }
 
 .summary-empty-bucket {
-  min-height: 54px;
   display: flex;
+  grid-template-columns: none;
   align-items: center;
+  min-height: 54px;
   padding: 10px 11px;
   border: 1px dashed var(--border);
   border-radius: 8px;
@@ -1879,21 +1871,50 @@ h2 {
   .workspace.has-detail,
   .workspace.is-board-view,
   .workspace.is-board-view.has-detail {
-    grid-template-columns: 1fr;
+    display: flex;
+    flex-direction: column;
+    align-content: stretch;
     gap: 10px;
+    height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding-bottom: 88px;
   }
 
   .task-panel,
   .summary-panel,
   .flow-rail,
   .task-detail,
-  .board-panel {
+  .board-panel,
+  .inbox-panel,
+  .waiting-panel,
+  .history-panel,
+  .meetings-panel,
+  .settings-panel {
+    flex: 0 0 auto;
+    width: 100%;
     border-radius: 20px;
   }
 
+  .task-panel,
+  .summary-panel,
+  .board-panel {
+    height: auto;
+    min-height: auto;
+    overflow: visible;
+  }
+
+  .todo-list,
+  .summary-list,
   .board-columns {
+    flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .board-columns {
+    display: grid;
     grid-template-columns: 1fr;
-    overflow: auto;
   }
 
   .board-column {
@@ -1901,11 +1922,23 @@ h2 {
   }
 
   .flow-rail {
-    grid-template-columns: auto 1fr auto;
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-rows: auto;
     align-items: center;
-    padding: 10px 14px;
+    gap: 12px;
+    min-height: 56px;
+    overflow: hidden;
+    padding: 12px 16px;
     border-inline: 1px solid var(--border);
+  }
+
+  .done-count {
+    width: auto;
+    min-width: 0;
+    min-height: 36px;
+    padding: 0 12px;
+    white-space: nowrap;
   }
 
   .rail-line {
@@ -1917,6 +1950,30 @@ h2 {
 
   .rail-caption {
     writing-mode: horizontal-tb;
+    justify-self: end;
+  }
+
+  .sign-out-button {
+    left: 16px;
+    bottom: 16px;
+  }
+
+  .view-toggle {
+    width: 100%;
+  }
+
+  .panel-heading {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 12px;
+  }
+
+  .panel-heading .view-toggle {
+    width: 100%;
+  }
+
+  .task-detail {
+    order: 99;
   }
 }
 
@@ -1924,7 +1981,7 @@ h2 {
   .workspace {
     width: 100vw;
     margin: 0;
-    padding: 8px;
+    padding: 8px 8px 88px;
     border-radius: 0;
   }
 
@@ -1961,17 +2018,28 @@ h2 {
     flex-basis: auto;
   }
 
-  .day-rhythm {
-    grid-template-columns: repeat(2, 1fr);
-    row-gap: 20px;
+  .calendar-picker,
+  .calendar-trigger {
+    width: 100%;
   }
 
-  .todo-item,
   .summary-section li {
+    grid-template-columns: 56px minmax(0, 1fr) auto;
+    gap: 8px;
     align-items: center;
   }
 
+  .summary-section li.summary-empty-bucket {
+    display: flex;
+    grid-template-columns: none;
+  }
+
+  .summary-time-input {
+    width: 56px;
+  }
+
   .todo-item {
+    align-items: center;
     grid-template-columns: 10px minmax(0, 1fr);
   }
 
@@ -1983,12 +2051,17 @@ h2 {
 
   .completion-cue {
     right: 16px;
-    bottom: 16px;
+    bottom: 64px;
   }
 
   .detail-timing-controls {
     grid-template-columns: 1fr;
     align-items: stretch;
+  }
+
+  .sign-out-button {
+    left: 12px;
+    bottom: 12px;
   }
 }
 
