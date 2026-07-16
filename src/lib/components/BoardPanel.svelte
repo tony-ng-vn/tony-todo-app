@@ -21,6 +21,8 @@
   export let onBoardDragOver;
   export let onBoardDrop;
   export let onCreateTaskInColumn;
+  export let showSignOut = false;
+  export let onSignOut;
 
   let draftingColumnId = null;
   let columnDraft = '';
@@ -89,6 +91,9 @@
         {@html themeMode === 'dark' ? iconSun() : iconMoon()}
         <span>{themeMode === 'dark' ? 'Light' : 'Dark'}</span>
       </button>
+      {#if showSignOut}
+        <button type="button" class="sign-out-button" on:click={onSignOut}>Sign out</button>
+      {/if}
     </div>
   </header>
 

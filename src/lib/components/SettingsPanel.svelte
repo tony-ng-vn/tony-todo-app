@@ -5,6 +5,8 @@
   export let inboxCount = 0;
   export let waitingCount = 0;
   export let onViewChange;
+  export let showSignOut = false;
+  export let onSignOut;
 
   const SOURCE_LABELS = {
     'granola-personal': 'Granola (personal notes)',
@@ -46,6 +48,13 @@
       <button type="button" class="view-toggle-button is-active" aria-current="page">Settings</button>
     </div>
   </div>
+
+  {#if showSignOut}
+    <div class="settings-section">
+      <h3 class="section-title">Account</h3>
+      <button type="button" class="sign-out-button" on:click={onSignOut}>Sign out</button>
+    </div>
+  {/if}
 
   <div class="settings-section">
     <h3 class="section-title">Connected sources</h3>

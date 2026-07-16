@@ -126,7 +126,8 @@
 .detail-window-actions,
 .open-task-button,
 .input-row button,
-.theme-toggle {
+.theme-toggle,
+.sign-out-button {
   display: flex;
   align-items: center;
 }
@@ -1085,21 +1086,27 @@ h2 {
 }
 
 .sign-out-button {
-  position: absolute;
-  left: 26px;
-  bottom: 24px;
-  z-index: 40;
-  padding: 6px 12px;
+  justify-content: center;
+  min-height: 34px;
+  padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface-strong);
-  color: var(--subtle);
+  color: var(--default);
   font-size: 12px;
   font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    color 180ms ease,
+    transform 180ms ease;
 }
 
 .sign-out-button:hover {
+  border-color: var(--subtle);
+  background: var(--block-hover);
   color: var(--strong);
 }
 
@@ -1288,7 +1295,8 @@ h2 {
 .input-row button:active,
 .todo-item button:active,
 .open-task-button:active,
-.theme-toggle:active {
+.theme-toggle:active,
+.sign-out-button:active {
   transform: translateY(1px) scale(0.98);
 }
 
@@ -1301,6 +1309,7 @@ h2 {
 .todo-item button:focus-visible,
 .open-task-button:focus-visible,
 .theme-toggle:focus-visible,
+.sign-out-button:focus-visible,
 .detail-close:focus-visible,
 .detail-timing-controls input:focus-visible,
 .detail-delete-task:focus-visible,
@@ -1953,11 +1962,6 @@ h2 {
     justify-self: end;
   }
 
-  .sign-out-button {
-    left: 16px;
-    bottom: 16px;
-  }
-
   .view-toggle {
     width: 100%;
   }
@@ -2057,11 +2061,6 @@ h2 {
   .detail-timing-controls {
     grid-template-columns: 1fr;
     align-items: stretch;
-  }
-
-  .sign-out-button {
-    left: 12px;
-    bottom: 12px;
   }
 }
 

@@ -30,6 +30,8 @@
   export let onOpenListDrop;
   export let onToggleTheme;
   export let onViewChange;
+  export let showSignOut = false;
+  export let onSignOut;
 </script>
 
 <section
@@ -56,6 +58,9 @@
         {@html themeMode === 'dark' ? iconSun() : iconMoon()}
         <span>{themeMode === 'dark' ? 'Light' : 'Dark'}</span>
       </button>
+      {#if showSignOut}
+        <button type="button" class="sign-out-button" on:click={onSignOut}>Sign out</button>
+      {/if}
     </div>
   </div>
 
