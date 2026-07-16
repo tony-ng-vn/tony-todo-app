@@ -126,7 +126,8 @@
 .detail-window-actions,
 .open-task-button,
 .input-row button,
-.theme-toggle {
+.theme-toggle,
+.sign-out-button {
   display: flex;
   align-items: center;
 }
@@ -1085,15 +1086,13 @@ h2 {
 }
 
 .sign-out-button {
-  display: inline-flex;
-  align-items: center;
   justify-content: center;
   min-height: 34px;
   padding: 0 12px;
   border: 1px solid var(--border);
   border-radius: 999px;
   background: var(--surface-strong);
-  color: var(--subtle);
+  color: var(--default);
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
@@ -1101,7 +1100,8 @@ h2 {
   transition:
     background-color 180ms ease,
     border-color 180ms ease,
-    color 180ms ease;
+    color 180ms ease,
+    transform 180ms ease;
 }
 
 .sign-out-button:hover {
@@ -1295,7 +1295,8 @@ h2 {
 .input-row button:active,
 .todo-item button:active,
 .open-task-button:active,
-.theme-toggle:active {
+.theme-toggle:active,
+.sign-out-button:active {
   transform: translateY(1px) scale(0.98);
 }
 
@@ -1308,6 +1309,7 @@ h2 {
 .todo-item button:focus-visible,
 .open-task-button:focus-visible,
 .theme-toggle:focus-visible,
+.sign-out-button:focus-visible,
 .detail-close:focus-visible,
 .detail-timing-controls input:focus-visible,
 .detail-delete-task:focus-visible,
