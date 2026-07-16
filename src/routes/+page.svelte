@@ -1075,6 +1075,8 @@
       {dropTargetColumnId}
       inboxCount={inboxLoops.length}
       waitingCount={waitingLoops.length}
+      showSignOut={useRemote && Boolean(authUser)}
+      onSignOut={handleSignOut}
       onToggleTheme={toggleThemeMode}
       onViewChange={setViewMode}
       onSelectedDayChange={handleBoardSelectedDayChange}
@@ -1128,6 +1130,8 @@
       userEmail={authUser?.email ?? ''}
       inboxCount={inboxLoops.length}
       waitingCount={waitingLoops.length}
+      showSignOut={useRemote && Boolean(authUser)}
+      onSignOut={handleSignOut}
       onViewChange={setViewMode}
     />
   {:else}
@@ -1159,6 +1163,8 @@
       onOpenListDrop={handleOpenListDrop}
       onToggleTheme={toggleThemeMode}
       onViewChange={setViewMode}
+      showSignOut={useRemote && Boolean(authUser)}
+      onSignOut={handleSignOut}
     />
 
     <FlowRail {completedToday} />
@@ -1210,7 +1216,6 @@
   {/if}
 
   {#if useRemote && authUser}
-    <button type="button" class="sign-out-button" on:click={handleSignOut}>Sign out</button>
     <FeedbackWidget onSubmit={handleSubmitFeedback} />
   {/if}
 </main>
