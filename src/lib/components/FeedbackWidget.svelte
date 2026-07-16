@@ -112,6 +112,24 @@
     gap: 10px;
   }
 
+  @media (max-width: 900px) {
+    .feedback-widget {
+      right: 16px;
+      bottom: 16px;
+    }
+  }
+
+  @media (max-width: 560px) {
+    .feedback-widget {
+      right: 12px;
+      bottom: 12px;
+    }
+
+    .feedback-panel {
+      width: min(300px, calc(100vw - 24px));
+    }
+  }
+
   .feedback-fab {
     min-height: 34px;
     padding: 6px 14px;

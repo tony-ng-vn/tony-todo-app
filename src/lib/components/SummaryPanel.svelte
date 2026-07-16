@@ -67,12 +67,6 @@
     </div>
     <CalendarPicker id="summary-date" value={selectedDay} label="Select recap date" onChange={(nextDate) => (selectedDay = nextDate)} />
   </div>
-  <div class="day-rhythm" aria-hidden="true">
-    <span>Morning</span>
-    <span>Lunch</span>
-    <span>Evening</span>
-    <span>Night</span>
-  </div>
   <div class="summary-list" id="summary-list">
     {#if summary.length}
       {#each summary as section (section.label)}
