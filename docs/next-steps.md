@@ -5,12 +5,14 @@ Do them in this order; each one only unblocks what it says it unblocks, nothing 
 
 ## 1. Sign up for your real account
 
-This is the one to do first. It unblocks the most: your original 8 todos (still sitting under the old anonymous ID) and the recurring ingestion schedule both need a real account to exist before anything else can move.
+This is the one to do first. It unblocks the most: your original pre-auth todos (still sitting under the old anonymous `client_id`) and the recurring ingestion schedule both need a real account to exist before anything else can move.
 
 1. Go to `https://tony-todo-app.vercel.app` (the live production deployment).
 2. Use the sign-up form to create your own account with your real email and a password.
-3. Tell me once it's done, and give me the email you used.
-4. I'll reassign the 8 original pre-auth todos to your new account with a one-time database update, and set up the recurring Granola ingestion schedule pointed at your account.
+3. After deploy of `claim-preauth-todos`, open the app once on the **Mac browser that originally created the tasks** while signed in. That browser still has `done-log-client-id` in localStorage; sign-in now reclaims those orphaned cloud rows and uploads any local-only tasks.
+4. Refresh on your phone — the same account should then show the tasks.
+5. Set `FEEDBACK_OWNER_EMAIL` to your account email if you want phone-only reclaim without the Mac `client_id` (owner recovery path in `claim-preauth-todos`).
+6. Tell me the email you used so the recurring Granola ingestion schedule can be pointed at your account.
 
 Note: `require_email_verification` is currently off (I disabled it earlier to unblock testing), so sign-up should work immediately without a confirmation email. Re-enabling it depends on step 3 below.
 
@@ -41,7 +43,7 @@ This can happen any time -- it's not blocking anything else on this list.
 
 ## Quick reference: what depends on what
 
-- Reclaiming your old todos: needs step 1 only.
+- Reclaiming your old todos: needs step 1, plus one signed-in open on the original Mac browser (or owner-email reclaim via `FEEDBACK_OWNER_EMAIL`).
 - Recurring ingestion schedule: needs step 1 only.
 - Gmail + Calendar: needs step 2, plus follow-up build work from me afterward.
 - Email verification on sign-up: needs step 3.

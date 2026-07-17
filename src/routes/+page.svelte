@@ -55,7 +55,13 @@
     updateRemoteTodoTimer,
     updateRemoteTodoTitle,
   } from '../todoRemote.js';
-  import { loadLocalState, reconcileRemoteState, saveLocalState } from '../todoPersistence.js';
+  import {
+    getStoredClientId,
+    loadLocalState,
+    localTodosNeedingUpload,
+    reconcileRemoteState,
+    saveLocalState,
+  } from '../todoPersistence.js';
   import {
     acceptLoop,
     dismissLoop,
@@ -797,7 +803,22 @@
     syncMessage = 'Loading cloud';
 
     try {
-      const remoteTodos = await loadRemoteTodos(insforge, authUser.id);
+      // Pre-auth rows still sit under the old browser client_id with user_id null.
+      // Reclaim them before the first remote read so phone/Mac share one account.
+      await claimPreauthTodos();
+
+      let remoteTodos = await loadRemoteTodos(insforge, authUser.id);
+      const pendingUploads = localTodosNeedingUpload(state.todos, remoteTodos);
+
+      // If this device still has local-only tasks (common on the Mac that created
+      // them before auth), push those up instead of wiping them with an empty cloud.
+      if (pendingUploads.length > 0) {
+        syncMessage = 'Uploading local tasks';
+        for (const todo of pendingUploads) {
+          await insertRemoteTodo(insforge, authUser.id, todo);
+        }
+        remoteTodos = await loadRemoteTodos(insforge, authUser.id);
+      }
 
       state = reconcileRemoteState(state, remoteTodos);
       saveLocalState(state);
@@ -807,6 +828,21 @@
     }
 
     await loadLoopSurfaces();
+  }
+
+  async function claimPreauthTodos() {
+    if (!useRemote || !authUser) {
+      return;
+    }
+
+    const clientId = getStoredClientId();
+    try {
+      // Owner accounts can reclaim without a client id (solo recovery). Everyone
+      // else needs the Mac browser's stored client_id so we only claim their rows.
+      await insforge.getHttpClient().post('/functions/claim-preauth-todos', clientId ? { clientId } : {});
+    } catch {
+      // Non-fatal: hydrate still proceeds with whatever the account already owns.
+    }
   }
 
   async function loadLoopSurfaces() {
