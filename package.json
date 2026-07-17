@@ -7,7 +7,9 @@
     "test": "vitest run",
     "test:ui": "node scripts/ui-smoke.mjs",
     "build": "vite build",
-    "dev": "vite dev --host 127.0.0.1"
+    "dev": "vite dev --host 127.0.0.1",
+    "understanding:build": "node scripts/understanding-workbook.mjs",
+    "understanding:serve": "node scripts/understanding-workbook.mjs && node scripts/understanding-serve.mjs"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^7.0.1",
@@ -19,6 +21,7 @@
     "vitest": "^4.1.8"
   },
   "dependencies": {
+    "feedback-sdk-widget": "^0.1.0",
     "@insforge/sdk": "^1.3.1",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
