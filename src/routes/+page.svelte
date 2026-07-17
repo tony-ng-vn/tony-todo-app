@@ -14,6 +14,7 @@
   import TaskDetail from '../lib/components/TaskDetail.svelte';
   import TaskPanel from '../lib/components/TaskPanel.svelte';
   import FeedbackWidget from '../lib/components/FeedbackWidget.svelte';
+  import FeedbackSdkWidget from '$lib/components/FeedbackSdkWidget.svelte';
   import {
     addTodo,
     createInitialState,
@@ -1220,3 +1221,5 @@
   {/if}
 </main>
 {/if}
+
+<FeedbackSdkWidget />
