@@ -22,6 +22,27 @@
       {isSignUp ? 'Create an account to sync your tasks.' : 'Sign in to sync your tasks.'}
     </p>
 
+    <div class="auth-mode-switch" role="group" aria-label="Account mode">
+      <button
+        type="button"
+        class="auth-mode"
+        class:is-active={!isSignUp}
+        aria-pressed={!isSignUp}
+        on:click={() => onToggleMode('sign-in')}
+      >
+        Sign in
+      </button>
+      <button
+        type="button"
+        class="auth-mode"
+        class:is-active={isSignUp}
+        aria-pressed={isSignUp}
+        on:click={() => onToggleMode('sign-up')}
+      >
+        Sign up
+      </button>
+    </div>
+
     <label class="auth-field">
       <span>Email</span>
       <input type="email" bind:value={email} autocomplete="email" required />
@@ -49,27 +70,36 @@
         {isSignUp ? 'Sign up' : 'Sign in'}
       {/if}
     </button>
-
-    <button type="button" class="auth-toggle" on:click={() => onToggleMode(isSignUp ? 'sign-in' : 'sign-up')}>
-      {isSignUp ? 'Already have an account? Sign in' : 'Need an account? Sign up'}
-    </button>
   </form>
 </div>
 
 <style>
   .auth-gate {
+    box-sizing: border-box;
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
     width: 100%;
+    height: 100svh;
     height: 100dvh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
+    padding:
+      max(24px, env(safe-area-inset-top, 0px))
+      max(16px, env(safe-area-inset-right, 0px))
+      max(24px, env(safe-area-inset-bottom, 0px))
+      max(16px, env(safe-area-inset-left, 0px));
   }
 
   .auth-card {
     display: flex;
     flex-direction: column;
     gap: var(--space-3);
-    width: min(360px, 90vw);
+    flex: 0 0 auto;
+    width: min(360px, 100%);
+    margin-block: auto;
     padding: var(--space-6);
     border: 1px solid var(--border);
     border-radius: 20px;
@@ -87,9 +117,40 @@
   }
 
   .auth-subtitle {
-    margin: 0 0 var(--space-2);
+    margin: 0;
     font-size: 13px;
     color: var(--subtle);
+  }
+
+  .auth-mode-switch {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 4px;
+    margin: var(--space-1) 0 var(--space-2);
+    padding: 4px;
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--field-surface);
+  }
+
+  .auth-mode {
+    min-height: 40px;
+    padding: 0 var(--space-3);
+    border: none;
+    border-radius: 9px;
+    background: transparent;
+    color: var(--default);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
+  }
+
+  .auth-mode.is-active {
+    background: var(--button-bg);
+    color: var(--button-fg);
+    font-weight: 600;
   }
 
   .auth-field {
@@ -101,12 +162,14 @@
   }
 
   .auth-field input {
+    min-height: 44px;
     padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border);
     border-radius: 10px;
     background: var(--field-surface);
     color: var(--strong);
-    font-size: 13px;
+    /* 16px prevents iOS Safari from zooming the page on focus and hiding the Sign up control. */
+    font-size: 16px;
   }
 
   .auth-field input:focus-visible {
@@ -121,29 +184,21 @@
   }
 
   .auth-submit {
+    min-height: 44px;
     padding: var(--space-2) var(--space-3);
     border: none;
     border-radius: 10px;
     background: var(--button-bg);
     color: var(--button-fg);
-    font-size: 13px;
+    font-size: 16px;
     font-weight: 600;
     cursor: pointer;
+    -webkit-appearance: none;
+    appearance: none;
   }
 
   .auth-submit:disabled {
     opacity: 0.6;
     cursor: default;
-  }
-
-  .auth-toggle {
-    padding: 0;
-    border: none;
-    background: none;
-    color: var(--subtle);
-    font-size: 12px;
-    text-decoration: underline;
-    cursor: pointer;
-    align-self: center;
   }
 </style>
