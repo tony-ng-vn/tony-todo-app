@@ -1,5 +1,5 @@
 const TODO_SELECT_COLUMNS =
-  'id,title,created_at,completed_at,note,source,notion_page_id,notion_database_id,notion_status,first_started_at,active_started_at,tracked_seconds,is_progressive,parent_task_id,is_progress_session,progress_label';
+  'id,title,created_at,completed_at,due_date,note,source,notion_page_id,notion_database_id,notion_status,first_started_at,active_started_at,tracked_seconds,is_progressive,parent_task_id,is_progress_session,progress_label';
 
 export function toRemoteRecord(todo, userId) {
   return {
@@ -8,6 +8,7 @@ export function toRemoteRecord(todo, userId) {
     title: todo.title,
     created_at: todo.createdAt,
     completed_at: todo.completedAt,
+    due_date: todo.dueDate ?? null,
     note: todo.note ?? '',
     source: todo.source ?? 'app',
     notion_page_id: todo.notionPageId ?? null,
@@ -29,6 +30,7 @@ export function fromRemoteRecord(record) {
     title: record.title,
     createdAt: record.created_at,
     completedAt: record.completed_at,
+    dueDate: record.due_date ?? null,
     note: record.note ?? '',
     source: record.source ?? 'app',
     notionPageId: record.notion_page_id ?? null,
@@ -73,6 +75,10 @@ export async function updateRemoteTodoNote(client, userId, todo) {
 
 export async function updateRemoteTodoTitle(client, userId, todo) {
   await updateRemoteTodo(client, userId, todo, { title: todo.title });
+}
+
+export async function updateRemoteTodoDueDate(client, userId, todo) {
+  await updateRemoteTodo(client, userId, todo, { due_date: todo.dueDate ?? null });
 }
 
 export async function updateRemoteTodoTimer(client, userId, todo) {

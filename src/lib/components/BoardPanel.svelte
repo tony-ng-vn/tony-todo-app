@@ -1,6 +1,7 @@
 <script>
   import { tick } from 'svelte';
   import { linkifyText } from '../../linkify.js';
+  import { formatDueDate } from '../../todoStore.js';
   import { iconMoon, iconPlus, iconSun } from './icons.js';
 
   export let syncMessage = 'Local only';
@@ -162,6 +163,9 @@
                 <button type="button" class="board-card-open" on:click={() => onOpenTask?.(todo.id)}>
                   <span class="board-card-title">{@html linkifyText(todo.title)}</span>
                   <span class="board-card-meta">
+                    {#if todo.dueDate}
+                      <span class="board-card-due">Due {formatDueDate(todo.dueDate)}</span>
+                    {/if}
                     {#if todo.progressLabel}
                       <span class="board-card-progress">{todo.progressLabel}</span>
                     {/if}

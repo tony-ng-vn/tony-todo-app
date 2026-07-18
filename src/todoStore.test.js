@@ -4,6 +4,8 @@ import {
   completeTodo,
   createInitialState,
   failTodo,
+  formatDueDate,
+  setTodoDueDate,
   getBoardColumns,
   getDaySummary,
   getMillisecondsUntilNextDay,
@@ -585,5 +587,51 @@ describe('board view columns', () => {
       trackedSeconds: 25 * 60,
       completedAt: doneAt.toISOString(),
     });
+  });
+});
+
+describe('task due dates', () => {
+  it('defaults a new todo to no due date', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'No deadline', new Date('2026-06-08T08:00:00'));
+    expect(state.todos.at(-1).dueDate).toBeNull();
+  });
+
+  it('stores a due date passed at creation time', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Ship it', new Date('2026-06-08T08:00:00'), {
+      dueDate: '2026-06-12T00:00:00.000Z',
+    });
+    expect(state.todos.at(-1).dueDate).toBe('2026-06-12T00:00:00.000Z');
+  });
+
+  it('backfills dueDate to null for todos loaded without the field', () => {
+    const state = createInitialState([
+      { id: 'legacy-1', title: 'Old task', createdAt: '2026-06-01T08:00:00.000Z', completedAt: null },
+    ]);
+    expect(state.todos[0].dueDate).toBeNull();
+  });
+
+  it('sets and clears a due date on an existing todo', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Ship', new Date('2026-06-08T08:00:00'));
+    const id = state.todos[0].id;
+
+    state = setTodoDueDate(state, id, '2026-06-12T00:00:00.000Z');
+    expect(state.todos[0].dueDate).toBe('2026-06-12T00:00:00.000Z');
+
+    state = setTodoDueDate(state, id, null);
+    expect(state.todos[0].dueDate).toBeNull();
+  });
+
+  it('formats a due date as a short month/day label', () => {
+    // Local midnight of Jun 12, so the label is stable regardless of timezone.
+    const iso = new Date(2026, 5, 12).toISOString();
+    expect(formatDueDate(iso)).toBe('Jun 12');
+  });
+
+  it('formats a missing or invalid due date as an empty string', () => {
+    expect(formatDueDate(null)).toBe('');
+    expect(formatDueDate('not-a-date')).toBe('');
   });
 });

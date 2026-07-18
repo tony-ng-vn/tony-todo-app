@@ -15,7 +15,7 @@ export function createInitialState(todos = []) {
   return { todos: todos.map(normalizeTodo) };
 }
 
-export function addTodo(state, title, createdAt = new Date()) {
+export function addTodo(state, title, createdAt = new Date(), { dueDate = null } = {}) {
   const cleanTitle = title.trim();
 
   if (!cleanTitle) {
@@ -31,6 +31,7 @@ export function addTodo(state, title, createdAt = new Date()) {
         title: cleanTitle,
         createdAt: createdAt.toISOString(),
         completedAt: null,
+        dueDate: dueDate ?? null,
         note: '',
         source: 'app',
         notionPageId: null,
@@ -354,6 +355,28 @@ export function updateTodoTitle(state, todoId, title) {
   };
 }
 
+export function setTodoDueDate(state, todoId, dueDate) {
+  return {
+    ...state,
+    todos: state.todos.map((todo) => (todo.id === todoId ? { ...todo, dueDate: dueDate ?? null } : todo)),
+  };
+}
+
+// Short, day-granular label for a task's due date (e.g. "Jun 12"). Empty for
+// no/invalid date. Formatted in local time to match the day the user picked.
+export function formatDueDate(dueDate) {
+  if (!dueDate) {
+    return '';
+  }
+
+  const date = new Date(dueDate);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat([], { month: 'short', day: 'numeric' }).format(date);
+}
+
 export function setTodoProgressive(state, todoId, isProgressive) {
   return {
     ...state,
@@ -539,6 +562,7 @@ function normalizedTrackedSeconds(todo) {
 function normalizeTodo(todo) {
   return {
     ...todo,
+    dueDate: todo.dueDate ?? null,
     note: todo.note ?? '',
     source: todo.source ?? 'app',
     notionPageId: todo.notionPageId ?? null,

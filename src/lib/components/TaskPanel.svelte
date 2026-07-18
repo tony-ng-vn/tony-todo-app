@@ -1,5 +1,5 @@
 <script>
-  import { formatDuration, getElapsedSeconds } from '../../todoStore.js';
+  import { formatDuration, formatDueDate, getElapsedSeconds } from '../../todoStore.js';
   import { linkifyText } from '../../linkify.js';
   import { iconCheck, iconMoon, iconPage, iconPause, iconPlay, iconSun, iconX } from './icons.js';
 
@@ -8,6 +8,7 @@
   export let openTodoSections = [];
   export let openCount = 0;
   export let titleDraft = '';
+  export let dueDateDraft = '';
   export let draftTitle = '';
   export let editingTaskId = null;
   export let newlyAddedTodoId = null;
@@ -106,6 +107,15 @@
         bind:value={titleDraft}
         on:input={onDraftInput}
       />
+      <input
+        id="todo-due-date"
+        name="dueDate"
+        type="date"
+        class="new-task-due"
+        aria-label="Due date (optional)"
+        title="Due date (optional)"
+        bind:value={dueDateDraft}
+      />
       <button type="submit">Add</button>
     </div>
   </form>
@@ -192,6 +202,9 @@
           {isRunning ? 'Tracking' : 'Duration'} {formatDuration(elapsedSeconds)}
         {/if}
       </span>
+      {#if todo.dueDate}
+        <span class="task-due-badge" data-due-for={todo.id}>Due {formatDueDate(todo.dueDate)}</span>
+      {/if}
       {#if todo.isProgressive}
         <span class="task-progress-label">
           {todo.progressLabel || 'Add session note in task page'}
