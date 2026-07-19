@@ -13,7 +13,6 @@
   import SummaryPanel from '../lib/components/SummaryPanel.svelte';
   import TaskDetail from '../lib/components/TaskDetail.svelte';
   import TaskPanel from '../lib/components/TaskPanel.svelte';
-  import FeedbackWidget from '../lib/components/FeedbackWidget.svelte';
   import FeedbackSdkWidget from '$lib/components/FeedbackSdkWidget.svelte';
   import {
     addTodo,
@@ -44,7 +43,6 @@
   } from '../todoStore.js';
   import { insforge, isInsForgeConfigured } from '../insforgeClient.js';
   import { getCurrentUser, signInWithPassword, signOut, signUp } from '../auth.js';
-  import { submitFeedback } from '../feedbackRemote.js';
   import {
     completeRemoteTodo,
     deleteRemoteTodo,
@@ -785,11 +783,6 @@
     syncMessage = 'Signed out';
   }
 
-  async function handleSubmitFeedback({ category, message }) {
-    // pageContext records which view the idea came from, for triage.
-    await submitFeedback(insforge, authUser?.id, { category, message, pageContext: viewMode });
-  }
-
   async function hydrateRemoteTodos() {
     if (!useRemote || !authUser) {
       return;
@@ -1216,9 +1209,6 @@
     </aside>
   {/if}
 
-  {#if useRemote && authUser}
-    <FeedbackWidget onSubmit={handleSubmitFeedback} />
-  {/if}
 </main>
 {/if}
 
