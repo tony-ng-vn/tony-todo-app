@@ -5,6 +5,7 @@
   import LottieAnimation from '../lib/components/LottieAnimation.svelte';
   import AuthGate from '../lib/components/AuthGate.svelte';
   import BoardPanel from '../lib/components/BoardPanel.svelte';
+  import CalendarPanel from '../lib/components/CalendarPanel.svelte';
   import InboxPanel from '../lib/components/InboxPanel.svelte';
   import WaitingPanel from '../lib/components/WaitingPanel.svelte';
   import HistoryPanel from '../lib/components/HistoryPanel.svelte';
@@ -22,6 +23,7 @@
     formatDayKey,
     formatDuration,
     getBoardColumns,
+    getCalendarMonth,
     getDaySummary,
     getElapsedSeconds,
     getMillisecondsUntilNextDay,
@@ -78,6 +80,8 @@
   let state = createInitialState();
   let selectedDay = formatDayKey(new Date());
   let boardDueFilter = 'all';
+  let calendarYear = new Date().getFullYear();
+  let calendarMonth = new Date().getMonth();
   let syncMessage = 'Local only';
   let useRemote = false;
   let authUser = null;
@@ -129,6 +133,7 @@
   $: openCount = openTodos.length;
   $: summary = getDaySummary(state, selectedDay);
   $: boardColumns = getBoardColumns(state, { dayKey: selectedDay, dueFilter: boardDueFilter });
+  $: calendarMonthData = getCalendarMonth(state, { year: calendarYear, month: calendarMonth });
   $: completedToday = summary.reduce(
     (total, section) => total + section.items.filter((item) => item.outcome !== 'failed').length,
     0,
@@ -348,13 +353,25 @@
     applyThemeMode(themeMode);
   }
 
-  const VIEW_MODES = ['flow', 'board', 'inbox', 'waiting', 'history', 'meetings', 'settings'];
+  const VIEW_MODES = ['flow', 'board', 'calendar', 'inbox', 'waiting', 'history', 'meetings', 'settings'];
 
   function setViewMode(nextViewMode) {
     viewMode = VIEW_MODES.includes(nextViewMode) ? nextViewMode : 'flow';
     localStorage.setItem(VIEW_STORAGE_KEY, viewMode);
     draggedBoardTodoId = null;
     dropTargetColumnId = null;
+  }
+
+  function shiftCalendarMonth(delta) {
+    const next = new Date(calendarYear, calendarMonth + delta, 1);
+    calendarYear = next.getFullYear();
+    calendarMonth = next.getMonth();
+  }
+
+  function goToCurrentMonth() {
+    const now = new Date();
+    calendarYear = now.getFullYear();
+    calendarMonth = now.getMonth();
   }
 
   function handleBoardSelectedDayChange(nextDay) {
@@ -1093,7 +1110,7 @@
 <main
   class="workspace"
   class:has-detail={selectedTask}
-  class:is-board-view={viewMode === 'board' || viewMode === 'inbox' || viewMode === 'waiting' || viewMode === 'history' || viewMode === 'meetings' || viewMode === 'settings'}
+  class:is-board-view={viewMode === 'board' || viewMode === 'calendar' || viewMode === 'inbox' || viewMode === 'waiting' || viewMode === 'history' || viewMode === 'meetings' || viewMode === 'settings'}
   aria-label="Done Log todo app"
 >
   {#if viewMode === 'board'}
@@ -1120,6 +1137,18 @@
       onBoardDragOver={handleBoardDragOver}
       onBoardDrop={handleBoardDrop}
       onCreateTaskInColumn={handleCreateTaskInColumn}
+    />
+  {:else if viewMode === 'calendar'}
+    <CalendarPanel
+      monthLabel={calendarMonthData.monthLabel}
+      weeks={calendarMonthData.weeks}
+      inboxCount={inboxLoops.length}
+      waitingCount={waitingLoops.length}
+      onViewChange={setViewMode}
+      onPrevMonth={() => shiftCalendarMonth(-1)}
+      onNextMonth={() => shiftCalendarMonth(1)}
+      onToday={goToCurrentMonth}
+      onOpenTask={openTask}
     />
   {:else if viewMode === 'inbox'}
     <InboxPanel

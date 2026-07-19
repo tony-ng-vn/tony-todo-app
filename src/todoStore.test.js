@@ -8,6 +8,7 @@ import {
   matchesDueFilter,
   setTodoDueDate,
   getBoardColumns,
+  getCalendarMonth,
   getDaySummary,
   getMillisecondsUntilNextDay,
   getPendingTodos,
@@ -30,6 +31,51 @@ import {
   updateTodoTitle,
   updateTodoNote,
 } from './todoStore.js';
+
+describe('calendar month', () => {
+  const now = new Date(2026, 6, 15, 9, 0, 0); // Wed Jul 15 2026, local
+
+  function completedState() {
+    // Two tasks done Jul 15, one done Jul 3.
+    return createInitialState([
+      { id: 'a', title: 'Ship A', createdAt: new Date(2026, 6, 15, 8).toISOString(), completedAt: new Date(2026, 6, 15, 10).toISOString() },
+      { id: 'b', title: 'Ship B', createdAt: new Date(2026, 6, 15, 8).toISOString(), completedAt: new Date(2026, 6, 15, 14).toISOString() },
+      { id: 'c', title: 'Ship C', createdAt: new Date(2026, 6, 3, 8).toISOString(), completedAt: new Date(2026, 6, 3, 12).toISOString() },
+      { id: 'd', title: 'Still open', createdAt: new Date(2026, 6, 4, 8).toISOString(), completedAt: null },
+    ]);
+  }
+
+  it('returns a full 6x7 grid with a month label', () => {
+    const month = getCalendarMonth(completedState(), { year: 2026, month: 6, now });
+    expect(month.monthLabel).toBe('July 2026');
+    expect(month.weeks).toHaveLength(6);
+    for (const week of month.weeks) {
+      expect(week).toHaveLength(7);
+    }
+    // The grid starts on a Sunday.
+    expect(new Date(`${month.weeks[0][0].dateKey}T00:00:00`).getDay()).toBe(0);
+  });
+
+  it('groups completed tasks into their day cells and marks in-month/today', () => {
+    const month = getCalendarMonth(completedState(), { year: 2026, month: 6, now });
+    const cells = month.weeks.flat();
+    const byKey = Object.fromEntries(cells.map((cell) => [cell.dateKey, cell]));
+
+    const jul15 = byKey['2026-07-15'];
+    expect(jul15.items.map((item) => item.title)).toEqual(['Ship A', 'Ship B']);
+    expect(jul15.inMonth).toBe(true);
+    expect(jul15.isToday).toBe(true);
+
+    const jul3 = byKey['2026-07-03'];
+    expect(jul3.items.map((item) => item.title)).toEqual(['Ship C']);
+    expect(jul3.isToday).toBe(false);
+
+    // A day from an adjacent month is present but flagged out-of-month with no items.
+    const jun29 = byKey['2026-06-29'];
+    expect(jun29.inMonth).toBe(false);
+    expect(jun29.items).toEqual([]);
+  });
+});
 
 describe('todo day summary', () => {
   it('keeps active todos ordered by creation time', () => {

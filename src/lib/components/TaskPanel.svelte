@@ -78,6 +78,9 @@
     <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('board')}>
       Board
     </button>
+    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('calendar')}>
+      Calendar
+    </button>
     <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('inbox')}>
       Inbox{inboxCount ? ` (${inboxCount})` : ''}
     </button>

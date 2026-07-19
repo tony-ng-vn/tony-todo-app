@@ -19,6 +19,7 @@
     <div class="view-toggle" role="group" aria-label="Workspace view">
       <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('flow')}>Tasks</button>
       <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('board')}>Board</button>
+      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('calendar')}>Calendar</button>
       <button type="button" class="view-toggle-button is-active" aria-current="page">Inbox</button>
       <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('waiting')}>
         Waiting{waitingCount ? ` (${waitingCount})` : ''}
