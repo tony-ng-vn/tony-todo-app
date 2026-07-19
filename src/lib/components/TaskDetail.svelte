@@ -15,6 +15,7 @@
   export let onProgressInput;
   export let onCompletedDateChange;
   export let onCompletedTimingChange;
+  export let onDueDateChange;
   export let onDeleteTask;
   export let formatDuration;
   export let completedTime;
@@ -65,6 +66,14 @@
 
   function completedDateValue(todo) {
     return todo?.completedAt ? toDateValue(todo.completedAt) : '';
+  }
+
+  function dueDateValue(todo) {
+    return todo?.dueDate ? toDateValue(todo.dueDate) : '';
+  }
+
+  function handleDueDateInput(event) {
+    onDueDateChange?.(selectedTask.id, event.currentTarget.value);
   }
 
   function completedTimeValue(todo) {
@@ -293,6 +302,16 @@
       </div>
     {/if}
     <p class="detail-meta" id="detail-meta">{detailMeta(selectedTask)}</p>
+    <label class="detail-due-date">
+      <span>Due date</span>
+      <input
+        type="date"
+        class="detail-due-input"
+        aria-label="Task due date"
+        value={dueDateValue(selectedTask)}
+        on:change={handleDueDateInput}
+      />
+    </label>
     {#if selectedTask.completedAt}
       <div class="detail-timing-controls" aria-label="Task timing">
         <label>

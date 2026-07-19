@@ -33,6 +33,7 @@
     getPendingTodos,
     pauseTodoTimer,
     reopenTodo,
+    setTodoDueDate,
     setTodoProgressive,
     startTodoTimer,
     updateCompletedTodoTiming,
@@ -49,6 +50,7 @@
     insertRemoteTodo,
     loadRemoteTodos,
     updateRemoteTodoCompletion,
+    updateRemoteTodoDueDate,
     updateRemoteTodoNote,
     updateRemoteTodoProgress,
     updateRemoteTodoTimer,
@@ -85,6 +87,7 @@
   let authError = '';
   let authLoading = false;
   let titleDraft = '';
+  let dueDateDraft = '';
   let draftTitle = '';
   let selectedTaskId = null;
   let editingTaskId = null;
@@ -171,9 +174,20 @@
     }
   }
 
+  // A due date is a calendar day, so anchor the picked YYYY-MM-DD to local
+  // midnight before storing it as an ISO string. Empty input -> no due date.
+  function dueDateInputToIso(value) {
+    if (!value) {
+      return null;
+    }
+
+    const date = new Date(`${value}T00:00:00`);
+    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+  }
+
   async function handleSubmit() {
     const existingIds = new Set(state.todos.map((todo) => todo.id));
-    state = addTodo(state, titleDraft);
+    state = addTodo(state, titleDraft, new Date(), { dueDate: dueDateInputToIso(dueDateDraft) });
     const createdTodo = state.todos.find((todo) => !existingIds.has(todo.id));
 
     if (!createdTodo) {
@@ -183,6 +197,7 @@
     newlyAddedTodoId = createdTodo.id;
     draftTitle = '';
     titleDraft = '';
+    dueDateDraft = '';
     saveLocalState(state);
     window.setTimeout(() => {
       if (newlyAddedTodoId === createdTodo.id) {
@@ -286,6 +301,23 @@
     }
 
     await syncRemoteChange('Saving title', () => persistTodoTitle(after));
+  }
+
+  // dateValue is a YYYY-MM-DD string from the detail sheet's date input, or ''
+  // to clear the due date.
+  async function handleDueDateChange(todoId, dateValue) {
+    const before = findTodo(todoId);
+    const nextDueDate = dueDateInputToIso(dateValue);
+    state = setTodoDueDate(state, todoId, nextDueDate);
+    saveLocalState(state);
+    const after = findTodo(todoId);
+
+    if (!before || !after || before.dueDate === after.dueDate) {
+      renderRemoteStatus();
+      return;
+    }
+
+    await syncRemoteChange('Saving due date', () => persistTodoDueDate(after));
   }
 
   function handleTitleKeydown(event, todoId, title) {
@@ -958,6 +990,11 @@
     await updateRemoteTodoTitle(insforge, authUser.id, todo);
   }
 
+  async function persistTodoDueDate(todo) {
+    if (!useRemote || !authUser || !todo) return;
+    await updateRemoteTodoDueDate(insforge, authUser.id, todo);
+  }
+
   async function persistTodoProgress(todo) {
     if (!useRemote || !authUser || !todo) return;
     await updateRemoteTodoProgress(insforge, authUser.id, todo);
@@ -1135,6 +1172,7 @@
       {openTodoSections}
       {openCount}
       bind:titleDraft
+      bind:dueDateDraft
       {draftTitle}
       {editingTaskId}
       {newlyAddedTodoId}
@@ -1194,6 +1232,7 @@
     onProgressInput={handleProgressInput}
     onCompletedDateChange={handleCompletedAtChange}
     onCompletedTimingChange={handleCompletedTimingChange}
+    onDueDateChange={handleDueDateChange}
     onDeleteTask={handleDeleteTask}
     {formatDuration}
     {completedTime}

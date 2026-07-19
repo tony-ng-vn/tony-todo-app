@@ -5,6 +5,7 @@ import {
   fromRemoteRecord,
   loadRemoteTodos,
   toRemoteRecord,
+  updateRemoteTodoDueDate,
   updateRemoteTodoProgress,
   updateRemoteTodoTimer,
   updateRemoteTodoTitle,
@@ -57,6 +58,7 @@ describe('todo remote mapping', () => {
           title: 'Send invoice',
           createdAt: '2026-06-08T08:00:00.000Z',
           completedAt: null,
+          dueDate: '2026-06-12T00:00:00.000Z',
           note: 'Bring account number',
           firstStartedAt: '2026-06-08T08:10:00.000Z',
           activeStartedAt: null,
@@ -74,6 +76,7 @@ describe('todo remote mapping', () => {
       title: 'Send invoice',
       created_at: '2026-06-08T08:00:00.000Z',
       completed_at: null,
+      due_date: '2026-06-12T00:00:00.000Z',
       note: 'Bring account number',
       source: 'app',
       notion_page_id: null,
@@ -96,6 +99,7 @@ describe('todo remote mapping', () => {
         title: 'Send invoice',
         created_at: '2026-06-08T08:00:00.000Z',
         completed_at: '2026-06-08T09:00:00.000Z',
+        due_date: '2026-06-12T00:00:00.000Z',
         note: 'Bring account number',
         source: 'notion',
         notion_page_id: 'notion-page-1',
@@ -114,6 +118,7 @@ describe('todo remote mapping', () => {
       title: 'Send invoice',
       createdAt: '2026-06-08T08:00:00.000Z',
       completedAt: '2026-06-08T09:00:00.000Z',
+      dueDate: '2026-06-12T00:00:00.000Z',
       note: 'Bring account number',
       source: 'notion',
       notionPageId: 'notion-page-1',
@@ -158,6 +163,51 @@ describe('todo remote mapping', () => {
     expect(calls[0]).toEqual(['from', 'todos']);
     expect(calls[1][0]).toBe('update');
     expect(calls[1][1]).toMatchObject({ title: 'New title' });
+    expect(calls).toContainEqual(['eq', 'id', 'todo-1']);
+    expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
+  });
+
+  it('maps a missing due date to null in both directions', () => {
+    expect(
+      toRemoteRecord(
+        { id: 'todo-1', title: 'No due date', createdAt: '2026-06-08T08:00:00.000Z', completedAt: null },
+        'user-123',
+      ).due_date,
+    ).toBeNull();
+    expect(fromRemoteRecord({ id: 'todo-1', title: 'No due date' }).dueDate).toBeNull();
+  });
+
+  it('updates a remote due date scoped by user id', async () => {
+    const calls = [];
+    const client = {
+      database: {
+        from(table) {
+          calls.push(['from', table]);
+          return {
+            update(values) {
+              calls.push(['update', values]);
+              return {
+                eq(column, value) {
+                  calls.push(['eq', column, value]);
+                  return this;
+                },
+                then(resolve) {
+                  resolve({ error: null });
+                },
+              };
+            },
+          };
+        },
+      },
+    };
+
+    await updateRemoteTodoDueDate(client, 'user-123', {
+      id: 'todo-1',
+      dueDate: '2026-06-12T00:00:00.000Z',
+    });
+
+    expect(calls[1][0]).toBe('update');
+    expect(calls[1][1]).toMatchObject({ due_date: '2026-06-12T00:00:00.000Z' });
     expect(calls).toContainEqual(['eq', 'id', 'todo-1']);
     expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
   });
