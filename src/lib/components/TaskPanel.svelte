@@ -72,7 +72,7 @@
       aria-current={viewMode === 'flow' ? 'page' : undefined}
       on:click={() => onViewChange?.('flow')}
     >
-      Flow
+      Tasks
     </button>
     <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('board')}>
       Board

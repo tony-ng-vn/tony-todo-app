@@ -99,7 +99,7 @@
 
   <div class="view-toggle" role="group" aria-label="Workspace view">
     <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('flow')}>
-      Flow
+      Tasks
     </button>
     <button type="button" class="view-toggle-button is-active" aria-current="page">Board</button>
     <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('inbox')}>

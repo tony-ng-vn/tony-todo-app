@@ -35,7 +35,7 @@
       <span class="panel-count">{userEmail}</span>
     </div>
     <div class="view-toggle" role="group" aria-label="Workspace view">
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('flow')}>Flow</button>
+      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('flow')}>Tasks</button>
       <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('board')}>Board</button>
       <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('inbox')}>
         Inbox{inboxCount ? ` (${inboxCount})` : ''}
