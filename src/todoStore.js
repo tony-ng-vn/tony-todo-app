@@ -351,6 +351,50 @@ export function getCompletedTodos(state) {
     .toSorted((first, second) => new Date(first.completedAt) - new Date(second.completedAt));
 }
 
+// Month grid of completed tasks, grouped by the day each task was finished.
+// month is 0-based. Always returns 6 weeks x 7 days so the grid height is
+// stable, including leading/trailing days from adjacent months (flagged with
+// inMonth: false), Notion-calendar style.
+export function getCalendarMonth(state, { year, month, now = new Date() } = {}) {
+  const byDay = new Map();
+  for (const todo of getCompletedTodos(state)) {
+    const key = formatDayKey(new Date(todo.completedAt));
+    if (!byDay.has(key)) {
+      byDay.set(key, []);
+    }
+    byDay.get(key).push(todo);
+  }
+
+  const todayKey = formatDayKey(now);
+  const firstOfMonth = new Date(year, month, 1);
+  const gridStart = new Date(year, month, 1 - firstOfMonth.getDay());
+  const cursor = new Date(gridStart);
+  const weeks = [];
+
+  for (let week = 0; week < 6; week += 1) {
+    const days = [];
+    for (let day = 0; day < 7; day += 1) {
+      const key = formatDayKey(cursor);
+      days.push({
+        dateKey: key,
+        day: cursor.getDate(),
+        inMonth: cursor.getMonth() === month,
+        isToday: key === todayKey,
+        items: byDay.get(key) ?? [],
+      });
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    weeks.push(days);
+  }
+
+  return {
+    year,
+    month,
+    monthLabel: new Intl.DateTimeFormat([], { month: 'long', year: 'numeric' }).format(firstOfMonth),
+    weeks,
+  };
+}
+
 export function getDaySummary(state, dayKey) {
   const sections = new Map(SUMMARY_BUCKETS.map((bucket) => [bucket.label, []]));
 
