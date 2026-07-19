@@ -5,6 +5,7 @@ import {
   createInitialState,
   failTodo,
   formatDueDate,
+  matchesDueFilter,
   setTodoDueDate,
   getBoardColumns,
   getDaySummary,
@@ -633,5 +634,45 @@ describe('task due dates', () => {
   it('formats a missing or invalid due date as an empty string', () => {
     expect(formatDueDate(null)).toBe('');
     expect(formatDueDate('not-a-date')).toBe('');
+  });
+});
+
+describe('board due-date filter', () => {
+  const now = new Date(2026, 6, 19, 9, 0, 0); // Sun Jul 19 2026, local
+  const withDue = (dueDate) => ({ id: 'x', title: 't', dueDate });
+
+  it('keeps every task under the "all" filter, including tasks with no due date', () => {
+    expect(matchesDueFilter(withDue(null), 'all', now)).toBe(true);
+    expect(matchesDueFilter(withDue(new Date(2026, 6, 10).toISOString()), 'all', now)).toBe(true);
+  });
+
+  it('matches only past-due tasks under "overdue"', () => {
+    expect(matchesDueFilter(withDue(new Date(2026, 6, 18).toISOString()), 'overdue', now)).toBe(true);
+    expect(matchesDueFilter(withDue(new Date(2026, 6, 19).toISOString()), 'overdue', now)).toBe(false);
+    expect(matchesDueFilter(withDue(null), 'overdue', now)).toBe(false);
+  });
+
+  it('matches only today under "today"', () => {
+    expect(matchesDueFilter(withDue(new Date(2026, 6, 19).toISOString()), 'today', now)).toBe(true);
+    expect(matchesDueFilter(withDue(new Date(2026, 6, 20).toISOString()), 'today', now)).toBe(false);
+  });
+
+  it('matches today through six days out under "week"', () => {
+    expect(matchesDueFilter(withDue(new Date(2026, 6, 19).toISOString()), 'week', now)).toBe(true);
+    expect(matchesDueFilter(withDue(new Date(2026, 6, 25).toISOString()), 'week', now)).toBe(true);
+    expect(matchesDueFilter(withDue(new Date(2026, 6, 26).toISOString()), 'week', now)).toBe(false);
+    expect(matchesDueFilter(withDue(new Date(2026, 6, 18).toISOString()), 'week', now)).toBe(false);
+  });
+
+  it('applies the filter to the open board columns only', () => {
+    const state = createInitialState([
+      { id: 'a', title: 'Overdue task', createdAt: new Date(2026, 6, 1).toISOString(), completedAt: null, dueDate: new Date(2026, 6, 18).toISOString() },
+      { id: 'b', title: 'Future task', createdAt: new Date(2026, 6, 1).toISOString(), completedAt: null, dueDate: new Date(2026, 6, 30).toISOString() },
+      { id: 'c', title: 'No due date', createdAt: new Date(2026, 6, 1).toISOString(), completedAt: null, dueDate: null },
+    ]);
+
+    const columns = getBoardColumns(state, { dueFilter: 'overdue', now });
+    const notStarted = columns.find((column) => column.id === 'not_started');
+    expect(notStarted.items.map((item) => item.id)).toEqual(['a']);
   });
 });

@@ -77,6 +77,7 @@
 
   let state = createInitialState();
   let selectedDay = formatDayKey(new Date());
+  let boardDueFilter = 'all';
   let syncMessage = 'Local only';
   let useRemote = false;
   let authUser = null;
@@ -127,7 +128,7 @@
   $: openTodoSections = getOpenTodoSections(openTodos, new Date(`${currentDayKey}T00:00:00`));
   $: openCount = openTodos.length;
   $: summary = getDaySummary(state, selectedDay);
-  $: boardColumns = getBoardColumns(state, { dayKey: selectedDay });
+  $: boardColumns = getBoardColumns(state, { dayKey: selectedDay, dueFilter: boardDueFilter });
   $: completedToday = summary.reduce(
     (total, section) => total + section.items.filter((item) => item.outcome !== 'failed').length,
     0,
@@ -1100,6 +1101,8 @@
       {syncMessage}
       columns={boardColumns}
       {selectedDay}
+      dueFilter={boardDueFilter}
+      onDueFilterChange={(value) => (boardDueFilter = value)}
       {themeMode}
       {newlyAddedTodoId}
       {draggedBoardTodoId}

@@ -206,13 +206,55 @@ export function getBoardColumnId(todo) {
   return 'not_started';
 }
 
-export function getBoardColumns(state, { dayKey, now = new Date() } = {}) {
+// Board filter presets keyed off a task's due date. 'all' shows everything;
+// the rest only match tasks that actually have a due date.
+export const BOARD_DUE_FILTERS = ['all', 'overdue', 'today', 'week'];
+
+export function matchesDueFilter(todo, filter, now = new Date()) {
+  if (!filter || filter === 'all') {
+    return true;
+  }
+
+  if (!todo?.dueDate) {
+    return false;
+  }
+
+  const due = new Date(todo.dueDate);
+  if (Number.isNaN(due.getTime())) {
+    return false;
+  }
+
+  const dueKey = formatDayKey(due);
+  const todayKey = formatDayKey(now);
+
+  if (filter === 'overdue') {
+    return dueKey < todayKey;
+  }
+
+  if (filter === 'today') {
+    return dueKey === todayKey;
+  }
+
+  if (filter === 'week') {
+    const weekEnd = new Date(now);
+    weekEnd.setDate(weekEnd.getDate() + 6);
+    return dueKey >= todayKey && dueKey <= formatDayKey(weekEnd);
+  }
+
+  return true;
+}
+
+export function getBoardColumns(state, { dayKey, dueFilter = 'all', now = new Date() } = {}) {
   const pending = getPendingTodos(state);
   const doneDayKey = dayKey ?? formatDayKey(now);
   const notStarted = [];
   const inProgress = [];
 
   for (const todo of pending) {
+    if (!matchesDueFilter(todo, dueFilter, now)) {
+      continue;
+    }
+
     if (todo.activeStartedAt) {
       inProgress.push(enrichBoardItem(todo, now));
     } else {
