@@ -569,6 +569,43 @@ h2 {
   font: inherit;
 }
 
+.board-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: var(--space-3);
+}
+
+.board-filter-label {
+  margin-right: 2px;
+  color: var(--subtle);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.board-filter-button {
+  flex-shrink: 0;
+  min-height: 30px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 0 12px;
+  background: transparent;
+  color: var(--default);
+  font-size: 12px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.board-filter-button.is-active {
+  background: var(--block-surface);
+  color: var(--strong);
+  border-color: var(--subtle);
+  box-shadow: var(--shadow-raised);
+}
+
 .board-columns {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

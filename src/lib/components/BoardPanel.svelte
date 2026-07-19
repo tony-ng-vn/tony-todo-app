@@ -7,6 +7,7 @@
   export let syncMessage = 'Local only';
   export let columns = [];
   export let selectedDay = '';
+  export let dueFilter = 'all';
   export let themeMode = 'light';
   export let newlyAddedTodoId = null;
   export let draggedBoardTodoId = null;
@@ -16,6 +17,16 @@
   export let onToggleTheme;
   export let onViewChange;
   export let onSelectedDayChange;
+  export let onDueFilterChange;
+
+  // Due-date filter presets for the open columns. Values must match
+  // BOARD_DUE_FILTERS in todoStore.
+  const DUE_FILTERS = [
+    { id: 'all', label: 'All' },
+    { id: 'overdue', label: 'Overdue' },
+    { id: 'today', label: 'Today' },
+    { id: 'week', label: 'This week' },
+  ];
   export let onOpenTask;
   export let onBoardDragStart;
   export let onBoardDragEnd;
@@ -118,6 +129,21 @@
     <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('settings')}>
       Settings
     </button>
+  </div>
+
+  <div class="board-filter" role="group" aria-label="Filter tasks by due date">
+    <span class="board-filter-label">Due</span>
+    {#each DUE_FILTERS as option (option.id)}
+      <button
+        type="button"
+        class="board-filter-button"
+        class:is-active={dueFilter === option.id}
+        aria-pressed={dueFilter === option.id}
+        on:click={() => onDueFilterChange?.(option.id)}
+      >
+        {option.label}
+      </button>
+    {/each}
   </div>
 
   <div class="board-columns" role="list">
