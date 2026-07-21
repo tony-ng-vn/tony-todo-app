@@ -1109,7 +1109,7 @@
 <main
   class="workspace"
   class:has-detail={selectedTask}
-  class:is-board-view={viewMode === 'board' || viewMode === 'calendar' || viewMode === 'inbox' || viewMode === 'waiting' || viewMode === 'history' || viewMode === 'meetings' || viewMode === 'profile' || viewMode === 'settings'}
+  class:is-board-view={viewMode !== 'flow'}
   aria-label="Done Log todo app"
 >
   {#if viewMode === 'board'}
