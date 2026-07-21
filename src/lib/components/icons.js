@@ -67,6 +67,15 @@ export function iconSun() {
   `;
 }
 
+export function iconUser() {
+  return `
+    <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <circle cx="8" cy="5" r="2.75" />
+      <path d="M2.75 13.25a5.25 5.25 0 0 1 10.5 0" />
+    </svg>
+  `;
+}
+
 export function iconPlus() {
   return `
     <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">

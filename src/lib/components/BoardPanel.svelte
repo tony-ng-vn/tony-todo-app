@@ -2,7 +2,7 @@
   import { tick } from 'svelte';
   import { linkifyText } from '../../linkify.js';
   import { formatDueDate } from '../../todoStore.js';
-  import { iconMoon, iconPlus, iconSun } from './icons.js';
+  import { iconMoon, iconPlus, iconSun, iconUser } from './icons.js';
 
   export let syncMessage = 'Local only';
   export let columns = [];
@@ -96,6 +96,14 @@
       </label>
       <button
         type="button"
+        class="theme-toggle profile-button"
+        on:click={() => onViewChange?.('profile')}
+      >
+        {@html iconUser()}
+        <span>Profile</span>
+      </button>
+      <button
+        type="button"
         class="theme-toggle"
         on:click={onToggleTheme}
         aria-label={`Switch to ${themeMode === 'dark' ? 'light' : 'dark'} mode`}
@@ -128,9 +136,6 @@
     </button>
     <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('meetings')}>
       Meetings
-    </button>
-    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('profile')}>
-      Profile
     </button>
     <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('settings')}>
       Settings

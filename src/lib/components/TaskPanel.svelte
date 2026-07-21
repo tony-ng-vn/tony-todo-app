@@ -1,7 +1,7 @@
 <script>
   import { formatDuration, formatDueDate, getElapsedSeconds } from '../../todoStore.js';
   import { linkifyText } from '../../linkify.js';
-  import { iconCheck, iconMoon, iconPage, iconPause, iconPlay, iconSun, iconX } from './icons.js';
+  import { iconCheck, iconMoon, iconPage, iconPause, iconPlay, iconSun, iconUser, iconX } from './icons.js';
 
   export let syncMessage = 'Local only';
   export let ongoingTodos = [];
@@ -52,6 +52,15 @@
       <output class="sync-status" id="sync-status" aria-live="polite">{syncMessage}</output>
       <button
         type="button"
+        class="theme-toggle profile-button"
+        aria-current={viewMode === 'profile' ? 'page' : undefined}
+        on:click={() => onViewChange?.('profile')}
+      >
+        {@html iconUser()}
+        <span>Profile</span>
+      </button>
+      <button
+        type="button"
         class="theme-toggle"
         on:click={onToggleTheme}
         aria-label={`Switch to ${themeMode === 'dark' ? 'light' : 'dark'} mode`}
@@ -92,9 +101,6 @@
     </button>
     <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('meetings')}>
       Meetings
-    </button>
-    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('profile')}>
-      Profile
     </button>
     <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('settings')}>
       Settings
