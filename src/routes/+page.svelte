@@ -10,6 +10,7 @@
   import WaitingPanel from '../lib/components/WaitingPanel.svelte';
   import HistoryPanel from '../lib/components/HistoryPanel.svelte';
   import MeetingsPanel from '../lib/components/MeetingsPanel.svelte';
+  import ProfilePanel from '../lib/components/ProfilePanel.svelte';
   import SettingsPanel from '../lib/components/SettingsPanel.svelte';
   import SummaryPanel from '../lib/components/SummaryPanel.svelte';
   import TaskDetail from '../lib/components/TaskDetail.svelte';
@@ -59,6 +60,7 @@
     updateRemoteTodoTitle,
   } from '../todoRemote.js';
   import { loadLocalState, reconcileRemoteState, saveLocalState } from '../todoPersistence.js';
+  import { normalizeViewMode } from '../viewModes.js';
   import {
     acceptLoop,
     dismissLoop,
@@ -353,10 +355,8 @@
     applyThemeMode(themeMode);
   }
 
-  const VIEW_MODES = ['flow', 'board', 'calendar', 'inbox', 'waiting', 'history', 'meetings', 'settings'];
-
   function setViewMode(nextViewMode) {
-    viewMode = VIEW_MODES.includes(nextViewMode) ? nextViewMode : 'flow';
+    viewMode = normalizeViewMode(nextViewMode);
     localStorage.setItem(VIEW_STORAGE_KEY, viewMode);
     draggedBoardTodoId = null;
     dropTargetColumnId = null;
@@ -1051,8 +1051,7 @@
   }
 
   function loadViewMode() {
-    const storedView = localStorage.getItem(VIEW_STORAGE_KEY);
-    return VIEW_MODES.includes(storedView) ? storedView : 'flow';
+    return normalizeViewMode(localStorage.getItem(VIEW_STORAGE_KEY));
   }
 
   function applyThemeMode(nextThemeMode) {
@@ -1110,7 +1109,7 @@
 <main
   class="workspace"
   class:has-detail={selectedTask}
-  class:is-board-view={viewMode === 'board' || viewMode === 'calendar' || viewMode === 'inbox' || viewMode === 'waiting' || viewMode === 'history' || viewMode === 'meetings' || viewMode === 'settings'}
+  class:is-board-view={viewMode === 'board' || viewMode === 'calendar' || viewMode === 'inbox' || viewMode === 'waiting' || viewMode === 'history' || viewMode === 'meetings' || viewMode === 'profile' || viewMode === 'settings'}
   aria-label="Done Log todo app"
 >
   {#if viewMode === 'board'}
@@ -1184,6 +1183,17 @@
       {meetings}
       inboxCount={inboxLoops.length}
       waitingCount={waitingLoops.length}
+      onViewChange={setViewMode}
+    />
+  {:else if viewMode === 'profile'}
+    <ProfilePanel
+      userEmail={authUser?.email ?? ''}
+      userId={authUser?.id ?? ''}
+      {syncMessage}
+      inboxCount={inboxLoops.length}
+      waitingCount={waitingLoops.length}
+      showSignOut={useRemote && Boolean(authUser)}
+      onSignOut={handleSignOut}
       onViewChange={setViewMode}
     />
   {:else if viewMode === 'settings'}

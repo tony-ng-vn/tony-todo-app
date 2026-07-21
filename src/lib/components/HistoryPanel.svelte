@@ -24,6 +24,7 @@
       </button>
       <button type="button" class="view-toggle-button is-active" aria-current="page">History</button>
       <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('meetings')}>Meetings</button>
+      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('profile')}>Profile</button>
       <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('settings')}>Settings</button>
     </div>
   </div>
