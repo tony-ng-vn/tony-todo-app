@@ -1,0 +1,423 @@
+<script>
+  import { formatDueDate, formatDuration, getElapsedSeconds } from '../../todoStore.js';
+  import { iconCheck, iconPage, iconPause, iconPlay, iconX } from './icons.js';
+
+  export let todo;
+  export let expanded = false;
+  export let onToggleDetails;
+  export let onTimerAction;
+  export let onComplete;
+  export let onTitleCommit;
+  export let onNoteSave;
+  export let onProgressiveChange;
+  export let onProgressCommit;
+  export let onDueDateChange;
+  export let onDelete;
+
+  let draftTodoId = null;
+  let noteDraft = '';
+  let progressDraft = '';
+  let sourceNote = '';
+  let sourceProgress = '';
+
+  $: {
+    const nextNote = todo.note ?? '';
+    const nextProgress = todo.progressLabel ?? '';
+
+    if (todo.id !== draftTodoId) {
+      draftTodoId = todo.id;
+      sourceNote = nextNote;
+      sourceProgress = nextProgress;
+      noteDraft = nextNote;
+      progressDraft = nextProgress;
+    } else {
+      if (nextNote !== sourceNote) {
+        sourceNote = nextNote;
+        noteDraft = nextNote;
+      }
+
+      if (nextProgress !== sourceProgress) {
+        sourceProgress = nextProgress;
+        progressDraft = nextProgress;
+      }
+    }
+  }
+
+  $: isRunning = Boolean(todo.activeStartedAt);
+  $: duration = formatDuration(getElapsedSeconds(todo));
+
+  function dueDateValue(dueDate) {
+    if (!dueDate) {
+      return '';
+    }
+
+    const date = new Date(dueDate);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }
+
+  function handleTitleKeydown(event) {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      event.currentTarget.blur();
+    }
+  }
+
+  function handleTextareaTab(event, updateDraft) {
+    if (event.key !== 'Tab' || event.shiftKey) {
+      return;
+    }
+
+    event.preventDefault();
+    const textarea = event.currentTarget;
+    const start = textarea.selectionStart ?? textarea.value.length;
+    const end = textarea.selectionEnd ?? start;
+    const nextValue = `${textarea.value.slice(0, start)}\t${textarea.value.slice(end)}`;
+    updateDraft(nextValue);
+
+    requestAnimationFrame(() => textarea.setSelectionRange(start + 1, start + 1));
+  }
+</script>
+
+<article
+  class:is-running={isRunning}
+  class:is-expanded={expanded}
+  class="menubar-task"
+  data-menubar-id={todo.id}
+>
+  <div class="menubar-task-summary">
+    <span class="menubar-task-dot" aria-hidden="true"></span>
+    <button
+      type="button"
+      class="menubar-details-toggle"
+      aria-expanded={expanded}
+      on:click={() => onToggleDetails(todo.id)}
+    >
+      <span class="menubar-task-title">{todo.title}</span>
+      <span class="menubar-task-meta">
+        {isRunning ? 'Tracking' : 'Duration'} {duration}
+        {#if todo.dueDate} - due {formatDueDate(todo.dueDate)}{/if}
+      </span>
+      {#if todo.progressLabel}
+        <span class="menubar-task-progress">{todo.progressLabel}</span>
+      {/if}
+    </button>
+    <div class="menubar-task-actions">
+      <button
+        type="button"
+        class:menubar-pause={isRunning}
+        class:menubar-start={!isRunning}
+        class="menubar-icon-button"
+        aria-label={`${isRunning ? 'Pause' : 'Start'} ${todo.title}`}
+        title={isRunning ? 'Pause' : 'Start'}
+        on:click={() => onTimerAction(isRunning ? 'pause' : 'start', todo.id)}
+      >
+        {@html isRunning ? iconPause() : iconPlay()}
+      </button>
+      <button
+        type="button"
+        class="menubar-icon-button menubar-finish"
+        aria-label={`${todo.isProgressive ? 'Log progress for' : 'Finish'} ${todo.title}`}
+        title={todo.isProgressive ? 'Log progress' : 'Finish'}
+        on:click={() => onComplete(todo.id)}
+      >
+        {@html iconCheck()}
+      </button>
+    </div>
+  </div>
+
+  {#if expanded}
+    <div class="menubar-task-details" data-menubar-details={todo.id}>
+      <label>
+        <span>Title</span>
+        <input
+          class="menubar-title-input"
+          type="text"
+          value={todo.title}
+          on:keydown={handleTitleKeydown}
+          on:focusout={(event) => onTitleCommit(todo.id, event.currentTarget.value)}
+        />
+      </label>
+
+      <label>
+        <span>Note</span>
+        <textarea
+          class="menubar-note-input"
+          bind:value={noteDraft}
+          rows="3"
+          on:keydown={(event) => handleTextareaTab(event, (value) => (noteDraft = value))}
+        ></textarea>
+      </label>
+      <button
+        type="button"
+        class="menubar-secondary-button menubar-save-note"
+        disabled={noteDraft === (todo.note ?? '')}
+        on:click={() => onNoteSave(todo.id, noteDraft)}
+      >
+        Save note
+      </button>
+
+      <label class="menubar-progressive-toggle">
+        <input
+          type="checkbox"
+          checked={todo.isProgressive}
+          on:change={(event) => onProgressiveChange(todo.id, event.currentTarget.checked)}
+        />
+        <span>Progressive task</span>
+      </label>
+
+      {#if todo.isProgressive}
+        <label>
+          <span>Current progress</span>
+          <textarea
+            class="menubar-progress-input"
+            bind:value={progressDraft}
+            rows="2"
+            on:keydown={(event) => handleTextareaTab(event, (value) => (progressDraft = value))}
+            on:focusout={() => onProgressCommit(todo.id, progressDraft)}
+          ></textarea>
+        </label>
+      {/if}
+
+      <label>
+        <span>Due date</span>
+        <input
+          type="date"
+          value={dueDateValue(todo.dueDate)}
+          on:change={(event) => onDueDateChange(todo.id, event.currentTarget.value)}
+        />
+      </label>
+
+      <div class="menubar-detail-footer">
+        <span>{isRunning ? `Live ${duration}` : `Tracked ${duration}`}</span>
+        <button type="button" class="menubar-delete" on:click={() => onDelete(todo.id)}>
+          {@html iconX()}
+          Delete
+        </button>
+      </div>
+    </div>
+  {/if}
+</article>
+
+<style>
+  .menubar-task {
+    overflow: hidden;
+    border: 1px solid var(--block-border);
+    border-radius: 14px;
+    background: var(--block-surface);
+    box-shadow: inset 0 1px 0 var(--inset-highlight);
+    transition:
+      border-color 160ms ease,
+      background-color 160ms ease;
+  }
+
+  .menubar-task.is-running {
+    border-color: color-mix(in srgb, var(--board-in-progress) 32%, var(--block-border));
+    background: var(--block-running);
+  }
+
+  .menubar-task-summary {
+    display: grid;
+    grid-template-columns: 6px minmax(0, 1fr) auto;
+    gap: 9px;
+    align-items: center;
+    min-height: 64px;
+    padding: 8px 9px 8px 11px;
+  }
+
+  .menubar-task-dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--subtle);
+  }
+
+  .is-running .menubar-task-dot {
+    background: var(--board-in-progress);
+    box-shadow: 0 0 0 4px var(--board-in-progress-soft);
+  }
+
+  .menubar-details-toggle {
+    display: grid;
+    gap: 2px;
+    min-width: 0;
+    padding: 3px 0;
+    background: transparent;
+    color: inherit;
+    text-align: left;
+  }
+
+  .menubar-task-title,
+  .menubar-task-meta,
+  .menubar-task-progress {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .menubar-task-title {
+    color: var(--strong);
+    font-size: 13px;
+    font-weight: 600;
+  }
+
+  .menubar-task-meta,
+  .menubar-task-progress {
+    color: var(--subtle);
+    font-size: 11px;
+  }
+
+  .menubar-task-progress {
+    color: var(--default);
+  }
+
+  .menubar-task-actions {
+    display: flex;
+    gap: 5px;
+  }
+
+  .menubar-icon-button {
+    display: grid;
+    place-items: center;
+    width: 34px;
+    height: 34px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--surface-strong);
+    color: var(--strong);
+    transition:
+      background-color 160ms ease,
+      transform 160ms ease;
+  }
+
+  .menubar-icon-button:hover {
+    background: var(--block-hover);
+  }
+
+  .menubar-icon-button:active {
+    transform: scale(0.96);
+  }
+
+  .menubar-icon-button :global(.nucleo-icon),
+  .menubar-delete :global(.nucleo-icon) {
+    width: 15px;
+    height: 15px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.35;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  .menubar-task-details {
+    display: grid;
+    gap: 10px;
+    padding: 12px;
+    border-top: 1px solid var(--border);
+    background: color-mix(in srgb, var(--surface-strong) 68%, transparent);
+  }
+
+  .menubar-task-details label {
+    display: grid;
+    gap: 5px;
+    color: var(--subtle);
+    font-size: 11px;
+    font-weight: 500;
+  }
+
+  .menubar-task-details input[type='text'],
+  .menubar-task-details input[type='date'],
+  .menubar-task-details textarea {
+    width: 100%;
+    min-width: 0;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 9px 10px;
+    background: var(--field-surface);
+    color: var(--strong);
+    font-size: 13px;
+    line-height: 1.4;
+  }
+
+  .menubar-task-details input[type='text'],
+  .menubar-task-details input[type='date'] {
+    min-height: 38px;
+  }
+
+  .menubar-task-details textarea {
+    resize: vertical;
+  }
+
+  .menubar-task-details input:focus-visible,
+  .menubar-task-details textarea:focus-visible,
+  .menubar-details-toggle:focus-visible,
+  .menubar-icon-button:focus-visible,
+  .menubar-secondary-button:focus-visible,
+  .menubar-delete:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
+  }
+
+  .menubar-secondary-button {
+    justify-self: start;
+    min-height: 34px;
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 0 11px;
+    background: var(--surface-strong);
+    color: var(--strong);
+    font-size: 12px;
+    font-weight: 600;
+  }
+
+  .menubar-secondary-button:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  .menubar-progressive-toggle {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+  }
+
+  .menubar-progressive-toggle input {
+    width: 16px;
+    height: 16px;
+    accent-color: var(--strong);
+  }
+
+  .menubar-detail-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    color: var(--subtle);
+    font-size: 11px;
+  }
+
+  .menubar-delete {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    min-height: 34px;
+    border-radius: 9px;
+    padding: 0 10px;
+    background: transparent;
+    color: #b0463c;
+    font-size: 12px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .menubar-task,
+    .menubar-icon-button {
+      transition: none;
+    }
+  }
+</style>

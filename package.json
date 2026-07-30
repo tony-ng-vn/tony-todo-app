@@ -5,9 +5,14 @@
   "type": "module",
   "scripts": {
     "test": "vitest run",
+    "test:electron": "vitest run electron/shellConfig.test.js",
     "test:ui": "node scripts/ui-smoke.mjs",
+    "test:menubar": "node scripts/menubar-smoke.mjs",
     "build": "vite build",
     "dev": "vite dev --host 127.0.0.1",
+    "menubar": "electron electron/main.mjs",
+    "menubar:dev": "DONE_LOG_MENUBAR_URL=http://127.0.0.1:5176/menubar?local=1 electron electron/main.mjs",
+    "menubar:check": "DONE_LOG_MENUBAR_URL=http://127.0.0.1:5176/menubar?local=1 MENUBAR_SHELL_SMOKE=1 electron electron/main.mjs",
     "understanding:build": "node scripts/understanding-workbook.mjs",
     "understanding:serve": "node scripts/understanding-workbook.mjs && node scripts/understanding-serve.mjs"
   },
@@ -15,6 +20,7 @@
     "@sveltejs/adapter-auto": "^7.0.1",
     "@sveltejs/kit": "^2.64.0",
     "@sveltejs/vite-plugin-svelte": "^7.1.2",
+    "electron": "^43.2.0",
     "playwright": "^1.60.0",
     "svelte": "^5.56.3",
     "vite": "^8.0.16",
@@ -22,10 +28,10 @@
     "yaml": "^2.9.0"
   },
   "dependencies": {
-    "feedback-sdk-widget": "^0.1.0",
     "@insforge/sdk": "^1.3.1",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
+    "feedback-sdk-widget": "^0.1.0",
     "lottie-web": "^5.13.0"
   },
   "overrides": {
