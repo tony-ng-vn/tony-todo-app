@@ -26,3 +26,13 @@
 - Added automatic light/dark theming via semantic CSS tokens after reviewing Apple, Atlassian, GitHub Primer, and Fluent guidance. Light mode now separates blocks from the canvas with raised paper surfaces; dark mode uses brighter elevated surfaces and softer shadows instead of inverted light colors.
 - Added an explicit persisted light/dark toggle next to sync status because relying only on OS color scheme made theme switching undiscoverable. Tightened recap bucket spacing and aligned the rhythm labels to the actual Morning/Lunch/Evening/Night buckets.
 - Added progressive tasks as open parent tasks with completed session records. Logging a progressive task creates a daily recap entry with the current progress label and duration, then resets the parent timer while keeping the parent task open.
+
+## 2026-07-30
+
+- Added a compact `/menubar` Svelte route that reuses the existing todo domain, local cache, account auth, and backend-authoritative cloud reconciliation.
+- Added a native Electron tray shell with a frameless translucent popover, click-to-toggle behavior, blur-to-hide behavior, an external full-app action, and a small right-click menu.
+- The companion follows the app's current parallel-timer behavior instead of the issue's older single-timer wording.
+- The companion uses the app's current account-based `user_id` sync instead of the design document's older anonymous `client_id` handoff.
+- The compact route lists only ongoing and open tasks, so the full app remains responsible for the completed-task timing editor.
+- Added Playwright coverage for quick capture, parallel start and pause, normal completion, progressive session logging, inline title and note edits, progress, due date, progressive toggle, delete, compact overflow, and hidden scrollbars.
+- Added Electron configuration tests and a real launch smoke check so the native runtime, route loading, and on-screen positioning are verified separately from the browser route.

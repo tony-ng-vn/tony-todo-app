@@ -9,12 +9,13 @@ The app is a small SvelteKit frontend backed by InsForge Postgres when configure
 - Add open tasks and mark them done.
 - Daily recap grouped into Morning, Lunch, Afternoon, Evening, and Late night.
 - Start, pause, and resume task timers; completing a running task finalizes its duration.
-- One active timer at a time; starting another task pauses the current one.
+- Run multiple task timers in parallel.
 - Task detail sheet with notes.
 - Double-click task titles to rename them.
 - Drag completed tasks inside a day recap to reorder them.
 - `http` and `https` URLs in task titles render as external links.
-- Browser-local cache first, with optional InsForge cloud sync by `client_id`.
+- Browser-local cache first, with optional account-based InsForge cloud sync.
+- Compact `/menubar` route and native macOS tray shell for quick task capture and updates.
 
 ## Backend
 
@@ -39,7 +40,8 @@ npx @insforge/cli current
 npx @insforge/cli secrets get ANON_KEY
 ```
 
-Keep `.env` and `.env.local` out of commits. The app stores a generated `done-log-client-id` in browser `localStorage` and scopes all remote rows by that value. Real user auth is not implemented yet.
+Keep `.env` and `.env.local` out of commits.
+Signed-in cloud data is scoped by `user_id` and protected by row-level security.
 
 ## Local Development
 
@@ -56,6 +58,23 @@ npm run dev
 ```
 
 The dev server binds to `127.0.0.1`. To force local-only mode even when InsForge env vars are present, add `?local=1` to the URL.
+
+## macOS Menu Bar Companion
+
+Start the SvelteKit dev server on port 5176:
+
+```bash
+npm run dev -- --port 5176
+```
+
+In another terminal, open the native menu bar shell against the local route:
+
+```bash
+npm run menubar:dev
+```
+
+The shell uses the deployed `/menubar` route by default when started with `npm run menubar`.
+See [docs/menubar-companion.md](docs/menubar-companion.md) for behavior, configuration, and manual verification steps.
 
 ## Checks
 
@@ -79,6 +98,19 @@ UI_SMOKE_URL=http://127.0.0.1:5173/ npm run test:ui
 ```
 
 `test:ui` appends `?local=1`, seeds local storage, and checks mobile/desktop overflow, target sizing, contrast, button motion, and the main glass layout. If Vite chooses a different port, update `UI_SMOKE_URL`.
+
+Run the compact menu bar route smoke check:
+
+```bash
+UI_SMOKE_URL=http://127.0.0.1:5176/menubar npm run test:menubar
+```
+
+Run the Electron shell unit and launch checks:
+
+```bash
+npm run test:electron
+npm run menubar:check
+```
 
 ## Migrations
 
@@ -105,9 +137,8 @@ Applied migrations are history; avoid editing files that have already been appli
 
 ## Current Caveats
 
-- There is no authentication UI yet. Data is scoped by a browser-generated `client_id`, so clearing local storage creates a new task scope.
+- The browser and Electron shell keep separate authentication sessions, so the first deployed Electron launch requires signing in.
 - Offline writes update local storage first, but there is no conflict resolution or retry queue beyond the next normal sync path.
 - Reordering completed tasks rewrites their `completed_at` values in one-minute increments so the chosen order persists.
 - Notion sync is only planned. The schema has fields for Notion metadata, but import/export behavior is not implemented.
 - Timer elapsed time is capped per active segment in the store logic to avoid runaway values.
-- No RLS policy files are present in this repo; verify backend security policy state in InsForge before exposing shared or authenticated data.

@@ -18,7 +18,8 @@ In scope:
 - Start and stop task timers.
 - Finish tasks.
 - Open and edit task details in a compact view.
-- Edit title, note, progress label, timing, and delete where the main app already supports it.
+- Edit title, note, progress label, due date, and delete where the main app already supports it.
+- Keep completed-task timing edits in the full app because the companion only lists ongoing and open tasks.
 - Include an "Open full app" action for the full dashboard.
 - Use a custom menu-bar icon.
 
@@ -70,7 +71,8 @@ The popover layout:
 
 5. Compact detail view
    - Opens inline under the selected task row.
-   - Allows editing title, note, progress label, timing fields, and delete.
+   - Allows editing title, note, progress label, due date, progressive mode, and delete.
+   - Leaves completed-task timing edits in the full app because completed tasks are not listed here.
    - Keeps controls dense and touch/click friendly.
 
 The full app remains the place for daily summaries, broad recap review, drag ordering, and richer layout.
@@ -85,13 +87,13 @@ The menu-bar route should follow the same local/remote behavior as the main app:
 4. Save local state immediately.
 5. Sync remote mutations with `todoRemote`.
 
-The likely risk is client identity. The current app uses a browser-local `client_id`, so an Electron shell and a normal browser may not automatically share the same task set. The implementation should make this explicit.
+The browser and Electron keep separate authentication sessions, but both use the same account-scoped `user_id` task set after sign-in.
 
 First-version behavior:
 
 - Load the deployed Vercel `/menubar` URL in Electron so it uses the web runtime and remote InsForge behavior.
-- Add a visible "copy/connect client id" flow if local Electron storage creates a separate task set during implementation.
-- Avoid introducing full auth in this slice.
+- Reuse the current account authentication UI and require one sign-in inside the Electron profile.
+- Refresh from the authoritative cloud task set whenever the popover regains focus.
 
 ## Native Shell
 
