@@ -1,5 +1,6 @@
 <script>
   import { linkifyText } from '../../linkify.js';
+  import WorkspaceTabs from './WorkspaceTabs.svelte';
 
   export let monthLabel = '';
   export let weeks = [];
@@ -22,21 +23,7 @@
       <h2 id="calendar-heading">Calendar</h2>
       <span class="panel-count">Tasks completed each day</span>
     </div>
-    <div class="view-toggle" role="group" aria-label="Workspace view">
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('flow')}>Tasks</button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('board')}>Board</button>
-      <button type="button" class="view-toggle-button is-active" aria-current="page">Calendar</button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('inbox')}>
-        Inbox{inboxCount ? ` (${inboxCount})` : ''}
-      </button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('waiting')}>
-        Waiting{waitingCount ? ` (${waitingCount})` : ''}
-      </button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('history')}>History</button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('meetings')}>Meetings</button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('profile')}>Profile</button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('settings')}>Settings</button>
-    </div>
+    <WorkspaceTabs currentView="calendar" {inboxCount} {waitingCount} {onViewChange} />
   </div>
 
   <div class="calendar-controls">

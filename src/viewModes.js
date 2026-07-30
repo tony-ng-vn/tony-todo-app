@@ -1,17 +1,21 @@
-// Single source of truth for the workspace views. Kept out of +page.svelte so
-// the fallback logic (loadViewMode, setViewMode) is unit-testable.
-export const VIEW_MODES = [
-  'flow',
-  'board',
-  'calendar',
-  'inbox',
-  'waiting',
-  'history',
-  'meetings',
-  'profile',
-  'settings',
+// Single source of truth for workspace routing and navigation.
+export const WORKSPACE_TABS = [
+  { id: 'flow', label: 'Tasks' },
+  { id: 'board', label: 'Board' },
+  { id: 'calendar', label: 'Calendar' },
+  { id: 'inbox', label: 'Inbox' },
+  { id: 'waiting', label: 'Waiting' },
+  { id: 'history', label: 'History' },
+  { id: 'meetings', label: 'Meetings' },
+  { id: 'settings', label: 'Settings' },
 ];
 
+export const VIEW_MODES = WORKSPACE_TABS.map((tab) => tab.id);
+
 export function normalizeViewMode(value) {
+  if (value === 'profile') {
+    return 'settings';
+  }
+
   return VIEW_MODES.includes(value) ? value : 'flow';
 }
