@@ -59,6 +59,10 @@ export async function proxyToInsForge({ request, url }) {
 
   const backendResponse = await fetch(targetUrl, init);
 
+  return createProxyResponse(backendResponse);
+}
+
+export async function createProxyResponse(backendResponse) {
   const responseHeaders = new Headers();
   for (const [key, value] of backendResponse.headers) {
     // Set-Cookie is handled separately below so multiple cookies survive.
@@ -73,8 +77,7 @@ export async function proxyToInsForge({ request, url }) {
     responseHeaders.append('set-cookie', stripCookieDomain(cookie));
   }
 
-  const body = await backendResponse.arrayBuffer();
-  return new Response(body, {
+  return new Response(backendResponse.body, {
     status: backendResponse.status,
     statusText: backendResponse.statusText,
     headers: responseHeaders,

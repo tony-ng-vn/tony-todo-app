@@ -1,5 +1,36 @@
 import { describe, expect, it } from 'vitest';
-import { stripCookieDomain } from './insforgeProxy.js';
+import { createProxyResponse, stripCookieDomain } from './insforgeProxy.js';
+
+describe('createProxyResponse', () => {
+  it('preserves a response body from the backend', async () => {
+    const backendResponse = new Response('saved', {
+      status: 200,
+      headers: { 'content-type': 'text/plain' },
+    });
+
+    const response = await createProxyResponse(backendResponse);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('text/plain');
+    expect(await response.text()).toBe('saved');
+  });
+
+  it.each([204, 205, 304])(
+    'forwards a bodyless %i response without creating an invalid body',
+    async (status) => {
+      const backendResponse = new Response(null, {
+        status,
+        headers: { 'x-backend': 'insforge' },
+      });
+
+      const response = await createProxyResponse(backendResponse);
+
+      expect(response.status).toBe(status);
+      expect(response.body).toBeNull();
+      expect(response.headers.get('x-backend')).toBe('insforge');
+    },
+  );
+});
 
 describe('stripCookieDomain', () => {
   it('removes a Domain attribute so the cookie becomes host-only', () => {
