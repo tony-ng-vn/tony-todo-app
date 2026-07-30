@@ -7,6 +7,8 @@ final class MenuBarController: NSObject {
   private let contextMenu: NSMenu
   private let fullAppURL: URL
   private let webViewController: MenuBarWebViewController
+  private let loginItemManager: LoginItemManager
+  private let launchAtLoginItem: NSMenuItem
 
   init(url: URL) {
     statusItem = NSStatusBar.system.statusItem(
@@ -16,6 +18,8 @@ final class MenuBarController: NSObject {
     contextMenu = NSMenu()
     fullAppURL = MenuBarConfiguration.fullAppURL(for: url)
     webViewController = MenuBarWebViewController(homeURL: url)
+    loginItemManager = LoginItemManager()
+    launchAtLoginItem = NSMenuItem()
     super.init()
 
     configurePopover()
@@ -54,6 +58,12 @@ final class MenuBarController: NSObject {
     contextMenu.addItem(openItem)
     contextMenu.addItem(.separator())
 
+    launchAtLoginItem.title = "Launch at Login"
+    launchAtLoginItem.action = #selector(toggleLaunchAtLogin)
+    launchAtLoginItem.target = self
+    contextMenu.addItem(launchAtLoginItem)
+    contextMenu.addItem(.separator())
+
     let quitItem = NSMenuItem(
       title: "Quit",
       action: #selector(quit),
@@ -79,6 +89,12 @@ final class MenuBarController: NSObject {
       self,
       selector: #selector(showPopoverFromNotification),
       name: .doneLogShowPopover,
+      object: nil
+    )
+    DistributedNotificationCenter.default().addObserver(
+      self,
+      selector: #selector(quit),
+      name: .doneLogQuit,
       object: nil
     )
   }
@@ -128,9 +144,52 @@ final class MenuBarController: NSObject {
       return
     }
 
+    updateLaunchAtLoginItem()
     statusItem.menu = contextMenu
     button.performClick(nil)
     statusItem.menu = nil
+  }
+
+  private func updateLaunchAtLoginItem() {
+    guard loginItemManager.isAvailable else {
+      launchAtLoginItem.title = "Launch at Login (Install app first)"
+      launchAtLoginItem.state = .off
+      launchAtLoginItem.isEnabled = false
+      return
+    }
+
+    launchAtLoginItem.isEnabled = true
+    switch LoginItemPolicy.indicator(for: loginItemManager.status) {
+    case .off:
+      launchAtLoginItem.title = "Launch at Login"
+      launchAtLoginItem.state = .off
+    case .on:
+      launchAtLoginItem.title = "Launch at Login"
+      launchAtLoginItem.state = .on
+    case .requiresApproval:
+      launchAtLoginItem.title = "Launch at Login (Approval Required)"
+      launchAtLoginItem.state = .mixed
+    }
+  }
+
+  @objc
+  private func toggleLaunchAtLogin() {
+    do {
+      try loginItemManager.performMenuAction()
+      updateLaunchAtLoginItem()
+    } catch {
+      showLoginItemError(error)
+    }
+  }
+
+  private func showLoginItemError(_ error: Error) {
+    NSApp.activate(ignoringOtherApps: true)
+    let alert = NSAlert()
+    alert.alertStyle = .warning
+    alert.messageText = "Could not update Launch at Login"
+    alert.informativeText = error.localizedDescription
+    alert.addButton(withTitle: "OK")
+    alert.runModal()
   }
 
   @objc

@@ -57,3 +57,6 @@ jobs:
 
       - name: Build release binary
         run: swift build --package-path native -c release
+
+      - name: Build signed app bundle
+        run: npm run menubar:bundle

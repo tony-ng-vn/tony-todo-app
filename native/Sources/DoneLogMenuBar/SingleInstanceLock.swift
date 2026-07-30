@@ -41,6 +41,9 @@ extension Notification.Name {
   static let doneLogShowPopover = Notification.Name(
     "com.tonynguyen.done-log-menubar.show-popover"
   )
+  static let doneLogQuit = Notification.Name(
+    "com.tonynguyen.done-log-menubar.quit"
+  )
 }
 
 enum MenuBarLaunchPolicy {

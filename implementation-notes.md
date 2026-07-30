@@ -42,3 +42,6 @@
 - Added Swift configuration, navigation, permission, and single-instance tests plus a process smoke check that waits for the menu bar route to load.
 - Replaced the raw Electron shell with a Swift `NSStatusItem`, `NSPopover`, and `WKWebView` host after Electron failed to register a visible macOS status item.
 - The native host follows Quill's single-binary approach, keeps the existing `/menubar` web UI, avoids the Electron download, and verifies the status item with Swift unit and process smoke checks.
+- Packaged the Swift host as a signed `Done Log.app` with a custom application icon and an npm installer that safely updates `/Applications/Done Log.app`.
+- Registered the installed application through `SMAppService.mainApp` so it can launch after login without a terminal process.
+- Added a Launch at Login context-menu control, command-line lifecycle checks, policy tests, and a macOS CI bundle build.

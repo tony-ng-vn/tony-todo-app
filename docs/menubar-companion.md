@@ -3,6 +3,19 @@
 The menu bar companion provides a compact Done Log surface at `/menubar`.
 It supports quick capture, ongoing and open task lists, timer controls, normal completion, progressive session logging, and inline task details.
 
+## Install
+
+Install Done Log in Applications:
+
+```bash
+npm run menubar:install
+```
+
+The installer builds and signs `/Applications/Done Log.app`, enables launch at login, and opens it.
+The app then runs independently from the terminal and returns automatically after the next login.
+Open Done Log later from Applications or Spotlight.
+Right-click the menu bar icon to turn Launch at Login on or off, open the full app, or quit.
+
 ## Run Locally
 
 The native shell requires macOS 14 or newer and the Xcode command line tools.
@@ -48,7 +61,7 @@ DONE_LOG_MENUBAR_URL=https://example.com/menubar npm run menubar
 - Click the tray icon to show or hide the popover.
 - Click outside the popover to hide it.
 - Use Open full app to open the root app in the default browser.
-- Right-click the tray icon to open the full app or quit the shell.
+- Right-click the tray icon to control launch at login, open the full app, or quit the shell.
 - Ongoing tasks appear before open tasks.
 - Starting a timer does not pause other running tasks because the current app supports parallel timers.
 - Finishing a normal task moves it to the recap.
@@ -67,6 +80,7 @@ UI_SMOKE_URL=http://127.0.0.1:5176 npm run test:ui
 npm run test:menubar
 npm run test:native-menubar
 npm run menubar:check
+npm run menubar:bundle
 npm run build
 ```
 
@@ -81,4 +95,4 @@ For the manual native check:
 7. Click outside the popover and confirm it hides.
 8. Reopen it and confirm the task state remains.
 9. Use Open full app and confirm the root app opens in the default browser.
-10. Right-click the tray icon and confirm Open Done Log and Quit are available.
+10. Right-click the tray icon and confirm Launch at Login, Open Done Log, and Quit are available.
