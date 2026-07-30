@@ -74,6 +74,9 @@ try {
       openCount: document.querySelector('.menubar-count')?.textContent.trim(),
       ongoingBeforeOpen: ongoing?.getBoundingClientRect().top < open?.getBoundingClientRect().top,
       runningVisible: Boolean(document.querySelector('[data-menubar-id="menubar-running"]')),
+      runningStarted: document.querySelector(
+        '[data-menubar-id="menubar-running"] .menubar-task-started',
+      )?.textContent.trim(),
       openVisible: Boolean(document.querySelector('[data-menubar-id="menubar-open"]')),
       fullAppHref: document.querySelector('.menubar-open-full')?.getAttribute('href'),
       scrollWidth: document.documentElement.scrollWidth,
@@ -230,6 +233,9 @@ try {
   if (initial.openCount !== '4 open') failures.push(`unexpected open count: ${JSON.stringify(initial)}`);
   if (!initial.ongoingBeforeOpen || !initial.runningVisible || !initial.openVisible) {
     failures.push(`task sections are incomplete or out of order: ${JSON.stringify(initial)}`);
+  }
+  if (!initial.runningStarted?.startsWith('Started ')) {
+    failures.push(`running task start time is missing: ${JSON.stringify(initial)}`);
   }
   if (initial.fullAppHref !== '/') failures.push(`full app link is wrong: ${JSON.stringify(initial)}`);
   if (initial.scrollWidth > initial.clientWidth || initial.scrollbarWidth !== 'none') {

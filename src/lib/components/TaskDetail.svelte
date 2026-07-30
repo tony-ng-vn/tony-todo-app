@@ -2,6 +2,7 @@
   import { tick } from 'svelte';
   import CalendarPicker from './CalendarPicker.svelte';
   import { linkifyText } from '../../linkify.js';
+  import { formatTaskTimestamp } from '../../todoStore.js';
 
   export let selectedTask = null;
   export let noteDraft = '';
@@ -44,20 +45,7 @@
   }
 
   function completedStartValue(todo) {
-    if (!todo?.completedAt) {
-      return '';
-    }
-
-    if (todo.firstStartedAt) {
-      return toDateTimeLocalValue(todo.firstStartedAt);
-    }
-
-    const completedAt = new Date(todo.completedAt);
-    if (Number.isNaN(completedAt.getTime())) {
-      return '';
-    }
-
-    return toDateTimeLocalValue(new Date(completedAt.getTime() - Number(todo.trackedSeconds ?? 0) * 1000));
+    return todo?.completedAt && todo.firstStartedAt ? toDateTimeLocalValue(todo.firstStartedAt) : '';
   }
 
   function completedEndValue(todo) {
@@ -310,6 +298,24 @@
       </div>
     {/if}
     <p class="detail-meta" id="detail-meta">{detailMeta(selectedTask)}</p>
+    {#if !selectedTask.completedAt}
+      <dl class="detail-timeline" aria-label="Task start and end time">
+        <div>
+          <dt>Started</dt>
+          <dd>
+            {#if selectedTask.firstStartedAt}
+              <time datetime={selectedTask.firstStartedAt}>{formatTaskTimestamp(selectedTask.firstStartedAt)}</time>
+            {:else}
+              Not recorded
+            {/if}
+          </dd>
+        </div>
+        <div>
+          <dt>Ended</dt>
+          <dd>{selectedTask.activeStartedAt ? 'In progress' : 'Not finished'}</dd>
+        </div>
+      </dl>
+    {/if}
     <label class="detail-due-date">
       <span>Due date</span>
       <input
@@ -333,6 +339,9 @@
         </label>
         <label>
           <span>Start time</span>
+          {#if !selectedTask.firstStartedAt}
+            <small class="detail-start-missing">Not recorded</small>
+          {/if}
           <CalendarPicker
             mode="datetime"
             triggerClass="detail-start-picker"

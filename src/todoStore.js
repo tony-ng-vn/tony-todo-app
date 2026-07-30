@@ -408,6 +408,7 @@ export function getDaySummary(state, dayKey) {
     sections.get(label).push({
       id: todo.id,
       title: todo.title,
+      startedAt: todo.firstStartedAt ?? null,
       completedAt: todo.completedAt,
       note: todo.note ?? '',
       durationSeconds: normalizedTrackedSeconds(todo),
@@ -461,6 +462,22 @@ export function formatDueDate(dueDate) {
   }
 
   return new Intl.DateTimeFormat([], { month: 'short', day: 'numeric' }).format(date);
+}
+
+export function formatTaskTimestamp(timestamp) {
+  if (!timestamp) {
+    return '';
+  }
+
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) {
+    return '';
+  }
+
+  return new Intl.DateTimeFormat([], {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(date);
 }
 
 export function setTodoProgressive(state, todoId, isProgressive) {

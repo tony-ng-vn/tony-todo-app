@@ -34,6 +34,9 @@ try {
     ...assertExists(desktop, '.theme-toggle', 'theme toggle'),
     ...assertBucketLabels(desktop),
     ...assertIncludes(desktop.summaryDurations, '45m', 'summary duration text'),
+    ...assertStartsWith(desktop.summaryTiming, 'Start ', 'summary start time'),
+    ...assertIncludes(desktop.summaryTiming, 'End', 'summary end time'),
+    ...assertStartsWith(desktop.taskTiming, 'Started ', 'running task start label'),
     ...assertDraftInsertionCue(draftCue),
     ...assertWorkspaceNavigation(navigation),
   ];
@@ -49,6 +52,11 @@ try {
 async function inspectWorkspaceNavigation(viewport) {
   const page = await browser.newPage({ viewport });
   await page.addInitScript(() => {
+    if (sessionStorage.getItem('ui-smoke-navigation-seeded')) {
+      return;
+    }
+
+    sessionStorage.setItem('ui-smoke-navigation-seeded', '1');
     localStorage.setItem('done-log-client-id', 'ui-smoke-navigation');
     localStorage.setItem('done-log-state', JSON.stringify({ todos: [] }));
     localStorage.setItem('done-log-view', 'flow');
@@ -274,6 +282,10 @@ async function inspectViewport(viewport, isMobile) {
       },
       summaryBuckets: Array.from(document.querySelectorAll('.summary-section h3')).map((element) => element.textContent.trim()),
       summaryDurations: Array.from(document.querySelectorAll('.summary-duration')).map((element) => element.textContent.trim()),
+      summaryTiming: Array.from(
+        document.querySelectorAll('.summary-time-label, .summary-timing'),
+      ).map((element) => element.textContent.trim()),
+      taskTiming: Array.from(document.querySelectorAll('.task-timing')).map((element) => element.textContent.trim()),
       taskSections: Array.from(document.querySelectorAll('.task-list-section')).map((section) => ({
         heading: section.querySelector('h2')?.textContent.trim(),
         count: section.querySelector('.section-count')?.textContent.trim(),
@@ -365,11 +377,11 @@ async function exerciseSummaryTimeEditing(page) {
   }));
   await page.keyboard.press('Escape');
 
-  await page.locator('[data-summary-id="ui-smoke-morning-task"] time').dblclick();
+  await page.locator('[data-summary-id="ui-smoke-morning-task"] .summary-time-button time').dblclick();
   await page.fill('#summary-time-edit-ui-smoke-morning-task', '05:00');
   await page.locator('#summary-time-edit-ui-smoke-morning-task').press('Enter');
 
-  return page.evaluate((summaryCalendarPresentation) => {
+  const result = await page.evaluate((summaryCalendarPresentation) => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     const todo = state.todos.find((item) => item.id === 'ui-smoke-morning-task');
     const completedAt = new Date(todo.completedAt);
@@ -377,11 +389,23 @@ async function exerciseSummaryTimeEditing(page) {
     return {
       completedHour: completedAt.getHours(),
       completedMinute: completedAt.getMinutes(),
-      displayedTime: document.querySelector('[data-summary-id="ui-smoke-morning-task"] time')?.textContent.trim(),
+      displayedTime: document.querySelector(
+        '[data-summary-id="ui-smoke-morning-task"] .summary-time-button time',
+      )?.textContent.trim(),
       inputStillOpen: Boolean(document.querySelector('#summary-time-edit-ui-smoke-morning-task')),
       summaryCalendarPresentation,
     };
   }, summaryCalendarPresentation);
+
+  await page.click('[data-summary-id="ui-smoke-morning-task"] .open-task-button');
+  await page.waitForSelector('.detail-start-picker');
+  const missingStart = await page.evaluate(() => ({
+    pickerText: document.querySelector('.detail-start-picker')?.textContent.trim(),
+    disclosure: document.querySelector('.detail-start-missing')?.textContent.trim(),
+  }));
+  await page.click('#detail-close');
+
+  return { ...result, missingStart };
 }
 
 async function exerciseParallelAndReopen(page) {
@@ -753,6 +777,12 @@ function assertIncludes(values, expected, label) {
   return values.includes(expected) ? [] : [`${label} does not include ${expected}; saw ${values.join(', ')}`];
 }
 
+function assertStartsWith(values, expected, label) {
+  return values.some((value) => value.startsWith(expected))
+    ? []
+    : [`${label} does not start with ${expected}; saw ${values.join(', ')}`];
+}
+
 function assertGlassSurface(result, selector, label) {
   const glass = result.glass[selector];
   return glass.backdropFilter.includes('blur') && glass.borderRadius !== '0px'
@@ -814,6 +844,13 @@ function assertDetailEditing(result) {
     summaryTimeEdit.summaryCalendarPresentation?.dayButtonCount < 28
   ) {
     failures.push(`summary date picker is not using the custom calendar: ${JSON.stringify(summaryTimeEdit.summaryCalendarPresentation)}`);
+  }
+
+  if (
+    summaryTimeEdit.missingStart?.pickerText !== 'Select time' ||
+    summaryTimeEdit.missingStart?.disclosure !== 'Not recorded'
+  ) {
+    failures.push(`missing start time is not disclosed clearly: ${JSON.stringify(summaryTimeEdit)}`);
   }
 
   if (editChecks.storedNote !== '- [x] Follow up with USCIS' || editChecks.storedTitle !== 'Smoke renamed task') {

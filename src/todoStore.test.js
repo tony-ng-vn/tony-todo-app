@@ -159,6 +159,7 @@ describe('todo day summary', () => {
         {
           id: todoId,
           title: 'Review prototype',
+          startedAt: null,
           completedAt: doneAt.toISOString(),
           note: '',
           durationSeconds: 0,
@@ -296,6 +297,8 @@ describe('todo day summary', () => {
       trackedSeconds: 150 * 60,
     });
     expect(getDaySummary(state, '2026-06-10').flatMap((section) => section.items)[0]).toMatchObject({
+      startedAt: '2026-06-10T13:15:00.000Z',
+      completedAt: '2026-06-10T15:45:00.000Z',
       durationSeconds: 150 * 60,
       durationLabel: '2h 30m',
     });
@@ -399,6 +402,8 @@ describe('todo day summary', () => {
     state = logProgressSession(state, parentId, sessionDoneAt);
     const sessionId = getProgressSessions(state, parentId)[0].id;
 
+    expect(getDaySummary(state, '2026-06-09').flatMap((section) => section.items)[0].startedAt).toBeNull();
+
     state = reopenTodo(state, sessionId);
 
     expect(state.todos.find((todo) => todo.id === sessionId).completedAt).toBe(sessionDoneAt.toISOString());
@@ -471,6 +476,8 @@ describe('todo day summary', () => {
     state = updateTodoProgress(state, parentId, 'pages 41-52');
     const doneAt = new Date('2026-06-09T20:28:00');
     state = startTodoTimer(state, parentId, new Date('2026-06-09T20:00:00'));
+    state = pauseTodoTimer(state, parentId, new Date('2026-06-09T20:10:00'));
+    state = startTodoTimer(state, parentId, new Date('2026-06-09T20:15:00'));
     state = logProgressSession(state, parentId, doneAt);
 
     const parent = state.todos.find((todo) => todo.id === parentId);
@@ -490,8 +497,9 @@ describe('todo day summary', () => {
       parentTaskId: parentId,
       isProgressSession: true,
       progressLabel: 'pages 41-52',
+      firstStartedAt: new Date('2026-06-09T20:00:00').toISOString(),
       completedAt: doneAt.toISOString(),
-      trackedSeconds: 28 * 60,
+      trackedSeconds: 23 * 60,
     });
     expect(getPendingTodos(state).map((todo) => todo.id)).toContain(parentId);
     const summaryItem = getDaySummary(state, '2026-06-09')
@@ -499,8 +507,9 @@ describe('todo day summary', () => {
       .find((item) => item.parentTaskId === parentId);
     expect(summaryItem).toMatchObject({
       title: 'Read Atomic Habits',
+      startedAt: new Date('2026-06-09T20:00:00').toISOString(),
       progressLabel: 'pages 41-52',
-      durationLabel: '28m',
+      durationLabel: '23m',
     });
   });
 
