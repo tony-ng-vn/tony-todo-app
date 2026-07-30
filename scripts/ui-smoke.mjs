@@ -511,18 +511,15 @@ async function exerciseDetailEditing(page) {
   await page.locator('#detail-title-input').blur();
   await page.waitForFunction(() => document.querySelector('.detail-title-display')?.textContent.trim() === 'Smoke renamed task');
   await page.fill('#detail-note', 'Smoke note');
-  const noteBeforeSave = await page.evaluate(() => {
+  const noteAfterInput = await page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     const todo = state.todos.find((item) => item.id === 'ui-smoke-local-task');
     return {
       storedNote: todo?.note,
       saveVisible: Boolean(document.querySelector('.detail-save-note')),
-      headerSaveVisible: Boolean(document.querySelector('.detail-window-actions .detail-save-note')),
-      headerSaveText: document.querySelector('.detail-window-actions .detail-save-note')?.textContent.trim(),
-      saveDisabled: document.querySelector('.detail-save-note')?.disabled ?? null,
+      statusText: document.querySelector('.detail-note-row span')?.textContent.trim(),
     };
   });
-  await page.click('.detail-save-note');
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     return state.todos.find((item) => item.id === 'ui-smoke-local-task')?.note === 'Smoke note';
@@ -530,7 +527,6 @@ async function exerciseDetailEditing(page) {
   await page.fill('#detail-note', '/todo Follow up with USCIS');
   await page.waitForFunction(() => document.querySelector('#detail-note')?.value === '- [ ] Follow up with USCIS');
   const slashTodoValue = await page.locator('#detail-note').inputValue();
-  await page.click('.detail-save-note');
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     return state.todos.find((item) => item.id === 'ui-smoke-local-task')?.note === '- [ ] Follow up with USCIS';
@@ -676,7 +672,7 @@ async function exerciseDetailEditing(page) {
     return !state.todos.some((item) => item.id === 'ui-smoke-evening-task');
   });
 
-  const editChecks = await page.evaluate(({ taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteBeforeSave, slashTodoValue, clickedTodoValue, tabEditCheck, progressEditorCheck }) => {
+  const editChecks = await page.evaluate(({ taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteAfterInput, slashTodoValue, clickedTodoValue, tabEditCheck, progressEditorCheck }) => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     const todo = state.todos.find((item) => item.id === 'ui-smoke-local-task');
     const session = state.todos.find((item) => item.parentTaskId === 'ui-smoke-local-task');
@@ -696,7 +692,7 @@ async function exerciseDetailEditing(page) {
       titleDisplayAfterEdit: document.querySelector('.detail-title-display')?.textContent.trim(),
       taskDetailScroll,
       deleteButtonUpfront,
-      noteBeforeSave,
+      noteAfterInput,
       slashTodoValue,
       clickedTodoValue,
       tabEditCheck,
@@ -709,7 +705,7 @@ async function exerciseDetailEditing(page) {
       detailUsesCustomCalendar,
       doneDateMoveCheck,
     };
-  }, { taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteBeforeSave, slashTodoValue, clickedTodoValue, tabEditCheck, progressEditorCheck });
+  }, { taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteAfterInput, slashTodoValue, clickedTodoValue, tabEditCheck, progressEditorCheck });
 
   return { ...editChecks, initialTitlePresentation, detailLayout, outsideClickKeepsDetailOpen };
 }
@@ -895,7 +891,7 @@ function assertDetailEditing(result) {
     failures.push(`missing start time is not disclosed clearly: ${JSON.stringify(summaryTimeEdit)}`);
   }
 
-  if (editChecks.storedNote !== '- [x] Follow up with USCIS' || editChecks.storedTitle !== 'Smoke renamed task') {
+  if (editChecks.storedNote !== '\t- [x] Follow up with USCIS' || editChecks.storedTitle !== 'Smoke renamed task') {
     failures.push(`detail editing failed: ${JSON.stringify(editChecks)}`);
   }
 
@@ -926,13 +922,11 @@ function assertDetailEditing(result) {
   }
 
   if (
-    editChecks.noteBeforeSave?.storedNote === 'Smoke note' ||
-    !editChecks.noteBeforeSave?.saveVisible ||
-    !editChecks.noteBeforeSave?.headerSaveVisible ||
-    editChecks.noteBeforeSave?.headerSaveText !== 'Save' ||
-    editChecks.noteBeforeSave?.saveDisabled
+    editChecks.noteAfterInput?.storedNote !== 'Smoke note' ||
+    editChecks.noteAfterInput?.saveVisible ||
+    editChecks.noteAfterInput?.statusText !== 'Saving details...'
   ) {
-    failures.push(`detail notes did not wait for explicit save: ${JSON.stringify(editChecks.noteBeforeSave)}`);
+    failures.push(`detail notes did not autosave on input: ${JSON.stringify(editChecks.noteAfterInput)}`);
   }
 
   if (editChecks.initialTitlePresentation?.titleInputInitiallyVisible) {

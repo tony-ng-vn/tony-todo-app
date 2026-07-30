@@ -6,12 +6,11 @@
 
   export let selectedTask = null;
   export let noteDraft = '';
+  export let noteSaveStatus = 'saved';
   export let selectedTaskSessions = [];
   export let selectedTaskTimeSegments = [];
   export let onClose;
   export let onNoteInput;
-  export let onNoteSave;
-  export let onNoteTodoToggle;
   export let onDetailTitleCommit;
   export let onProgressiveChange;
   export let onProgressInput;
@@ -148,7 +147,7 @@
     const lines = noteDraft.split('\n');
     const marker = item.done ? ' ' : 'x';
     lines[item.lineIndex] = `- [${marker}] ${item.label}`;
-    onNoteTodoToggle(selectedTask.id, lines.join('\n'));
+    onNoteInput(lines.join('\n'));
   }
 
   function expandTodoCommand(value, cursor) {
@@ -202,14 +201,6 @@
     </div>
     <div class="detail-window-actions">
       <button
-          type="button"
-          class="detail-save-note"
-          disabled={noteDraft === (selectedTask.note ?? '')}
-          on:click={() => onNoteSave(selectedTask.id, noteDraft)}
-        >
-          Save
-        </button>
-        <button
           type="button"
           class="detail-delete-task"
           aria-label={`Delete ${selectedTask.title}`}
@@ -272,7 +263,13 @@
     {/if}
     <div class="detail-note-row">
       <label class="detail-note-label" for="detail-note">Notes</label>
-      <span>{noteDraft === (selectedTask.note ?? '') ? 'Details saved' : 'Unsaved details'}</span>
+      <span aria-live="polite">
+        {noteSaveStatus === 'saving'
+          ? 'Saving details...'
+          : noteSaveStatus === 'error'
+            ? 'Saved locally - sync failed'
+            : 'Details saved automatically'}
+      </span>
     </div>
     <textarea
       id="detail-note"

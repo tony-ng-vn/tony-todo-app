@@ -170,12 +170,22 @@ try {
   await page.locator('[data-menubar-details="menubar-open"] .menubar-note-input').pressSequentially(
     'note',
   );
-  await page.click('[data-menubar-details="menubar-open"] .menubar-save-note');
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     const todo = state.todos.find((item) => item.id === 'menubar-open');
     return todo?.title === 'Renamed in menu bar' && todo?.note === 'Compact\tnote';
   });
+  await page.waitForFunction(
+    () =>
+      document.querySelector('[data-menubar-details="menubar-open"] .menubar-note-save-status')
+        ?.textContent.trim() === 'Note saved automatically',
+  );
+  const noteAutosavePresentation = await page.evaluate(() => ({
+    saveButtonVisible: Boolean(document.querySelector('.menubar-save-note')),
+    status: document
+      .querySelector('[data-menubar-details="menubar-open"] .menubar-note-save-status')
+      ?.textContent.trim(),
+  }));
 
   await page.click('[data-menubar-id="menubar-progressive"] .menubar-details-toggle');
   await page.fill('[data-menubar-details="menubar-progressive"] .menubar-progress-input', 'Chapter');
@@ -279,6 +289,8 @@ try {
     final.progress !== 'Chapter\t3' ||
     !final.dueDate?.startsWith('2026-08-01') ||
     !final.progressSession ||
+    noteAutosavePresentation.saveButtonVisible ||
+    noteAutosavePresentation.status !== 'Note saved automatically' ||
     !final.progressiveParentOpen ||
     !final.deleted ||
     final.nativeDateTimeInputs !== 0

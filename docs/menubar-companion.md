@@ -71,7 +71,7 @@ For the manual native check:
 2. Click the Done Log tray icon and confirm the popover appears below it.
 3. Add a task and confirm it appears under Open.
 4. Start and pause the task.
-5. Expand the task, edit its fields, and save the note.
+5. Expand the task, edit its fields, and confirm the note saves automatically.
 6. Click outside the popover and confirm it hides.
 7. Reopen it and confirm the task state remains.
 8. Use Open full app and confirm the root app opens in the default browser.

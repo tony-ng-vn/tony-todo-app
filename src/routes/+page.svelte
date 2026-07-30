@@ -62,6 +62,16 @@
     updateRemoteTodoTitle,
   } from '../todoRemote.js';
   import { loadLocalState, reconcileRemoteState, saveLocalState } from '../todoPersistence.js';
+  import {
+    createDebouncedSaveQueue,
+    getPendingNoteEdits,
+    markNoteEditSynced,
+    preservePendingNotesDuringLoad,
+    readNoteEdit,
+    recordNoteEdit,
+    snapshotNoteEdits,
+    withNoteSaveLock,
+  } from '../noteAutosave.js';
   import { normalizeViewMode } from '../viewModes.js';
   import {
     acceptLoop,
@@ -101,6 +111,7 @@
   let selectedTaskId = null;
   let editingTaskId = null;
   let noteDraft = '';
+  let noteSaveStatuses = {};
   let newlyAddedTodoId = null;
   let liveTimer = null;
   let dayRolloverTimer = null;
@@ -128,6 +139,7 @@
   let checkingForLoops = false;
   let checkStatus = '';
   let currentDayKey = formatDayKey(new Date());
+  const noteAutosave = createDebouncedSaveQueue(saveNoteToRemote);
 
   $: pendingTodos = getPendingTodos(state);
   $: pendingViewTodos = withLatestProgressSession(pendingTodos);
@@ -145,6 +157,7 @@
     0,
   );
   $: selectedTask = state.todos.find((todo) => todo.id === selectedTaskId);
+  $: selectedNoteSaveStatus = noteSaveStatuses[selectedTaskId] ?? 'saved';
   $: selectedTaskSessions = selectedTaskId ? getProgressSessions(state, selectedTaskId) : [];
   $: selectedTaskTimeSegments = selectedTaskId ? getTaskTimeSegments(state, selectedTaskId) : [];
 
@@ -152,6 +165,7 @@
     useRemote = isInsForgeConfigured && !new URLSearchParams(window.location.search).has('local');
     syncMessage = useRemote ? 'Connecting' : 'Local only';
     state = loadLocalState();
+    queuePendingNoteSaves();
     themeMode = loadThemeMode();
     viewMode = loadViewMode();
     applyThemeMode(themeMode);
@@ -167,6 +181,7 @@
     window.clearTimeout(progressSaveTimer);
     window.clearTimeout(titleSaveTimer);
     window.clearTimeout(completionCueTimer);
+    void noteAutosave.flushAll().catch(() => {});
     window.removeEventListener('focus', syncSelectedDayToToday);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
   });
@@ -544,25 +559,78 @@
     }
 
     noteDraft = nextNote;
+    state = updateTodoNote(state, selectedTaskId, nextNote);
+    saveLocalState(state);
+    const edit = recordNoteEdit(selectedTaskId, nextNote);
+    setNoteSaveStatus(selectedTaskId, 'saving');
+    noteAutosave.schedule(selectedTaskId, edit);
   }
 
-  async function handleNoteSave(todoId, nextNote) {
-    const before = findTodo(todoId);
-    state = updateTodoNote(state, todoId, nextNote);
-    const after = findTodo(todoId);
-    saveLocalState(state);
-
-    if (!before || !after || before.note === after.note) {
-      renderRemoteStatus();
+  async function saveNoteToRemote(todoId, edit) {
+    if (!useRemote || !authUser) {
+      setNoteSaveStatus(todoId, 'saved');
       return;
     }
 
-    await syncRemoteChange('Saving note', () => persistTodoNote(after));
+    await withNoteSaveLock(todoId, async () => {
+      const currentEdit = readNoteEdit(todoId);
+      if (!currentEdit || currentEdit.revision !== edit.revision) {
+        if (currentEdit) {
+          state = updateTodoNote(state, todoId, currentEdit.note);
+          if (selectedTaskId === todoId) {
+            noteDraft = currentEdit.note;
+          }
+          setNoteSaveStatus(
+            todoId,
+            currentEdit.syncedRevision === currentEdit.revision ? 'saved' : 'saving',
+          );
+        }
+        return;
+      }
+
+      const todo = findTodo(todoId);
+      if (!todo) {
+        return;
+      }
+
+      const saved = await syncRemoteChange('Saving note', () =>
+        persistTodoNote({ ...todo, note: edit.note }),
+      );
+      if (saved) {
+        markNoteEditSynced(todoId, edit.revision);
+      }
+      if (readNoteEdit(todoId)?.revision === edit.revision) {
+        setNoteSaveStatus(todoId, saved ? 'saved' : 'error');
+      }
+      if (!saved) {
+        throw new Error('Note sync failed');
+      }
+    });
   }
 
-  async function handleNoteTodoToggle(todoId, nextNote) {
-    noteDraft = nextNote;
-    await handleNoteSave(todoId, nextNote);
+  function queuePendingNoteSaves() {
+    let changed = false;
+
+    for (const { todo, edit } of getPendingNoteEdits(state.todos)) {
+      if (todo.note !== edit.note) {
+        state = updateTodoNote(state, todo.id, edit.note);
+        if (selectedTaskId === todo.id) {
+          noteDraft = edit.note;
+        }
+        changed = true;
+      }
+
+      setNoteSaveStatus(todo.id, 'saving');
+      noteAutosave.schedule(todo.id, edit);
+    }
+
+    if (changed) {
+      saveLocalState(state);
+    }
+  }
+
+  function setNoteSaveStatus(todoId, status) {
+    noteSaveStatuses = { ...noteSaveStatuses, [todoId]: status };
   }
 
   async function handleProgressiveChange(todoId, isProgressive) {
@@ -823,6 +891,7 @@
   }
 
   async function handleSignOut() {
+    await noteAutosave.flushAll().catch(() => {});
     await signOut(insforge);
     authUser = null;
     state = createInitialState();
@@ -835,12 +904,23 @@
       return;
     }
 
+    queuePendingNoteSaves();
+    try {
+      await noteAutosave.flushAll();
+    } catch {
+      return;
+    }
     syncMessage = 'Loading cloud';
+    const noteEditsAtLoad = snapshotNoteEdits(state.todos.map((todo) => todo.id));
 
     try {
       const remoteTodos = await loadRemoteTodos(insforge, authUser.id);
-
-      state = reconcileRemoteState(state, remoteTodos);
+      const todoIds = new Set([...state.todos, ...remoteTodos].map((todo) => todo.id));
+      state = preservePendingNotesDuringLoad(
+        reconcileRemoteState(state, remoteTodos),
+        noteEditsAtLoad,
+        snapshotNoteEdits([...todoIds]),
+      );
       saveLocalState(state);
       renderRemoteStatus(remoteTodos.length);
     } catch (error) {
@@ -980,8 +1060,10 @@
     try {
       await syncAction();
       renderRemoteStatus();
+      return true;
     } catch (error) {
       showOfflineCache(error);
+      return false;
     }
   }
 
@@ -1258,10 +1340,9 @@
     {selectedTaskSessions}
     {selectedTaskTimeSegments}
     bind:noteDraft
+    noteSaveStatus={selectedNoteSaveStatus}
     onClose={closeTask}
     onNoteInput={handleNoteInput}
-    onNoteSave={handleNoteSave}
-    onNoteTodoToggle={handleNoteTodoToggle}
     onDetailTitleCommit={handleDetailTitleCommit}
     onProgressiveChange={handleProgressiveChange}
     onProgressInput={handleProgressInput}
