@@ -298,8 +298,10 @@ async function exerciseSummaryTimeEditing(page) {
   await page.waitForSelector('.calendar-popover');
   const summaryCalendarPresentation = await page.evaluate(() => ({
     calendarVisible: Boolean(document.querySelector('.calendar-popover')),
-    nativeDateInputVisible: Boolean(document.querySelector('input[type="date"]')),
-    nativeTimeInputVisible: Boolean(document.querySelector('input[type="time"], input[type="datetime-local"]')),
+    nativeDateInputVisible: Boolean(document.querySelector('.summary-panel input[type="date"]')),
+    nativeTimeInputVisible: Boolean(
+      document.querySelector('.summary-panel input[type="time"], .summary-panel input[type="datetime-local"]'),
+    ),
     monthHeading: document.querySelector('.calendar-month-title')?.textContent.trim(),
     dayButtonCount: document.querySelectorAll('.calendar-day').length,
   }));
