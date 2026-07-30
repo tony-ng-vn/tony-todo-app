@@ -527,6 +527,22 @@ h2 {
   box-shadow: var(--shadow-raised);
 }
 
+.settings-tab-group {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: auto;
+  padding-left: 10px;
+}
+
+.settings-tab-group::before {
+  width: 1px;
+  height: 18px;
+  margin-right: 10px;
+  background: var(--border);
+  content: '';
+}
+
 .board-panel {
   display: flex;
   flex-direction: column;

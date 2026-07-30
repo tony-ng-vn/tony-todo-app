@@ -1,5 +1,6 @@
 <script>
   import { formatLoopAge } from '../../loopFormat.js';
+  import WorkspaceTabs from './WorkspaceTabs.svelte';
 
   export let loops = [];
   export let now = new Date();
@@ -34,19 +35,7 @@
       <h2 id="waiting-heading">Waiting</h2>
       <span class="panel-count">{loops.length} owned by someone else</span>
     </div>
-    <div class="view-toggle" role="group" aria-label="Workspace view">
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('flow')}>Tasks</button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('board')}>Board</button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('calendar')}>Calendar</button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('inbox')}>
-        Inbox{inboxCount ? ` (${inboxCount})` : ''}
-      </button>
-      <button type="button" class="view-toggle-button is-active" aria-current="page">Waiting</button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('history')}>History</button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('meetings')}>Meetings</button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('profile')}>Profile</button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('settings')}>Settings</button>
-    </div>
+    <WorkspaceTabs currentView="waiting" {inboxCount} waitingCount={loops.length} {onViewChange} />
   </div>
   <p class="panel-note">Work you're not blocked on, but should know is aging.</p>
 

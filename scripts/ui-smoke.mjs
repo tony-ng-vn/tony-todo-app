@@ -9,6 +9,7 @@ try {
   const mobile = await inspectViewport({ width: 390, height: 844 }, true);
   const desktop = await inspectViewport({ width: 1366, height: 900 }, false);
   const draftCue = await inspectDraftInsertionCue({ width: 1366, height: 900 });
+  const navigation = await inspectWorkspaceNavigation({ width: 1366, height: 900 });
   const failures = [
     ...assertNoOverflow(mobile),
     ...assertNoOverflow(desktop),
@@ -37,6 +38,7 @@ try {
     ...assertIncludes(desktop.summaryTiming, 'End', 'summary end time'),
     ...assertStartsWith(desktop.taskTiming, 'Started ', 'running task start label'),
     ...assertDraftInsertionCue(draftCue),
+    ...assertWorkspaceNavigation(navigation),
   ];
 
   if (failures.length) {
@@ -45,6 +47,62 @@ try {
   }
 } finally {
   await browser.close();
+}
+
+async function inspectWorkspaceNavigation(viewport) {
+  const page = await browser.newPage({ viewport });
+  await page.addInitScript(() => {
+    localStorage.setItem('done-log-client-id', 'ui-smoke-navigation');
+    localStorage.setItem('done-log-state', JSON.stringify({ todos: [] }));
+    localStorage.setItem('done-log-view', 'flow');
+  });
+  await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
+
+  const initialNavigation = await page.evaluate(() => {
+    const tabs = Array.from(document.querySelectorAll('.view-toggle-button'));
+    const settingsTab = tabs.find((tab) => tab.textContent.trim() === 'Settings');
+    const settingsGroup = settingsTab?.closest('.settings-tab-group');
+    const separatorStyle = settingsGroup ? getComputedStyle(settingsGroup, '::before') : null;
+    const separatorColor = separatorStyle?.backgroundColor ?? 'transparent';
+    const alphaMatch = separatorColor.match(/rgba\([^,]+,[^,]+,[^,]+,\s*([0-9.]+)\)/);
+
+    return {
+      labels: tabs.map((tab) => tab.textContent.trim()),
+      separatorWidth: Number.parseFloat(separatorStyle?.width ?? '0'),
+      separatorAlpha: alphaMatch ? Number.parseFloat(alphaMatch[1]) : separatorColor === 'transparent' ? 0 : 1,
+    };
+  });
+
+  await page.getByRole('button', { name: 'Settings', exact: true }).click();
+  const clickedSettings = await page.evaluate(() => ({
+    heading: document.querySelector('#settings-heading')?.textContent.trim() ?? '',
+    settingsIsActive:
+      document.querySelector('.settings-tab-group .view-toggle-button')?.getAttribute('aria-current') === 'page',
+  }));
+
+  await page.evaluate(() => localStorage.setItem('done-log-view', 'profile'));
+  await page.reload({ waitUntil: 'networkidle' });
+  const migratedHeading = await page.locator('#settings-heading').textContent();
+
+  await page.close();
+  return { ...initialNavigation, ...clickedSettings, migratedHeading: migratedHeading?.trim() ?? '' };
+}
+
+function assertWorkspaceNavigation(navigation) {
+  const failures = [];
+  if (navigation.labels.includes('Profile')) {
+    failures.push('Workspace navigation still includes the duplicate Profile tab');
+  }
+  if (navigation.heading !== 'Settings' || !navigation.settingsIsActive) {
+    failures.push('Clicking the in-app Settings tab did not open Settings');
+  }
+  if (navigation.migratedHeading !== 'Settings') {
+    failures.push('A saved Profile view did not migrate to Settings');
+  }
+  if (navigation.separatorWidth < 1 || navigation.separatorAlpha <= 0) {
+    failures.push('Settings does not have a visible separator from workspace tabs');
+  }
+  return failures;
 }
 
 async function inspectDraftInsertionCue(viewport) {
