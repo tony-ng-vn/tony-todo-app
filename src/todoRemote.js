@@ -95,6 +95,23 @@ export async function updateRemoteTodoCompletion(client, userId, todo) {
   await updateRemoteTodo(client, userId, todo, completionFields(todo));
 }
 
+export async function logRemoteProgressSession(client, parent, session) {
+  const { error } = await client.database.rpc('log_progress_session', {
+    p_parent_id: parent.id,
+    p_session_id: session.id,
+    p_title: session.title,
+    p_created_at: session.createdAt,
+    p_completed_at: session.completedAt,
+    p_note: session.note ?? '',
+    p_first_started_at: session.firstStartedAt ?? null,
+    p_tracked_seconds: normalizeTrackedSeconds(session.trackedSeconds),
+    p_time_segments: normalizeTimeSegments(session.timeSegments),
+    p_progress_label: session.progressLabel ?? '',
+  });
+
+  throwIfError(error);
+}
+
 export async function deleteRemoteTodo(client, userId, todoId) {
   const { error } = await client.database.from('todos').delete().eq('id', todoId).eq('user_id', userId);
 
@@ -149,5 +166,10 @@ function normalizeTrackedSeconds(value) {
 }
 
 function normalizeTimeSegments(value) {
-  return Array.isArray(value) ? value : [];
+  return Array.isArray(value)
+    ? value.map((segment) => ({
+        startedAt: segment.startedAt,
+        endedAt: segment.endedAt,
+      }))
+    : [];
 }

@@ -8,6 +8,7 @@ import {
   matchesDueFilter,
   setTodoDueDate,
   getBoardColumns,
+  getBoardColumnId,
   getCalendarMonth,
   getDaySummary,
   getMillisecondsUntilNextDay,
@@ -21,6 +22,7 @@ import {
   moveCompletedTodoToSummaryBucket,
   moveTodoToBoardColumn,
   pauseTodoTimer,
+  partitionPendingTodos,
   reorderCompletedTodosForDay,
   reopenTodo,
   setTodoProgressive,
@@ -305,6 +307,47 @@ describe('todo day summary', () => {
     });
   });
 
+  it('preserves detailed segments when editing aggregate completed timing', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Interrupted work', new Date('2026-06-10T08:00:00.000Z'));
+    const todoId = state.todos[0].id;
+    state = startTodoTimer(state, todoId, new Date('2026-06-10T09:00:00.000Z'));
+    state = pauseTodoTimer(state, todoId, new Date('2026-06-10T09:30:00.000Z'));
+    state = startTodoTimer(state, todoId, new Date('2026-06-10T10:00:00.000Z'));
+    state = completeTodo(state, todoId, new Date('2026-06-10T10:45:00.000Z'));
+    state = updateCompletedTodoTiming(
+      state,
+      todoId,
+      new Date('2026-06-10T08:30:00.000Z'),
+      new Date('2026-06-10T11:00:00.000Z'),
+    );
+
+    expect(state.todos[0]).toMatchObject({
+      firstStartedAt: '2026-06-10T08:30:00.000Z',
+      completedAt: '2026-06-10T11:00:00.000Z',
+      trackedSeconds: 2 * 60 * 60,
+      timeSegments: [
+        {
+          startedAt: '2026-06-10T08:30:00.000Z',
+          endedAt: '2026-06-10T09:30:00.000Z',
+        },
+        {
+          startedAt: '2026-06-10T10:00:00.000Z',
+          endedAt: '2026-06-10T11:00:00.000Z',
+        },
+      ],
+    });
+
+    const adjustedTodo = state.todos[0];
+    state = updateCompletedTodoTiming(
+      state,
+      todoId,
+      new Date('2026-06-10T08:30:00.000Z'),
+      new Date('2026-06-10T09:45:00.000Z'),
+    );
+    expect(state.todos[0]).toEqual(adjustedTodo);
+  });
+
   it('deletes a todo and its progress sessions', () => {
     let state = createInitialState();
     state = addTodo(state, 'Read chapter', new Date('2026-06-09T08:00:00'));
@@ -428,7 +471,6 @@ describe('todo day summary', () => {
         {
           startedAt: '2026-06-08T08:00:00.000Z',
           endedAt: '2026-06-08T08:02:05.000Z',
-          durationSeconds: 125,
         },
       ],
     });
@@ -454,12 +496,29 @@ describe('todo day summary', () => {
         {
           startedAt: '2026-06-08T08:00:00.000Z',
           endedAt: '2026-06-08T08:05:00.000Z',
-          durationSeconds: 5 * 60,
         },
         {
           startedAt: '2026-06-08T08:20:00.000Z',
           endedAt: '2026-06-08T08:27:30.000Z',
-          durationSeconds: 7 * 60 + 30,
+        },
+      ],
+    });
+  });
+
+  it('records the full duration of a segment longer than 24 hours', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Long task', new Date('2026-06-08T08:00:00.000Z'));
+    const todoId = state.todos[0].id;
+    state = startTodoTimer(state, todoId, new Date('2026-06-08T08:00:00.000Z'));
+
+    state = pauseTodoTimer(state, todoId, new Date('2026-06-10T08:00:00.000Z'));
+
+    expect(state.todos[0]).toMatchObject({
+      trackedSeconds: 48 * 60 * 60,
+      timeSegments: [
+        {
+          startedAt: '2026-06-08T08:00:00.000Z',
+          endedAt: '2026-06-10T08:00:00.000Z',
         },
       ],
     });
@@ -488,7 +547,12 @@ describe('todo day summary', () => {
     expect(paused.todos[0]).toMatchObject({
       activeStartedAt: null,
       trackedSeconds: 5 * 60,
-      timeSegments: [existingSegment],
+      timeSegments: [
+        {
+          startedAt: existingSegment.startedAt,
+          endedAt: existingSegment.endedAt,
+        },
+      ],
     });
   });
 
@@ -508,7 +572,6 @@ describe('todo day summary', () => {
         {
           startedAt: '2026-06-08T08:10:00.000Z',
           endedAt: '2026-06-08T08:40:10.000Z',
-          durationSeconds: 1810,
         },
       ],
     });
@@ -558,12 +621,10 @@ describe('todo day summary', () => {
         {
           startedAt: new Date('2026-06-09T20:00:00').toISOString(),
           endedAt: new Date('2026-06-09T20:10:00').toISOString(),
-          durationSeconds: 10 * 60,
         },
         {
           startedAt: new Date('2026-06-09T20:15:00').toISOString(),
           endedAt: doneAt.toISOString(),
-          durationSeconds: 13 * 60,
         },
       ],
     });
@@ -577,7 +638,10 @@ describe('todo day summary', () => {
       progressLabel: 'pages 41-52',
       durationLabel: '23m',
     });
-    expect(getTaskTimeSegments(state, parentId)).toEqual(sessions[0].timeSegments);
+    expect(getTaskTimeSegments(state, parentId)).toEqual([
+      { ...sessions[0].timeSegments[0], durationSeconds: 10 * 60 },
+      { ...sessions[0].timeSegments[1], durationSeconds: 13 * 60 },
+    ]);
   });
 
   it('preserves multiline progress indentation while editing', () => {
@@ -603,23 +667,32 @@ describe('todo day summary', () => {
 });
 
 describe('board view columns', () => {
-  it('splits todos into not started, in progress, and done columns', () => {
+  it('splits todos into not started, in progress, paused, and done columns', () => {
     let state = createInitialState();
     state = addTodo(state, 'Backlog task', new Date('2026-06-08T08:00:00'));
     state = addTodo(state, 'Active task', new Date('2026-06-08T08:05:00'));
+    state = addTodo(state, 'Paused task', new Date('2026-06-08T08:07:00'));
     state = addTodo(state, 'Finished task', new Date('2026-06-08T08:10:00'));
-    const [, activeId, finishedId] = state.todos.map((todo) => todo.id);
+    const [, activeId, pausedId, finishedId] = state.todos.map((todo) => todo.id);
 
     state = startTodoTimer(state, activeId, new Date('2026-06-08T09:00:00'));
+    state = startTodoTimer(state, pausedId, new Date('2026-06-08T09:05:00'));
+    state = pauseTodoTimer(state, pausedId, new Date('2026-06-08T09:15:00'));
     state = completeTodo(state, finishedId, new Date('2026-06-08T10:00:00'));
 
     const columns = getBoardColumns(state, { dayKey: '2026-06-08' });
 
-    expect(columns.map((column) => column.id)).toEqual(['not_started', 'in_progress', 'done']);
+    expect(columns.map((column) => column.id)).toEqual(['not_started', 'in_progress', 'paused', 'done']);
     expect(columns[0].items.map((todo) => todo.title)).toEqual(['Backlog task']);
     expect(columns[1].items.map((todo) => todo.title)).toEqual(['Active task']);
-    expect(columns[2].items.map((todo) => todo.title)).toEqual(['Finished task']);
-    expect(columns[2].items[0].durationLabel).toBe('0m');
+    expect(columns[2].items.map((todo) => todo.title)).toEqual(['Paused task']);
+    expect(columns[3].items.map((todo) => todo.title)).toEqual(['Finished task']);
+    expect(columns[3].items[0].durationLabel).toBe('0m');
+    expect(partitionPendingTodos(getPendingTodos(state))).toMatchObject({
+      ready: [expect.objectContaining({ title: 'Backlog task' })],
+      ongoing: [expect.objectContaining({ title: 'Active task' })],
+      paused: [expect.objectContaining({ title: 'Paused task' })],
+    });
   });
 
   it('only shows done tasks for the selected day on the board', () => {
@@ -632,7 +705,7 @@ describe('board view columns', () => {
     state = completeTodo(state, todayId, new Date('2026-06-08T12:00:00'));
 
     const columns = getBoardColumns(state, { dayKey: '2026-06-08' });
-    expect(columns[2].items.map((todo) => todo.title)).toEqual(['Today done']);
+    expect(columns[3].items.map((todo) => todo.title)).toEqual(['Today done']);
   });
 
   it('starts the timer when a task moves from not started to in progress', () => {
@@ -666,20 +739,21 @@ describe('board view columns', () => {
     });
   });
 
-  it('pauses the timer when a task moves back to not started', () => {
+  it('pauses the timer when a task moves to paused', () => {
     let state = createInitialState();
     state = addTodo(state, 'Pause me', new Date('2026-06-08T08:00:00'));
     const todoId = state.todos[0].id;
     state = startTodoTimer(state, todoId, new Date('2026-06-08T09:00:00'));
     const pausedAt = new Date('2026-06-08T09:20:00');
 
-    state = moveTodoToBoardColumn(state, todoId, 'not_started', pausedAt);
+    state = moveTodoToBoardColumn(state, todoId, 'paused', pausedAt);
 
     expect(state.todos[0]).toMatchObject({
       activeStartedAt: null,
       completedAt: null,
       trackedSeconds: 20 * 60,
     });
+    expect(getBoardColumnId(state.todos[0])).toBe('paused');
   });
 
   it('reopens a done task into in progress and starts a fresh timer segment', () => {

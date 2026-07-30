@@ -35,6 +35,7 @@
     moveTodoToBoardColumn,
     getPendingTodos,
     pauseTodoTimer,
+    partitionPendingTodos,
     reopenTodo,
     setTodoDueDate,
     setTodoProgressive,
@@ -52,6 +53,7 @@
     deleteRemoteTodo,
     insertRemoteTodo,
     loadRemoteTodos,
+    logRemoteProgressSession,
     updateRemoteTodoCompletion,
     updateRemoteTodoDueDate,
     updateRemoteTodoNote,
@@ -129,9 +131,10 @@
 
   $: pendingTodos = getPendingTodos(state);
   $: pendingViewTodos = withLatestProgressSession(pendingTodos);
-  $: ongoingTodos = pendingViewTodos.filter((todo) => todo.activeStartedAt);
-  $: pausedTodos = pendingViewTodos.filter((todo) => !todo.activeStartedAt && todo.firstStartedAt);
-  $: openTodos = pendingViewTodos.filter((todo) => !todo.activeStartedAt && !todo.firstStartedAt);
+  $: pendingTodoGroups = partitionPendingTodos(pendingViewTodos);
+  $: ongoingTodos = pendingTodoGroups.ongoing;
+  $: pausedTodos = pendingTodoGroups.paused;
+  $: openTodos = pendingTodoGroups.ready;
   $: openTodoSections = getOpenTodoSections(openTodos, new Date(`${currentDayKey}T00:00:00`));
   $: openCount = openTodos.length;
   $: summary = getDaySummary(state, selectedDay);
@@ -245,11 +248,7 @@
     saveLocalState(state);
 
     if (beforeTodo?.isProgressive) {
-      await syncRemoteChange('Saving session', async () => {
-        await persistTodoTimer(afterTodo);
-        await persistTodoProgress(afterTodo);
-        await persistNewTodo(createdTodo);
-      });
+      await syncRemoteChange('Saving session', () => persistProgressSession(afterTodo, createdTodo));
       return;
     }
 
@@ -450,11 +449,7 @@
     saveLocalState(state);
 
     if (beforeTodo?.isProgressive && columnId === 'done') {
-      await syncRemoteChange('Saving session', async () => {
-        await persistTodoTimer(afterTodo);
-        await persistTodoProgress(afterTodo);
-        await persistNewTodo(createdTodo);
-      });
+      await syncRemoteChange('Saving session', () => persistProgressSession(afterTodo, createdTodo));
       return;
     }
 
@@ -1023,6 +1018,11 @@
   async function persistTodoTimer(todo) {
     if (!useRemote || !authUser || !todo) return;
     await updateRemoteTodoTimer(insforge, authUser.id, todo);
+  }
+
+  async function persistProgressSession(parent, session) {
+    if (!useRemote || !authUser || !parent || !session) return;
+    await logRemoteProgressSession(insforge, parent, session);
   }
 
   async function persistCompletionChangedTodos(todosToUpdate) {

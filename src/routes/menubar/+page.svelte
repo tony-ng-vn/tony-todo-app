@@ -11,6 +11,7 @@
     getProgressSessions,
     logProgressSession,
     pauseTodoTimer,
+    partitionPendingTodos,
     setTodoDueDate,
     setTodoProgressive,
     startTodoTimer,
@@ -26,6 +27,7 @@
     deleteRemoteTodo,
     insertRemoteTodo,
     loadRemoteTodos,
+    logRemoteProgressSession,
     updateRemoteTodoDueDate,
     updateRemoteTodoNote,
     updateRemoteTodoProgress,
@@ -55,9 +57,10 @@
     ...todo,
     latestProgressSession: getProgressSessions(state, todo.id)[0] ?? null,
   }));
-  $: ongoingTodos = pendingTodos.filter((todo) => todo.activeStartedAt);
-  $: pausedTodos = pendingTodos.filter((todo) => !todo.activeStartedAt && todo.firstStartedAt);
-  $: openTodos = pendingTodos.filter((todo) => !todo.activeStartedAt && !todo.firstStartedAt);
+  $: pendingTodoGroups = partitionPendingTodos(pendingTodos);
+  $: ongoingTodos = pendingTodoGroups.ongoing;
+  $: pausedTodos = pendingTodoGroups.paused;
+  $: openTodos = pendingTodoGroups.ready;
 
   onMount(() => {
     useRemote = isInsForgeConfigured && !new URLSearchParams(window.location.search).has('local');
@@ -219,11 +222,7 @@
     saveLocalState(state);
 
     if (beforeTodo?.isProgressive) {
-      await syncRemoteChange('Saving session', async () => {
-        await persistTodoTimer(afterTodo);
-        await persistTodoProgress(afterTodo);
-        await persistNewTodo(createdTodo);
-      });
+      await syncRemoteChange('Saving session', () => persistProgressSession(afterTodo, createdTodo));
       return;
     }
 
@@ -345,6 +344,11 @@
     await updateRemoteTodoTimer(insforge, authUser.id, todo);
   }
 
+  async function persistProgressSession(parent, session) {
+    if (!useRemote || !authUser || !parent || !session) return;
+    await logRemoteProgressSession(insforge, parent, session);
+  }
+
   async function persistTodoTitle(todo) {
     if (!useRemote || !authUser || !todo) return;
     await updateRemoteTodoTitle(insforge, authUser.id, todo);
@@ -456,19 +460,7 @@
         </div>
         <div class="menubar-section-list">
           {#each ongoingTodos as todo (todo.id)}
-            <MenubarTaskRow
-              {todo}
-              expanded={expandedTaskId === todo.id}
-              onToggleDetails={toggleDetails}
-              onTimerAction={handleTimerAction}
-              onComplete={handleComplete}
-              onTitleCommit={handleTitleCommit}
-              onNoteSave={handleNoteSave}
-              onProgressiveChange={handleProgressiveChange}
-              onProgressCommit={handleProgressCommit}
-              onDueDateChange={handleDueDateChange}
-              onDelete={handleDelete}
-            />
+            {@render taskRow(todo)}
           {:else}
             <p class="menubar-empty">No timers are running.</p>
           {/each}
@@ -482,19 +474,7 @@
         </div>
         <div class="menubar-section-list">
           {#each pausedTodos as todo (todo.id)}
-            <MenubarTaskRow
-              {todo}
-              expanded={expandedTaskId === todo.id}
-              onToggleDetails={toggleDetails}
-              onTimerAction={handleTimerAction}
-              onComplete={handleComplete}
-              onTitleCommit={handleTitleCommit}
-              onNoteSave={handleNoteSave}
-              onProgressiveChange={handleProgressiveChange}
-              onProgressCommit={handleProgressCommit}
-              onDueDateChange={handleDueDateChange}
-              onDelete={handleDelete}
-            />
+            {@render taskRow(todo)}
           {:else}
             <p class="menubar-empty">No paused tasks.</p>
           {/each}
@@ -508,19 +488,7 @@
         </div>
         <div class="menubar-section-list">
           {#each openTodos as todo (todo.id)}
-            <MenubarTaskRow
-              {todo}
-              expanded={expandedTaskId === todo.id}
-              onToggleDetails={toggleDetails}
-              onTimerAction={handleTimerAction}
-              onComplete={handleComplete}
-              onTitleCommit={handleTitleCommit}
-              onNoteSave={handleNoteSave}
-              onProgressiveChange={handleProgressiveChange}
-              onProgressCommit={handleProgressCommit}
-              onDueDateChange={handleDueDateChange}
-              onDelete={handleDelete}
-            />
+            {@render taskRow(todo)}
           {:else}
             <p class="menubar-empty">Nothing open. Capture the next thing above.</p>
           {/each}
@@ -529,6 +497,22 @@
     </div>
   </main>
 {/if}
+
+{#snippet taskRow(todo)}
+  <MenubarTaskRow
+    {todo}
+    expanded={expandedTaskId === todo.id}
+    onToggleDetails={toggleDetails}
+    onTimerAction={handleTimerAction}
+    onComplete={handleComplete}
+    onTitleCommit={handleTitleCommit}
+    onNoteSave={handleNoteSave}
+    onProgressiveChange={handleProgressiveChange}
+    onProgressCommit={handleProgressCommit}
+    onDueDateChange={handleDueDateChange}
+    onDelete={handleDelete}
+  />
+{/snippet}
 
 <style>
   :global(html),

@@ -4,6 +4,7 @@ import {
   deleteRemoteTodo,
   fromRemoteRecord,
   loadRemoteTodos,
+  logRemoteProgressSession,
   toRemoteRecord,
   updateRemoteTodoDueDate,
   updateRemoteTodoProgress,
@@ -67,7 +68,6 @@ describe('todo remote mapping', () => {
             {
               startedAt: '2026-06-08T08:10:00.000Z',
               endedAt: '2026-06-08T08:40:00.000Z',
-              durationSeconds: 1800,
             },
           ],
           isProgressive: true,
@@ -96,7 +96,6 @@ describe('todo remote mapping', () => {
         {
           startedAt: '2026-06-08T08:10:00.000Z',
           endedAt: '2026-06-08T08:40:00.000Z',
-          durationSeconds: 1800,
         },
       ],
       is_progressive: true,
@@ -126,7 +125,6 @@ describe('todo remote mapping', () => {
           {
             startedAt: '2026-06-08T08:10:00.000Z',
             endedAt: '2026-06-08T08:40:00.000Z',
-            durationSeconds: 1800,
           },
         ],
         is_progressive: true,
@@ -152,7 +150,6 @@ describe('todo remote mapping', () => {
         {
           startedAt: '2026-06-08T08:10:00.000Z',
           endedAt: '2026-06-08T08:40:00.000Z',
-          durationSeconds: 1800,
         },
       ],
       isProgressive: true,
@@ -273,7 +270,6 @@ describe('todo remote mapping', () => {
         {
           startedAt: '2026-06-08T08:10:00.000Z',
           endedAt: '2026-06-08T08:20:00.000Z',
-          durationSeconds: 600,
         },
       ],
     });
@@ -288,12 +284,64 @@ describe('todo remote mapping', () => {
         {
           startedAt: '2026-06-08T08:10:00.000Z',
           endedAt: '2026-06-08T08:20:00.000Z',
-          durationSeconds: 600,
         },
       ],
     });
     expect(calls).toContainEqual(['eq', 'id', 'todo-1']);
     expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
+  });
+
+  it('logs a progressive session through one atomic remote operation', async () => {
+    const calls = [];
+    const client = {
+      database: {
+        rpc(name, values) {
+          calls.push(['rpc', name, values]);
+          return Promise.resolve({ error: null });
+        },
+      },
+    };
+    const parent = {
+      id: 'parent-1',
+      progressLabel: 'Chapter 3',
+    };
+    const session = {
+      id: 'session-1',
+      title: 'Read book',
+      createdAt: '2026-06-08T08:00:00.000Z',
+      completedAt: '2026-06-08T08:30:00.000Z',
+      note: 'Chapter 3',
+      firstStartedAt: '2026-06-08T08:00:00.000Z',
+      trackedSeconds: 30 * 60,
+      timeSegments: [
+        {
+          startedAt: '2026-06-08T08:00:00.000Z',
+          endedAt: '2026-06-08T08:30:00.000Z',
+        },
+      ],
+      progressLabel: 'Chapter 3',
+    };
+
+    await logRemoteProgressSession(client, parent, session);
+
+    expect(calls).toEqual([
+      [
+        'rpc',
+        'log_progress_session',
+        {
+          p_parent_id: 'parent-1',
+          p_session_id: 'session-1',
+          p_title: 'Read book',
+          p_created_at: '2026-06-08T08:00:00.000Z',
+          p_completed_at: '2026-06-08T08:30:00.000Z',
+          p_note: 'Chapter 3',
+          p_first_started_at: '2026-06-08T08:00:00.000Z',
+          p_tracked_seconds: 1800,
+          p_time_segments: session.timeSegments,
+          p_progress_label: 'Chapter 3',
+        },
+      ],
+    ]);
   });
 
   it('updates remote progress fields scoped by user id', async () => {
