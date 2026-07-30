@@ -809,7 +809,8 @@ h2 {
 .board-card-duration,
 .board-card-progress,
 .board-card-failed,
-.board-card-due {
+.board-card-due,
+.board-card-timing {
   display: inline-flex;
   align-items: center;
   min-height: 22px;
@@ -827,6 +828,13 @@ h2 {
 .board-card-duration {
   background: var(--empty-surface);
   color: var(--default);
+}
+
+.board-card-timing {
+  flex-basis: 100%;
+  padding: 0;
+  color: var(--subtle);
+  font-variant-numeric: tabular-nums;
 }
 
 .board-card.is-running .board-card-duration {
@@ -1220,6 +1228,7 @@ h2 {
 }
 
 .task-duration,
+.task-timing,
 .summary-duration,
 .summary-progress,
 .task-progress-label {
@@ -1231,6 +1240,20 @@ h2 {
 
 .task-duration.is-live {
   color: var(--strong);
+}
+
+.task-timing {
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-timing {
+  display: grid;
+  gap: 3px;
+  color: var(--default);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  line-height: 1.35;
 }
 
 .task-progress-label,
@@ -1555,6 +1578,8 @@ h2 {
 }
 
 .summary-time-button {
+  display: grid;
+  gap: 1px;
   min-height: 34px;
   border: 1px solid transparent;
   border-radius: 8px;
@@ -1567,6 +1592,13 @@ h2 {
     background-color 180ms ease,
     border-color 180ms ease,
     transform 180ms ease;
+}
+
+.summary-time-label {
+  color: var(--subtle);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
 .summary-time-button:hover {
@@ -1877,6 +1909,39 @@ h2 {
   font-size: 13px;
 }
 
+.detail-timeline {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+
+.detail-timeline > div {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--empty-surface);
+}
+
+.detail-timeline dt {
+  color: var(--subtle);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.detail-timeline dd {
+  margin: 0;
+  color: var(--strong);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  line-height: 1.4;
+}
+
 .detail-timing-controls {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1894,6 +1959,12 @@ h2 {
   font-size: 12px;
   font-weight: 500;
   text-transform: uppercase;
+}
+
+.detail-timing-controls .detail-start-missing {
+  color: var(--subtle);
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .detail-timing-controls input {
@@ -2169,6 +2240,10 @@ h2 {
   .detail-timing-controls {
     grid-template-columns: 1fr;
     align-items: stretch;
+  }
+
+  .detail-timeline {
+    grid-template-columns: 1fr;
   }
 }
 

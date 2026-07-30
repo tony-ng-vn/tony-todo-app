@@ -2,6 +2,7 @@
   import { tick } from 'svelte';
   import CalendarPicker from './CalendarPicker.svelte';
   import { linkifyText } from '../../linkify.js';
+  import { formatTaskTimestamp } from '../../todoStore.js';
   import { iconPage } from './icons.js';
 
   export let summary = [];
@@ -111,6 +112,7 @@
                       on:dblclick={() => startTimeEdit(item)}
                       aria-label={`Edit ${item.title} finished time`}
                     >
+                      <span class="summary-time-label">End</span>
                       <time datetime={item.completedAt}>{completedTime(item.completedAt)}</time>
                     </button>
                   {/if}
@@ -122,6 +124,14 @@
                     {#if item.progressLabel}
                       <span class="summary-progress">{item.progressLabel}</span>
                     {/if}
+                    <span class="summary-timing" aria-label="Task start time">
+                      Start
+                      {#if item.startedAt}
+                        <time datetime={item.startedAt}>{formatTaskTimestamp(item.startedAt)}</time>
+                      {:else}
+                        not recorded
+                      {/if}
+                    </span>
                     <span class="summary-duration">{item.durationLabel}</span>
                   </div>
                   <button type="button" class="open-task-button" on:click={(event) => onOpenTask(item.id, event.currentTarget)} aria-label={`Open ${item.title} details`}>
