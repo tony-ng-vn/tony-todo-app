@@ -13,7 +13,8 @@
   export let onTimerAction;
   export let onComplete;
   export let onTitleCommit;
-  export let onNoteSave;
+  export let onNoteInput;
+  export let noteSaveStatus = 'saved';
   export let onProgressiveChange;
   export let onProgressCommit;
   export let onDueDateChange;
@@ -88,6 +89,11 @@
 
     requestAnimationFrame(() => textarea.setSelectionRange(start + 1, start + 1));
   }
+
+  function updateNoteDraft(nextNote) {
+    noteDraft = nextNote;
+    onNoteInput(todo.id, nextNote);
+  }
 </script>
 
 <article
@@ -161,17 +167,17 @@
           class="menubar-note-input"
           bind:value={noteDraft}
           rows="3"
-          on:keydown={(event) => handleTextareaTab(event, (value) => (noteDraft = value))}
+          on:input={(event) => onNoteInput(todo.id, event.currentTarget.value)}
+          on:keydown={(event) => handleTextareaTab(event, updateNoteDraft)}
         ></textarea>
       </label>
-      <button
-        type="button"
-        class="menubar-secondary-button menubar-save-note"
-        disabled={noteDraft === (todo.note ?? '')}
-        on:click={() => onNoteSave(todo.id, noteDraft)}
-      >
-        Save note
-      </button>
+      <span class="menubar-note-save-status" aria-live="polite">
+        {noteSaveStatus === 'saving'
+          ? 'Saving note...'
+          : noteSaveStatus === 'error'
+            ? 'Saved locally - sync failed'
+            : 'Note saved automatically'}
+      </span>
 
       <label class="menubar-progressive-toggle">
         <input
@@ -371,27 +377,15 @@
   .menubar-task-details textarea:focus-visible,
   .menubar-details-toggle:focus-visible,
   .menubar-icon-button:focus-visible,
-  .menubar-secondary-button:focus-visible,
   .menubar-delete:focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 1px;
   }
 
-  .menubar-secondary-button {
-    justify-self: start;
-    min-height: 34px;
-    border: 1px solid var(--border);
-    border-radius: 9px;
-    padding: 0 11px;
-    background: var(--surface-strong);
-    color: var(--strong);
-    font-size: 12px;
-    font-weight: 600;
-  }
-
-  .menubar-secondary-button:disabled {
-    opacity: 0.45;
-    cursor: default;
+  .menubar-note-save-status {
+    color: var(--subtle);
+    font-size: 11px;
+    font-weight: 500;
   }
 
   .menubar-progressive-toggle {

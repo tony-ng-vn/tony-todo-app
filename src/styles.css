@@ -1751,36 +1751,6 @@ h2 {
   font-weight: 500;
 }
 
-.detail-save-note {
-  min-height: 34px;
-  border: 1px solid var(--border);
-  border-radius: 999px;
-  padding: 0 12px;
-  background: var(--surface-strong);
-  color: var(--default);
-  font-size: 12px;
-  font-weight: 500;
-  transition:
-    background-color 180ms ease,
-    border-color 180ms ease,
-    opacity 180ms ease,
-    transform 180ms ease;
-}
-
-.detail-save-note:disabled {
-  opacity: 0.48;
-}
-
-.detail-save-note:not(:disabled):hover {
-  border-color: var(--subtle);
-  background: var(--block-hover);
-  color: var(--strong);
-}
-
-.detail-save-note:not(:disabled):active {
-  transform: translateY(1px) scale(0.98);
-}
-
 .detail-title-input {
   width: 100%;
   min-height: 44px;
