@@ -145,6 +145,19 @@ describe('todo day summary', () => {
     ]);
   });
 
+  it('ignores completed todos with an invalid completion date', () => {
+    const state = createInitialState([
+      {
+        id: 'invalid-completion',
+        title: 'Corrupt completion',
+        createdAt: '2026-06-08T08:00:00-07:00',
+        completedAt: 'invalid',
+      },
+    ]);
+
+    expect(getDaySummary(state, '2026-06-08').flatMap((section) => section.items)).toEqual([]);
+  });
+
   it('adds completed todos to the summary for the day they were marked done', () => {
     let state = createInitialState();
     state = addTodo(state, 'Review prototype', new Date('2026-06-07T21:30:00-07:00'));

@@ -658,6 +658,10 @@ export function formatDuration(seconds) {
 
 export function getDayPartLabel(date) {
   const dayKey = formatSummaryDayKey(date);
+  if (!dayKey) {
+    return 'Night';
+  }
+
   return SUMMARY_BUCKETS.toReversed().find((bucket) => date >= bucket.startAt(dayKey))?.label ?? 'Early morning';
 }
 
@@ -737,6 +741,10 @@ function getSanFranciscoSunrise(dayKey) {
 }
 
 function formatSummaryDayKey(date) {
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
   const parts = getSanFranciscoDateTimeParts(date);
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
