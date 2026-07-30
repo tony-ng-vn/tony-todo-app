@@ -210,6 +210,21 @@ describe('todo day summary', () => {
     expect(getDaySummary(state, '2026-06-08')[2].items[0].title).toBe('Call Sam');
   });
 
+  it('treats midnight through early morning as Morning instead of Night', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Midnight task', new Date(2026, 5, 8, 0, 0));
+    state = addTodo(state, 'Early task', new Date(2026, 5, 8, 4, 59));
+    state = addTodo(state, 'Late task', new Date(2026, 5, 8, 23, 59));
+    state = completeTodo(state, state.todos[0].id, new Date(2026, 5, 8, 0, 0));
+    state = completeTodo(state, state.todos[1].id, new Date(2026, 5, 8, 4, 59));
+    state = completeTodo(state, state.todos[2].id, new Date(2026, 5, 8, 23, 59));
+
+    const summary = getDaySummary(state, '2026-06-08');
+
+    expect(summary[0].items.map((item) => item.title)).toEqual(['Midnight task', 'Early task']);
+    expect(summary[3].items.map((item) => item.title)).toEqual(['Late task']);
+  });
+
   it('updates a task note without changing other task fields', () => {
     let state = createInitialState();
     state = addTodo(state, 'Call school', new Date('2026-06-08T08:00:00'));

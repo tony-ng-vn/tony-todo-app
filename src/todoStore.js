@@ -1,8 +1,8 @@
 const SUMMARY_BUCKETS = [
-  { label: 'Morning', start: 5, end: 11 },
+  { label: 'Morning', start: 0, end: 11 },
   { label: 'Lunch', start: 11, end: 14 },
   { label: 'Evening', start: 14, end: 21 },
-  { label: 'Night', start: 21, end: 5 },
+  { label: 'Night', start: 21, end: 24 },
 ];
 
 export const BOARD_COLUMNS = [
@@ -624,11 +624,7 @@ export function formatDuration(seconds) {
 
 export function getDayPartLabel(date) {
   const hour = date.getHours();
-  return SUMMARY_BUCKETS.find((bucket) =>
-    bucket.start < bucket.end
-      ? hour >= bucket.start && hour < bucket.end
-      : hour >= bucket.start || hour < bucket.end,
-  )?.label ?? 'Night';
+  return SUMMARY_BUCKETS.find((bucket) => hour >= bucket.start && hour < bucket.end)?.label ?? 'Night';
 }
 
 export function createTodoId(title, date) {
