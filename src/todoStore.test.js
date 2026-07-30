@@ -133,10 +133,11 @@ describe('todo day summary', () => {
     ]);
   });
 
-  it('always renders the four recap buckets for the selected day', () => {
+  it('always renders the five recap buckets for the selected day', () => {
     const state = createInitialState();
 
     expect(getDaySummary(state, '2026-06-08')).toEqual([
+      { label: 'Early morning', items: [] },
       { label: 'Morning', items: [] },
       { label: 'Lunch', items: [] },
       { label: 'Evening', items: [] },
@@ -144,16 +145,29 @@ describe('todo day summary', () => {
     ]);
   });
 
+  it('ignores completed todos with an invalid completion date', () => {
+    const state = createInitialState([
+      {
+        id: 'invalid-completion',
+        title: 'Corrupt completion',
+        createdAt: '2026-06-08T08:00:00-07:00',
+        completedAt: 'invalid',
+      },
+    ]);
+
+    expect(getDaySummary(state, '2026-06-08').flatMap((section) => section.items)).toEqual([]);
+  });
+
   it('adds completed todos to the summary for the day they were marked done', () => {
     let state = createInitialState();
-    state = addTodo(state, 'Review prototype', new Date('2026-06-07T21:30:00'));
+    state = addTodo(state, 'Review prototype', new Date('2026-06-07T21:30:00-07:00'));
     const todoId = state.todos[0].id;
-    const doneAt = new Date('2026-06-08T12:15:00');
+    const doneAt = new Date('2026-06-08T12:15:00-07:00');
 
     state = completeTodo(state, todoId, doneAt);
 
     expect(getPendingTodos(state)).toEqual([]);
-    expect(getDaySummary(state, '2026-06-08')[1]).toEqual({
+    expect(getDaySummary(state, '2026-06-08')[2]).toEqual({
       label: 'Lunch',
       items: [
         {
@@ -175,9 +189,9 @@ describe('todo day summary', () => {
 
   it('marks failed todos as finished with a failed outcome in the day summary', () => {
     let state = createInitialState();
-    state = addTodo(state, 'Submit proposal', new Date('2026-06-08T08:00:00'));
+    state = addTodo(state, 'Submit proposal', new Date('2026-06-08T08:00:00-07:00'));
     const todoId = state.todos[0].id;
-    const failedAt = new Date('2026-06-08T17:20:00');
+    const failedAt = new Date('2026-06-08T17:20:00-07:00');
 
     state = failTodo(state, todoId, failedAt);
 
@@ -187,28 +201,71 @@ describe('todo day summary', () => {
       activeStartedAt: null,
       notionStatus: 'Failed',
     });
-    expect(getDaySummary(state, '2026-06-08')[2].items[0]).toMatchObject({
+    expect(getDaySummary(state, '2026-06-08')[3].items[0]).toMatchObject({
       id: todoId,
       title: 'Submit proposal',
       outcome: 'failed',
     });
   });
 
-  it('groups a day summary into fixed buckets in recap order', () => {
+  it('groups a day summary into the recap bucket order', () => {
     let state = createInitialState();
-    state = addTodo(state, 'Stretch', new Date('2026-06-08T06:30:00'));
-    state = addTodo(state, 'Call Sam', new Date('2026-06-08T07:00:00'));
-    state = completeTodo(state, state.todos[1].id, new Date('2026-06-08T18:45:00'));
-    state = completeTodo(state, state.todos[0].id, new Date('2026-06-08T08:00:00'));
+    state = addTodo(state, 'Stretch', new Date('2026-06-08T06:30:00-07:00'));
+    state = addTodo(state, 'Call Sam', new Date('2026-06-08T07:00:00-07:00'));
+    state = completeTodo(state, state.todos[1].id, new Date('2026-06-08T18:45:00-07:00'));
+    state = completeTodo(state, state.todos[0].id, new Date('2026-06-08T08:00:00-07:00'));
 
     expect(getDaySummary(state, '2026-06-08').map((section) => section.label)).toEqual([
+      'Early morning',
       'Morning',
       'Lunch',
       'Evening',
       'Night',
     ]);
-    expect(getDaySummary(state, '2026-06-08')[0].items[0].title).toBe('Stretch');
-    expect(getDaySummary(state, '2026-06-08')[2].items[0].title).toBe('Call Sam');
+    expect(getDaySummary(state, '2026-06-08')[1].items[0].title).toBe('Stretch');
+    expect(getDaySummary(state, '2026-06-08')[3].items[0].title).toBe('Call Sam');
+  });
+
+  it('separates pre-sunrise completions from Morning using San Francisco sunrise', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Midnight task', new Date('2026-06-08T00:00:00-07:00'));
+    state = addTodo(state, 'Before sunrise', new Date('2026-06-08T05:30:00-07:00'));
+    state = addTodo(state, 'After sunrise', new Date('2026-06-08T06:00:00-07:00'));
+    state = addTodo(state, 'Late task', new Date('2026-06-08T23:59:00-07:00'));
+    state = completeTodo(state, state.todos[0].id, new Date('2026-06-08T00:00:00-07:00'));
+    state = completeTodo(state, state.todos[1].id, new Date('2026-06-08T05:30:00-07:00'));
+    state = completeTodo(state, state.todos[2].id, new Date('2026-06-08T06:00:00-07:00'));
+    state = completeTodo(state, state.todos[3].id, new Date('2026-06-08T23:59:00-07:00'));
+
+    const summary = getDaySummary(state, '2026-06-08');
+
+    expect(summary[0].items.map((item) => item.title)).toEqual(['Midnight task', 'Before sunrise']);
+    expect(summary[1].items.map((item) => item.title)).toEqual(['After sunrise']);
+    expect(summary[4].items.map((item) => item.title)).toEqual(['Late task']);
+  });
+
+  it('moves the Early morning boundary with the San Francisco seasons', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Summer 6:30', new Date('2026-06-08T06:30:00-07:00'));
+    state = addTodo(state, 'Winter 6:30', new Date('2026-12-08T06:30:00-08:00'));
+    state = completeTodo(state, state.todos[0].id, new Date('2026-06-08T06:30:00-07:00'));
+    state = completeTodo(state, state.todos[1].id, new Date('2026-12-08T06:30:00-08:00'));
+
+    expect(getDaySummary(state, '2026-06-08')[1].items[0].title).toBe('Summer 6:30');
+    expect(getDaySummary(state, '2026-12-08')[0].items[0].title).toBe('Winter 6:30');
+  });
+
+  it('ends Evening at 8:00 PM', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Evening edge', new Date('2026-06-08T19:59:00-07:00'));
+    state = addTodo(state, 'Night edge', new Date('2026-06-08T20:00:00-07:00'));
+    state = completeTodo(state, state.todos[0].id, new Date('2026-06-08T19:59:00-07:00'));
+    state = completeTodo(state, state.todos[1].id, new Date('2026-06-08T20:00:00-07:00'));
+
+    const summary = getDaySummary(state, '2026-06-08');
+
+    expect(summary[3].items[0].title).toBe('Evening edge');
+    expect(summary[4].items[0].title).toBe('Night edge');
   });
 
   it('updates a task note without changing other task fields', () => {
@@ -244,14 +301,14 @@ describe('todo day summary', () => {
 
   it('reorders completed todos for a day by rewriting their completion times', () => {
     let state = createInitialState();
-    state = addTodo(state, 'First', new Date('2026-06-08T08:00:00'));
-    state = addTodo(state, 'Second', new Date('2026-06-08T08:01:00'));
-    state = completeTodo(state, state.todos[0].id, new Date('2026-06-08T12:00:00'));
-    state = completeTodo(state, state.todos[1].id, new Date('2026-06-08T12:10:00'));
+    state = addTodo(state, 'First', new Date('2026-06-08T08:00:00-07:00'));
+    state = addTodo(state, 'Second', new Date('2026-06-08T08:01:00-07:00'));
+    state = completeTodo(state, state.todos[0].id, new Date('2026-06-08T12:00:00-07:00'));
+    state = completeTodo(state, state.todos[1].id, new Date('2026-06-08T12:10:00-07:00'));
 
     state = reorderCompletedTodosForDay(state, '2026-06-08', [state.todos[1].id, state.todos[0].id]);
 
-    const summaryTitles = getDaySummary(state, '2026-06-08')[1].items.map((item) => item.title);
+    const summaryTitles = getDaySummary(state, '2026-06-08')[2].items.map((item) => item.title);
     expect(summaryTitles).toEqual(['Second', 'First']);
     expect(new Date(state.todos[1].completedAt) < new Date(state.todos[0].completedAt)).toBe(true);
   });
@@ -263,14 +320,14 @@ describe('todo day summary', () => {
     state = completeTodo(state, todoId, new Date('2026-06-08T08:30:00'));
     state.todos[0] = { ...state.todos[0], trackedSeconds: 17 * 60 };
 
-    state = updateTodoCompletedAt(state, todoId, new Date('2026-06-09T21:45:00'));
+    state = updateTodoCompletedAt(state, todoId, new Date('2026-06-09T21:45:00-07:00'));
 
     expect(state.todos[0]).toMatchObject({
-      completedAt: new Date('2026-06-09T21:45:00').toISOString(),
+      completedAt: new Date('2026-06-09T21:45:00-07:00').toISOString(),
       trackedSeconds: 17 * 60,
     });
     expect(getDaySummary(state, '2026-06-08').flatMap((section) => section.items)).toEqual([]);
-    expect(getDaySummary(state, '2026-06-09')[3].items[0]).toMatchObject({
+    expect(getDaySummary(state, '2026-06-09')[4].items[0]).toMatchObject({
       id: todoId,
       title: 'File receipt',
       durationLabel: '17m',
@@ -321,22 +378,34 @@ describe('todo day summary', () => {
 
   it('moves a completed todo to another bucket without changing tracked duration', () => {
     let state = createInitialState();
-    state = addTodo(state, 'Morning task', new Date('2026-06-08T08:00:00'));
-    state = addTodo(state, 'Night task', new Date('2026-06-08T08:01:00'));
-    state = completeTodo(state, state.todos[0].id, new Date('2026-06-08T08:30:00'));
-    state = completeTodo(state, state.todos[1].id, new Date('2026-06-08T21:30:00'));
+    state = addTodo(state, 'Morning task', new Date('2026-06-08T08:00:00-07:00'));
+    state = addTodo(state, 'Night task', new Date('2026-06-08T08:01:00-07:00'));
+    state = completeTodo(state, state.todos[0].id, new Date('2026-06-08T08:30:00-07:00'));
+    state = completeTodo(state, state.todos[1].id, new Date('2026-06-08T21:30:00-07:00'));
     state.todos[0] = { ...state.todos[0], trackedSeconds: 47 * 60 };
     const movedId = state.todos[0].id;
 
     state = moveCompletedTodoToSummaryBucket(state, '2026-06-08', movedId, 'Night');
 
     const summary = getDaySummary(state, '2026-06-08');
-    expect(summary[0].items).toEqual([]);
-    expect(summary[3].items.map((item) => item.title)).toEqual(['Night task', 'Morning task']);
-    expect(summary[3].items.find((item) => item.id === movedId)).toMatchObject({
+    expect(summary[1].items).toEqual([]);
+    expect(summary[4].items.map((item) => item.title)).toEqual(['Night task', 'Morning task']);
+    expect(summary[4].items.find((item) => item.id === movedId)).toMatchObject({
       durationSeconds: 47 * 60,
       durationLabel: '47m',
     });
+  });
+
+  it('anchors a todo moved to Morning at that date sunrise', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Move to sunrise', new Date('2026-06-08T08:00:00-07:00'));
+    const todoId = state.todos[0].id;
+    state = completeTodo(state, todoId, new Date('2026-06-08T18:00:00-07:00'));
+
+    state = moveCompletedTodoToSummaryBucket(state, '2026-06-08', todoId, 'Morning');
+
+    expect(state.todos[0].completedAt).toBe('2026-06-08T12:48:00.000Z');
+    expect(getDaySummary(state, '2026-06-08')[1].items[0].title).toBe('Move to sunrise');
   });
 
   it('formats tracked duration as minutes, hours, or days', () => {

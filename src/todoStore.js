@@ -1,8 +1,23 @@
+import { getTimes } from 'suncalc';
+
+const SAN_FRANCISCO = { latitude: 37.774929, longitude: -122.419418 };
+const SAN_FRANCISCO_TIME_ZONE = 'America/Los_Angeles';
+const DEFAULT_SUNRISE_HOUR = 6;
+const SAN_FRANCISCO_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-US-u-nu-latn', {
+  timeZone: SAN_FRANCISCO_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
 const SUMMARY_BUCKETS = [
-  { label: 'Morning', start: 5, end: 11 },
-  { label: 'Lunch', start: 11, end: 14 },
-  { label: 'Evening', start: 14, end: 21 },
-  { label: 'Night', start: 21, end: 5 },
+  { label: 'Early morning', startAt: (dayKey) => dateAtSanFranciscoTime(dayKey, 0) },
+  { label: 'Morning', startAt: getSanFranciscoSunrise },
+  { label: 'Lunch', startAt: (dayKey) => dateAtSanFranciscoTime(dayKey, 11 * 60) },
+  { label: 'Evening', startAt: (dayKey) => dateAtSanFranciscoTime(dayKey, 14 * 60) },
+  { label: 'Night', startAt: (dayKey) => dateAtSanFranciscoTime(dayKey, 20 * 60) },
 ];
 
 export const BOARD_COLUMNS = [
@@ -400,7 +415,7 @@ export function getDaySummary(state, dayKey) {
 
   for (const todo of getCompletedTodos(state)) {
     const completedDate = new Date(todo.completedAt);
-    if (formatDayKey(completedDate) !== dayKey) {
+    if (formatSummaryDayKey(completedDate) !== dayKey) {
       continue;
     }
 
@@ -542,7 +557,9 @@ export function getProgressSessions(state, parentTaskId) {
 }
 
 export function reorderCompletedTodosForDay(state, dayKey, orderedIds) {
-  const completedForDay = getCompletedTodos(state).filter((todo) => formatDayKey(new Date(todo.completedAt)) === dayKey);
+  const completedForDay = getCompletedTodos(state).filter(
+    (todo) => formatSummaryDayKey(new Date(todo.completedAt)) === dayKey,
+  );
   if (completedForDay.length === 0) {
     return state;
   }
@@ -574,7 +591,7 @@ export function moveCompletedTodoToSummaryBucket(state, dayKey, todoId, bucketLa
   const targetSection = summary.find((section) => section.label === bucketLabel);
   const movingTodo = state.todos.find((todo) => todo.id === todoId && todo.completedAt);
 
-  if (!targetSection || !movingTodo || formatDayKey(new Date(movingTodo.completedAt)) !== dayKey) {
+  if (!targetSection || !movingTodo || formatSummaryDayKey(new Date(movingTodo.completedAt)) !== dayKey) {
     return state;
   }
 
@@ -640,12 +657,12 @@ export function formatDuration(seconds) {
 }
 
 export function getDayPartLabel(date) {
-  const hour = date.getHours();
-  return SUMMARY_BUCKETS.find((bucket) =>
-    bucket.start < bucket.end
-      ? hour >= bucket.start && hour < bucket.end
-      : hour >= bucket.start || hour < bucket.end,
-  )?.label ?? 'Night';
+  const dayKey = formatSummaryDayKey(date);
+  if (!dayKey) {
+    return 'Night';
+  }
+
+  return SUMMARY_BUCKETS.toReversed().find((bucket) => date >= bucket.startAt(dayKey))?.label ?? 'Early morning';
 }
 
 export function createTodoId(title, date) {
@@ -709,7 +726,55 @@ function createProgressSessionId(parentId, completedAt) {
 
 function completedAtForBucketPosition(dayKey, bucketLabel, index) {
   const bucket = SUMMARY_BUCKETS.find((candidate) => candidate.label === bucketLabel);
-  const date = new Date(`${dayKey}T00:00:00`);
-  date.setHours(bucket.start, index, 0, 0);
-  return date.toISOString();
+  return new Date(bucket.startAt(dayKey).getTime() + index * 60_000).toISOString();
+}
+
+function getSanFranciscoSunrise(dayKey) {
+  const referenceDate = dateAtSanFranciscoTime(dayKey, 12 * 60);
+  const sunrise = getTimes(referenceDate, SAN_FRANCISCO.latitude, SAN_FRANCISCO.longitude).sunrise;
+
+  if (!Number.isNaN(sunrise.getTime())) {
+    return new Date(Math.round(sunrise.getTime() / 60_000) * 60_000);
+  }
+
+  return dateAtSanFranciscoTime(dayKey, DEFAULT_SUNRISE_HOUR * 60);
+}
+
+function formatSummaryDayKey(date) {
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const parts = getSanFranciscoDateTimeParts(date);
+  return `${parts.year}-${parts.month}-${parts.day}`;
+}
+
+function dateAtSanFranciscoTime(dayKey, minutesAfterMidnight) {
+  const [year, month, day] = dayKey.split('-').map(Number);
+  const hour = Math.floor(minutesAfterMidnight / 60);
+  const minute = minutesAfterMidnight % 60;
+  const desiredWallTime = Date.UTC(year, month - 1, day, hour, minute);
+  let result = new Date(desiredWallTime);
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    const parts = getSanFranciscoDateTimeParts(result);
+    const renderedWallTime = Date.UTC(
+      Number(parts.year),
+      Number(parts.month) - 1,
+      Number(parts.day),
+      Number(parts.hour),
+      Number(parts.minute),
+    );
+    result = new Date(result.getTime() + desiredWallTime - renderedWallTime);
+  }
+
+  return result;
+}
+
+function getSanFranciscoDateTimeParts(date) {
+  return Object.fromEntries(
+    SAN_FRANCISCO_DATE_TIME_FORMATTER.formatToParts(date)
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value]),
+  );
 }
