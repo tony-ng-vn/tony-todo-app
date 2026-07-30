@@ -61,7 +61,15 @@ The dev server binds to `127.0.0.1`. To force local-only mode even when InsForge
 
 ## macOS Menu Bar Companion
 
-Start the SvelteKit dev server on port 5176:
+Install Done Log as a native app:
+
+```bash
+npm run menubar:install
+```
+
+This creates `/Applications/Done Log.app`, enables launch at login, and opens the menu bar app without keeping a terminal open.
+
+For local development, start the SvelteKit dev server on port 5176:
 
 ```bash
 npm run dev -- --port 5176
@@ -73,7 +81,7 @@ In another terminal, open the native menu bar shell against the local route:
 npm run menubar:dev
 ```
 
-The shell uses the deployed `/menubar` route by default when started with `npm run menubar`.
+The development shell uses the deployed `/menubar` route by default when started with `npm run menubar`.
 See [docs/menubar-companion.md](docs/menubar-companion.md) for behavior, configuration, and manual verification steps.
 
 ## Checks

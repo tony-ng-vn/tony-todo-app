@@ -82,6 +82,10 @@ enum MenuBarSmokeError: LocalizedError {
 enum DoneLogMenuBarApp {
   @MainActor
   static func main() {
+    if let exitCode = runLoginItemCommandIfNeeded() {
+      exit(exitCode)
+    }
+
     let environment = ProcessInfo.processInfo.environment
     let isSmokeCheck = environment["MENUBAR_NATIVE_SMOKE"] == "1"
     let lockURL =
@@ -121,6 +125,55 @@ enum DoneLogMenuBarApp {
     application.setActivationPolicy(.accessory)
     withExtendedLifetime(instanceLock) {
       application.run()
+    }
+  }
+
+  @MainActor
+  private static func runLoginItemCommandIfNeeded() -> Int32? {
+    let arguments = Array(CommandLine.arguments.dropFirst())
+    guard let command = LoginItemCommand.resolve(arguments: arguments) else {
+      return nil
+    }
+
+    if command == .quitRunning {
+      DistributedNotificationCenter.default().postNotificationName(
+        .doneLogQuit,
+        object: nil,
+        userInfo: nil,
+        deliverImmediately: true
+      )
+      return 0
+    }
+
+    let manager = LoginItemManager()
+    guard manager.isAvailable else {
+      FileHandle.standardError.write(
+        Data("LOGIN_ITEM_FAILED run this command from Done Log.app\n".utf8)
+      )
+      return 1
+    }
+
+    do {
+      switch command {
+      case .register:
+        try manager.register()
+      case .unregister:
+        try manager.unregister()
+      case .status:
+        break
+      case .quitRunning:
+        break
+      }
+
+      FileHandle.standardOutput.write(
+        Data("LOGIN_ITEM_STATUS \(manager.statusDescription)\n".utf8)
+      )
+      return 0
+    } catch {
+      FileHandle.standardError.write(
+        Data("LOGIN_ITEM_FAILED \(error.localizedDescription)\n".utf8)
+      )
+      return 1
     }
   }
 }

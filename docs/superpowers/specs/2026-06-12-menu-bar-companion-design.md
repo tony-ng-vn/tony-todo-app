@@ -106,7 +106,9 @@ Native Swift shell responsibilities:
 - Use transient popover behavior so it hides when it loses focus.
 - Load the deployed `/menubar` URL by default.
 - In development, load the local Vite dev server `/menubar` URL.
-- Provide Open Done Log and Quit actions in the right-click context menu.
+- Package the native host as `/Applications/Done Log.app`.
+- Register the app with the macOS launch-at-login service.
+- Provide Launch at Login, Open Done Log, and Quit actions in the right-click context menu.
 
 The shell should not own todo state.
 
@@ -131,13 +133,15 @@ Add or extend tests in small slices:
 - Smoke assertions for quick add, start timer, stop timer, finish task, and opening compact details.
 - Build verification with `npm run build`.
 
-Native shell verification includes Swift unit tests, a process smoke check, and a manual interaction pass:
+Native shell verification includes Swift unit tests, an app-bundle build, a process smoke check, and a manual interaction pass:
 
 - app launches
 - icon appears in menu bar
 - click opens popover
 - outside click hides popover
 - "Open full app" opens the deployed app
+- the installed app runs without an attached terminal
+- launch at login can be enabled and disabled
 
 ## Implementation Notes
 
