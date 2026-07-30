@@ -105,10 +105,10 @@ Run the compact menu bar route smoke check:
 UI_SMOKE_URL=http://127.0.0.1:5176/menubar npm run test:menubar
 ```
 
-Run the Electron shell unit and launch checks:
+Run the native Swift shell unit and launch checks:
 
 ```bash
-npm run test:electron
+npm run test:native-menubar
 npm run menubar:check
 ```
 
@@ -137,7 +137,7 @@ Applied migrations are history; avoid editing files that have already been appli
 
 ## Current Caveats
 
-- The browser and Electron shell keep separate authentication sessions, so the first deployed Electron launch requires signing in.
+- The browser and native menu bar shell keep separate authentication sessions, so the first deployed shell launch requires signing in.
 - Offline writes update local storage first, but there is no conflict resolution or retry queue beyond the next normal sync path.
 - Reordering completed tasks rewrites their `completed_at` values in one-minute increments so the chosen order persists.
 - Notion sync is only planned. The schema has fields for Notion metadata, but import/export behavior is not implemented.
