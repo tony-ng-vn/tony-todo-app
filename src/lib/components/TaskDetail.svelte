@@ -115,8 +115,8 @@
     }
   }
 
-  async function handleNoteTextareaKeydown(event) {
-    if (event.key !== 'Tab') {
+  async function handleTextareaKeydown(event, onInput) {
+    if (event.key !== 'Tab' || event.shiftKey) {
       return;
     }
 
@@ -125,10 +125,18 @@
     const selectionStart = textarea.selectionStart ?? textarea.value.length;
     const selectionEnd = textarea.selectionEnd ?? selectionStart;
     const nextValue = `${textarea.value.slice(0, selectionStart)}\t${textarea.value.slice(selectionEnd)}`;
-    onNoteInput(nextValue);
+    onInput(nextValue);
 
     await tick();
     textarea.setSelectionRange(selectionStart + 1, selectionStart + 1);
+  }
+
+  function handleNoteTextareaKeydown(event) {
+    return handleTextareaKeydown(event, onNoteInput);
+  }
+
+  function handleProgressTextareaKeydown(event) {
+    return handleTextareaKeydown(event, (nextValue) => onProgressInput(selectedTask.id, nextValue));
   }
 
   function parseNoteTodos(note) {
@@ -264,14 +272,14 @@
     </label>
     {#if selectedTask.isProgressive}
       <label class="detail-note-label" for="progress-label">Today progress</label>
-      <input
+      <textarea
         id="progress-label"
         class="progress-input"
-        type="text"
         placeholder="pages 41-52, Chapter 4, lesson 2"
         value={selectedTask.progressLabel ?? ''}
         on:input={(event) => onProgressInput(selectedTask.id, event.currentTarget.value)}
-      />
+        on:keydown={handleProgressTextareaKeydown}
+      ></textarea>
     {/if}
     <div class="detail-note-row">
       <label class="detail-note-label" for="detail-note">Notes</label>

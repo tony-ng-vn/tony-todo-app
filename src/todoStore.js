@@ -484,7 +484,7 @@ export function updateTodoProgress(state, todoId, progressLabel) {
       todo.id === todoId
         ? {
             ...todo,
-            progressLabel: progressLabel.trim(),
+            progressLabel: progressLabel ?? '',
           }
         : todo,
     ),

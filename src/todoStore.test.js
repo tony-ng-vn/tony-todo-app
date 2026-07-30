@@ -504,6 +504,16 @@ describe('todo day summary', () => {
     });
   });
 
+  it('preserves multiline progress indentation while editing', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Review distractions', new Date('2026-06-09T08:00:00'));
+    const todoId = state.todos[0].id;
+
+    state = updateTodoProgress(state, todoId, '\t- Twitter\n\t- LinkedIn\n');
+
+    expect(state.todos[0].progressLabel).toBe('\t- Twitter\n\t- LinkedIn\n');
+  });
+
   it('falls back to normal completion for non-progressive tasks', () => {
     let state = createInitialState();
     state = addTodo(state, 'Submit form', new Date('2026-06-09T08:00:00'));
