@@ -1240,10 +1240,6 @@ h2 {
   line-height: 1.35;
 }
 
-.summary-timing > span {
-  display: block;
-}
-
 .task-progress-label,
 .summary-progress {
   overflow-wrap: anywhere;
@@ -1566,6 +1562,8 @@ h2 {
 }
 
 .summary-time-button {
+  display: grid;
+  gap: 1px;
   min-height: 34px;
   border: 1px solid transparent;
   border-radius: 8px;
@@ -1578,6 +1576,13 @@ h2 {
     background-color 180ms ease,
     border-color 180ms ease,
     transform 180ms ease;
+}
+
+.summary-time-label {
+  color: var(--subtle);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
 }
 
 .summary-time-button:hover {
@@ -1938,6 +1943,12 @@ h2 {
   font-size: 12px;
   font-weight: 500;
   text-transform: uppercase;
+}
+
+.detail-timing-controls .detail-start-missing {
+  color: var(--subtle);
+  font-size: 12px;
+  font-weight: 500;
 }
 
 .detail-timing-controls input {

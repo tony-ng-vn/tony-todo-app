@@ -1,5 +1,10 @@
 <script>
-  import { formatDueDate, formatDuration, getElapsedSeconds } from '../../todoStore.js';
+  import {
+    formatDueDate,
+    formatDuration,
+    formatTaskTimestamp,
+    getElapsedSeconds,
+  } from '../../todoStore.js';
   import { iconCheck, iconPage, iconPause, iconPlay, iconX } from './icons.js';
 
   export let todo;
@@ -104,6 +109,11 @@
         {isRunning ? 'Tracking' : 'Duration'} {duration}
         {#if todo.dueDate} - due {formatDueDate(todo.dueDate)}{/if}
       </span>
+      {#if todo.firstStartedAt}
+        <span class="menubar-task-started">
+          Started <time datetime={todo.firstStartedAt}>{formatTaskTimestamp(todo.firstStartedAt)}</time>
+        </span>
+      {/if}
       {#if todo.progressLabel}
         <span class="menubar-task-progress">{todo.progressLabel}</span>
       {/if}
@@ -255,6 +265,7 @@
 
   .menubar-task-title,
   .menubar-task-meta,
+  .menubar-task-started,
   .menubar-task-progress {
     min-width: 0;
     overflow: hidden;
@@ -269,6 +280,7 @@
   }
 
   .menubar-task-meta,
+  .menubar-task-started,
   .menubar-task-progress {
     color: var(--subtle);
     font-size: 11px;

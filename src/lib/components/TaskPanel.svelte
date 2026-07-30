@@ -1,5 +1,10 @@
 <script>
-  import { formatDuration, formatDueDate, formatTaskTimestamp, getElapsedSeconds } from '../../todoStore.js';
+  import {
+    formatDuration,
+    formatDueDate,
+    formatTaskTimestamp,
+    getElapsedSeconds,
+  } from '../../todoStore.js';
   import { linkifyText } from '../../linkify.js';
   import { iconCheck, iconMoon, iconPage, iconPause, iconPlay, iconSun, iconX } from './icons.js';
 

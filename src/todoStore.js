@@ -408,7 +408,7 @@ export function getDaySummary(state, dayKey) {
     sections.get(label).push({
       id: todo.id,
       title: todo.title,
-      firstStartedAt: todo.firstStartedAt,
+      startedAt: todo.firstStartedAt,
       completedAt: todo.completedAt,
       note: todo.note ?? '',
       durationSeconds: normalizedTrackedSeconds(todo),

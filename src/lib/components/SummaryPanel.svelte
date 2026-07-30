@@ -112,6 +112,7 @@
                       on:dblclick={() => startTimeEdit(item)}
                       aria-label={`Edit ${item.title} finished time`}
                     >
+                      <span class="summary-time-label">End</span>
                       <time datetime={item.completedAt}>{completedTime(item.completedAt)}</time>
                     </button>
                   {/if}
@@ -123,18 +124,13 @@
                     {#if item.progressLabel}
                       <span class="summary-progress">{item.progressLabel}</span>
                     {/if}
-                    <span class="summary-timing" aria-label="Task start and end time">
-                      <span>
-                        Start
-                        {#if item.firstStartedAt}
-                          <time datetime={item.firstStartedAt}>{formatTaskTimestamp(item.firstStartedAt)}</time>
-                        {:else}
-                          not recorded
-                        {/if}
-                      </span>
-                      <span>
-                        End <time datetime={item.completedAt}>{formatTaskTimestamp(item.completedAt)}</time>
-                      </span>
+                    <span class="summary-timing" aria-label="Task start time">
+                      Start
+                      {#if item.startedAt}
+                        <time datetime={item.startedAt}>{formatTaskTimestamp(item.startedAt)}</time>
+                      {:else}
+                        not recorded
+                      {/if}
                     </span>
                     <span class="summary-duration">{item.durationLabel}</span>
                   </div>
