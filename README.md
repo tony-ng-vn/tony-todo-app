@@ -7,7 +7,7 @@ The app is a small SvelteKit frontend backed by InsForge Postgres when configure
 ## Features
 
 - Add open tasks and mark them done.
-- Daily recap grouped into Morning, Lunch, Afternoon, Evening, and Late night.
+- Daily recap grouped into Early morning, Morning, Lunch, Evening, and Night.
 - Start, pause, and resume task timers; completing a running task finalizes its duration.
 - Run multiple task timers in parallel.
 - Task detail sheet with notes.
