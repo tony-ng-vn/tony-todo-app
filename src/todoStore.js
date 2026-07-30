@@ -1,8 +1,13 @@
+import { getTimes } from 'suncalc';
+
+const SAN_FRANCISCO = { latitude: 37.774929, longitude: -122.419418 };
+const DEFAULT_SUNRISE_HOUR = 6;
 const SUMMARY_BUCKETS = [
-  { label: 'Morning', start: 0, end: 11 },
-  { label: 'Lunch', start: 11, end: 14 },
-  { label: 'Evening', start: 14, end: 21 },
-  { label: 'Night', start: 21, end: 24 },
+  { label: 'Early morning', start: 0 },
+  { label: 'Morning', start: null },
+  { label: 'Lunch', start: 11 },
+  { label: 'Evening', start: 14 },
+  { label: 'Night', start: 20 },
 ];
 
 export const BOARD_COLUMNS = [
@@ -624,7 +629,20 @@ export function formatDuration(seconds) {
 
 export function getDayPartLabel(date) {
   const hour = date.getHours();
-  return SUMMARY_BUCKETS.find((bucket) => hour >= bucket.start && hour < bucket.end)?.label ?? 'Night';
+
+  if (hour >= 20) {
+    return 'Night';
+  }
+
+  if (hour >= 14) {
+    return 'Evening';
+  }
+
+  if (hour >= 11) {
+    return 'Lunch';
+  }
+
+  return date < getSanFranciscoSunrise(date) ? 'Early morning' : 'Morning';
 }
 
 export function createTodoId(title, date) {
@@ -689,6 +707,24 @@ function createProgressSessionId(parentId, completedAt) {
 function completedAtForBucketPosition(dayKey, bucketLabel, index) {
   const bucket = SUMMARY_BUCKETS.find((candidate) => candidate.label === bucketLabel);
   const date = new Date(`${dayKey}T00:00:00`);
+
+  if (bucket.label === 'Morning') {
+    return new Date(getSanFranciscoSunrise(date).getTime() + index * 60_000).toISOString();
+  }
+
   date.setHours(bucket.start, index, 0, 0);
   return date.toISOString();
+}
+
+function getSanFranciscoSunrise(date) {
+  const sunrise = getTimes(date, SAN_FRANCISCO.latitude, SAN_FRANCISCO.longitude).sunrise;
+
+  if (!Number.isNaN(sunrise.getTime())) {
+    sunrise.setSeconds(0, 0);
+    return sunrise;
+  }
+
+  const fallback = new Date(date);
+  fallback.setHours(DEFAULT_SUNRISE_HOUR, 0, 0, 0);
+  return fallback;
 }

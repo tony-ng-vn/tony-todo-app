@@ -743,7 +743,7 @@ function assertExists(result, selector, label) {
 }
 
 function assertBucketLabels(result) {
-  const expected = ['Morning', 'Lunch', 'Evening', 'Night'];
+  const expected = ['Early morning', 'Morning', 'Lunch', 'Evening', 'Night'];
   return expected.every((label, index) => result.summaryBuckets[index] === label)
     ? []
     : [`summary buckets are ${result.summaryBuckets.join(', ')}; expected ${expected.join(', ')}`];
