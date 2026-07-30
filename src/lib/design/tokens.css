@@ -40,6 +40,9 @@
   --board-in-progress: #c9a227;
   --board-in-progress-soft: rgba(201, 162, 39, 0.16);
   --board-in-progress-surface: rgba(201, 162, 39, 0.08);
+  --board-paused: #4f7fbf;
+  --board-paused-soft: rgba(79, 127, 191, 0.16);
+  --board-paused-surface: rgba(79, 127, 191, 0.08);
   --board-done: #4f9d6a;
   --board-done-soft: rgba(79, 157, 106, 0.16);
   --board-done-surface: rgba(79, 157, 106, 0.08);
@@ -91,6 +94,9 @@
     --board-in-progress: #e2c15a;
     --board-in-progress-soft: rgba(226, 193, 90, 0.22);
     --board-in-progress-surface: rgba(226, 193, 90, 0.1);
+    --board-paused: #78a9e6;
+    --board-paused-soft: rgba(120, 169, 230, 0.22);
+    --board-paused-surface: rgba(120, 169, 230, 0.1);
     --board-done: #6fbf88;
     --board-done-soft: rgba(111, 191, 136, 0.22);
     --board-done-surface: rgba(111, 191, 136, 0.1);
@@ -134,6 +140,9 @@
   --board-in-progress: #e2c15a;
   --board-in-progress-soft: rgba(226, 193, 90, 0.22);
   --board-in-progress-surface: rgba(226, 193, 90, 0.1);
+  --board-paused: #78a9e6;
+  --board-paused-soft: rgba(120, 169, 230, 0.22);
+  --board-paused-surface: rgba(120, 169, 230, 0.1);
   --board-done: #6fbf88;
   --board-done-soft: rgba(111, 191, 136, 0.22);
   --board-done-surface: rgba(111, 191, 136, 0.1);

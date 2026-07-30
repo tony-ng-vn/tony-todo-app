@@ -8,6 +8,7 @@
   export let noteDraft = '';
   export let noteSaveStatus = 'saved';
   export let selectedTaskSessions = [];
+  export let selectedTaskTimeSegments = [];
   export let onClose;
   export let onNoteInput;
   export let onDetailTitleCommit;
@@ -359,6 +360,26 @@
         </label>
       </div>
     {/if}
+    <div class="time-segment-history" aria-label="Time segments">
+      <h3>Time segments</h3>
+      {#if selectedTaskTimeSegments.length}
+        <ol>
+          {#each selectedTaskTimeSegments as segment, index (`${segment.startedAt}-${segment.endedAt}-${index}`)}
+            <li class="time-segment-item">
+              <span>Segment {index + 1}</span>
+              <div>
+                <time datetime={segment.startedAt}>{formatTaskTimestamp(segment.startedAt)}</time>
+                <small>to</small>
+                <time datetime={segment.endedAt}>{formatTaskTimestamp(segment.endedAt)}</time>
+              </div>
+              <strong>{formatDuration(segment.durationSeconds)}</strong>
+            </li>
+          {/each}
+        </ol>
+      {:else}
+        <p>No completed time segments yet.</p>
+      {/if}
+    </div>
     {#if selectedTask.isProgressive}
       <div class="session-history" aria-label="Progress sessions">
         <h3>Sessions</h3>

@@ -29,11 +29,13 @@
     getMillisecondsUntilNextDay,
     getOpenTodoSections,
     getProgressSessions,
+    getTaskTimeSegments,
     logProgressSession,
     moveCompletedTodoToSummaryBucket,
     moveTodoToBoardColumn,
     getPendingTodos,
     pauseTodoTimer,
+    partitionPendingTodos,
     reopenTodo,
     setTodoDueDate,
     setTodoProgressive,
@@ -51,6 +53,7 @@
     deleteRemoteTodo,
     insertRemoteTodo,
     loadRemoteTodos,
+    logRemoteProgressSession,
     updateRemoteTodoCompletion,
     updateRemoteTodoDueDate,
     updateRemoteTodoNote,
@@ -83,7 +86,7 @@
     snoozeLoop,
   } from '../loopRemote.js';
 
-  const TIMER_SYNC_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds'];
+  const TIMER_SYNC_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds', 'timeSegments'];
   const COMPLETION_SYNC_FIELDS = ['completedAt'];
   const THEME_STORAGE_KEY = 'done-log-theme';
   const VIEW_STORAGE_KEY = 'done-log-view';
@@ -140,8 +143,10 @@
 
   $: pendingTodos = getPendingTodos(state);
   $: pendingViewTodos = withLatestProgressSession(pendingTodos);
-  $: ongoingTodos = pendingViewTodos.filter((todo) => todo.activeStartedAt);
-  $: openTodos = pendingViewTodos.filter((todo) => !todo.activeStartedAt);
+  $: pendingTodoGroups = partitionPendingTodos(pendingViewTodos);
+  $: ongoingTodos = pendingTodoGroups.ongoing;
+  $: pausedTodos = pendingTodoGroups.paused;
+  $: openTodos = pendingTodoGroups.ready;
   $: openTodoSections = getOpenTodoSections(openTodos, new Date(`${currentDayKey}T00:00:00`));
   $: openCount = openTodos.length;
   $: summary = getDaySummary(state, selectedDay);
@@ -154,6 +159,7 @@
   $: selectedTask = state.todos.find((todo) => todo.id === selectedTaskId);
   $: selectedNoteSaveStatus = noteSaveStatuses[selectedTaskId] ?? 'saved';
   $: selectedTaskSessions = selectedTaskId ? getProgressSessions(state, selectedTaskId) : [];
+  $: selectedTaskTimeSegments = selectedTaskId ? getTaskTimeSegments(state, selectedTaskId) : [];
 
   onMount(() => {
     useRemote = isInsForgeConfigured && !new URLSearchParams(window.location.search).has('local');
@@ -257,11 +263,7 @@
     saveLocalState(state);
 
     if (beforeTodo?.isProgressive) {
-      await syncRemoteChange('Saving session', async () => {
-        await persistTodoTimer(afterTodo);
-        await persistTodoProgress(afterTodo);
-        await persistNewTodo(createdTodo);
-      });
+      await syncRemoteChange('Saving session', () => persistProgressSession(afterTodo, createdTodo));
       return;
     }
 
@@ -462,11 +464,7 @@
     saveLocalState(state);
 
     if (beforeTodo?.isProgressive && columnId === 'done') {
-      await syncRemoteChange('Saving session', async () => {
-        await persistTodoTimer(afterTodo);
-        await persistTodoProgress(afterTodo);
-        await persistNewTodo(createdTodo);
-      });
+      await syncRemoteChange('Saving session', () => persistProgressSession(afterTodo, createdTodo));
       return;
     }
 
@@ -1104,6 +1102,11 @@
     await updateRemoteTodoTimer(insforge, authUser.id, todo);
   }
 
+  async function persistProgressSession(parent, session) {
+    if (!useRemote || !authUser || !parent || !session) return;
+    await logRemoteProgressSession(insforge, parent, session);
+  }
+
   async function persistCompletionChangedTodos(todosToUpdate) {
     if (!useRemote || !authUser) return;
     await Promise.all(todosToUpdate.map((todo) => updateRemoteTodoCompletion(insforge, authUser.id, todo)));
@@ -1281,6 +1284,7 @@
     <TaskPanel
       {syncMessage}
       {ongoingTodos}
+      {pausedTodos}
       {openTodoSections}
       {openCount}
       bind:titleDraft
@@ -1334,6 +1338,7 @@
   <TaskDetail
     {selectedTask}
     {selectedTaskSessions}
+    {selectedTaskTimeSegments}
     bind:noteDraft
     noteSaveStatus={selectedNoteSaveStatus}
     onClose={closeTask}

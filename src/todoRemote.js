@@ -1,5 +1,5 @@
 const TODO_SELECT_COLUMNS =
-  'id,title,created_at,completed_at,due_date,note,source,notion_page_id,notion_database_id,notion_status,first_started_at,active_started_at,tracked_seconds,is_progressive,parent_task_id,is_progress_session,progress_label';
+  'id,title,created_at,completed_at,due_date,note,source,notion_page_id,notion_database_id,notion_status,first_started_at,active_started_at,tracked_seconds,time_segments,is_progressive,parent_task_id,is_progress_session,progress_label';
 
 export function toRemoteRecord(todo, userId) {
   return {
@@ -17,6 +17,7 @@ export function toRemoteRecord(todo, userId) {
     first_started_at: todo.firstStartedAt ?? null,
     active_started_at: todo.activeStartedAt ?? null,
     tracked_seconds: normalizeTrackedSeconds(todo.trackedSeconds),
+    time_segments: normalizeTimeSegments(todo.timeSegments),
     is_progressive: Boolean(todo.isProgressive),
     parent_task_id: todo.parentTaskId ?? null,
     is_progress_session: Boolean(todo.isProgressSession),
@@ -39,6 +40,7 @@ export function fromRemoteRecord(record) {
     firstStartedAt: record.first_started_at ?? null,
     activeStartedAt: record.active_started_at ?? null,
     trackedSeconds: normalizeTrackedSeconds(record.tracked_seconds),
+    timeSegments: normalizeTimeSegments(record.time_segments),
     isProgressive: Boolean(record.is_progressive),
     parentTaskId: record.parent_task_id ?? null,
     isProgressSession: Boolean(record.is_progress_session),
@@ -93,6 +95,23 @@ export async function updateRemoteTodoCompletion(client, userId, todo) {
   await updateRemoteTodo(client, userId, todo, completionFields(todo));
 }
 
+export async function logRemoteProgressSession(client, parent, session) {
+  const { error } = await client.database.rpc('log_progress_session', {
+    p_parent_id: parent.id,
+    p_session_id: session.id,
+    p_title: session.title,
+    p_created_at: session.createdAt,
+    p_completed_at: session.completedAt,
+    p_note: session.note ?? '',
+    p_first_started_at: session.firstStartedAt ?? null,
+    p_tracked_seconds: normalizeTrackedSeconds(session.trackedSeconds),
+    p_time_segments: normalizeTimeSegments(session.timeSegments),
+    p_progress_label: session.progressLabel ?? '',
+  });
+
+  throwIfError(error);
+}
+
 export async function deleteRemoteTodo(client, userId, todoId) {
   const { error } = await client.database.from('todos').delete().eq('id', todoId).eq('user_id', userId);
 
@@ -125,6 +144,7 @@ function timerFields(todo) {
     first_started_at: todo.firstStartedAt ?? null,
     active_started_at: todo.activeStartedAt ?? null,
     tracked_seconds: normalizeTrackedSeconds(todo.trackedSeconds),
+    time_segments: normalizeTimeSegments(todo.timeSegments),
   };
 }
 
@@ -143,4 +163,13 @@ function throwIfError(error) {
 
 function normalizeTrackedSeconds(value) {
   return Math.max(0, Math.floor(Number(value ?? 0)));
+}
+
+function normalizeTimeSegments(value) {
+  return Array.isArray(value)
+    ? value.map((segment) => ({
+        startedAt: segment.startedAt,
+        endedAt: segment.endedAt,
+      }))
+    : [];
 }

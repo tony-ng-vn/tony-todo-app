@@ -35,6 +35,23 @@ try {
             trackedSeconds: 0,
           },
           {
+            id: 'menubar-paused',
+            title: 'Paused task',
+            createdAt: new Date(now - 25 * 60 * 1000).toISOString(),
+            completedAt: null,
+            note: '',
+            firstStartedAt: new Date(now - 20 * 60 * 1000).toISOString(),
+            activeStartedAt: null,
+            trackedSeconds: 5 * 60,
+            timeSegments: [
+              {
+                startedAt: new Date(now - 20 * 60 * 1000).toISOString(),
+                endedAt: new Date(now - 15 * 60 * 1000).toISOString(),
+                durationSeconds: 5 * 60,
+              },
+            ],
+          },
+          {
             id: 'menubar-progressive',
             title: 'Progressive task',
             createdAt: new Date(now - 20 * 60 * 1000).toISOString(),
@@ -66,14 +83,18 @@ try {
 
   const initial = await page.evaluate(() => {
     const ongoing = document.querySelector('[data-menubar-section="ongoing"]');
+    const paused = document.querySelector('[data-menubar-section="paused"]');
     const open = document.querySelector('[data-menubar-section="open"]');
     const shellStyle = getComputedStyle(document.querySelector('.menubar-shell'));
     return {
       title: document.querySelector('.menubar-heading')?.textContent.trim(),
       sync: document.querySelector('.menubar-sync')?.textContent.trim(),
       openCount: document.querySelector('.menubar-count')?.textContent.trim(),
-      ongoingBeforeOpen: ongoing?.getBoundingClientRect().top < open?.getBoundingClientRect().top,
+      sectionsInOrder:
+        ongoing?.getBoundingClientRect().top < paused?.getBoundingClientRect().top &&
+        paused?.getBoundingClientRect().top < open?.getBoundingClientRect().top,
       runningVisible: Boolean(document.querySelector('[data-menubar-id="menubar-running"]')),
+      pausedVisible: Boolean(document.querySelector('[data-menubar-id="menubar-paused"]')),
       runningStarted: document.querySelector(
         '[data-menubar-id="menubar-running"] .menubar-task-started',
       )?.textContent.trim(),
@@ -240,8 +261,8 @@ try {
   const failures = [];
   if (initial.title !== 'Done Log') failures.push(`unexpected heading: ${JSON.stringify(initial)}`);
   if (initial.sync !== 'Local only') failures.push(`unexpected sync state: ${JSON.stringify(initial)}`);
-  if (initial.openCount !== '4 open') failures.push(`unexpected open count: ${JSON.stringify(initial)}`);
-  if (!initial.ongoingBeforeOpen || !initial.runningVisible || !initial.openVisible) {
+  if (initial.openCount !== '5 open') failures.push(`unexpected open count: ${JSON.stringify(initial)}`);
+  if (!initial.sectionsInOrder || !initial.runningVisible || !initial.pausedVisible || !initial.openVisible) {
     failures.push(`task sections are incomplete or out of order: ${JSON.stringify(initial)}`);
   }
   if (!initial.runningStarted?.startsWith('Started ')) {
@@ -254,7 +275,7 @@ try {
   if (Number.parseFloat(initial.taskTransitionDuration) > 0.001) {
     failures.push(`reduced motion is not respected: ${JSON.stringify(initial)}`);
   }
-  if (countAfterEmptyAdd !== 4) {
+  if (countAfterEmptyAdd !== 5) {
     failures.push(`empty quick add created a task: ${countAfterEmptyAdd}`);
   }
   if (!parallelTimers.includes('menubar-running') || !parallelTimers.includes('menubar-open')) {

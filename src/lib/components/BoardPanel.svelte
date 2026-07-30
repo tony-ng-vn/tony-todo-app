@@ -216,7 +216,7 @@
               <button type="button" class="board-draft-cancel" on:click={cancelDraft}>Cancel</button>
             </div>
           </div>
-        {:else}
+        {:else if column.id !== 'paused'}
           <button
             type="button"
             class="board-new-task"
