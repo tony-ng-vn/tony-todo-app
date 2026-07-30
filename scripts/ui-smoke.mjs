@@ -441,6 +441,23 @@ async function exerciseDetailEditing(page) {
 
   await page.locator('.progress-toggle input').check();
   await page.fill('#progress-label', 'pages 41-52');
+  await page.keyboard.press('Shift+Tab');
+  const shiftTabMovedToProgressToggle = await page.evaluate(
+    () => document.activeElement === document.querySelector('.progress-toggle input'),
+  );
+  await page.locator('#progress-label').focus();
+  await page.locator('#progress-label').evaluate((editor) => editor.setSelectionRange(0, 0));
+  await page.keyboard.press('Tab');
+  const progressEditorCheck = {
+    ...(await page.evaluate(() => ({
+      tagName: document.querySelector('#progress-label')?.tagName,
+      value: document.querySelector('#progress-label')?.value,
+      selectionStart: document.querySelector('#progress-label')?.selectionStart,
+      activeElementId: document.activeElement?.id,
+    }))),
+    shiftTabMovedToProgressToggle,
+  };
+  await page.fill('#progress-label', 'pages 41-52');
   await page.click('#detail-close');
   await page.waitForTimeout(120);
   await page.click(`${localTaskSelector} button[aria-label^="Log"]`);
@@ -544,7 +561,7 @@ async function exerciseDetailEditing(page) {
     return !state.todos.some((item) => item.id === 'ui-smoke-evening-task');
   });
 
-  const editChecks = await page.evaluate(({ taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteBeforeSave, slashTodoValue, clickedTodoValue, tabEditCheck }) => {
+  const editChecks = await page.evaluate(({ taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteBeforeSave, slashTodoValue, clickedTodoValue, tabEditCheck, progressEditorCheck }) => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     const todo = state.todos.find((item) => item.id === 'ui-smoke-local-task');
     const session = state.todos.find((item) => item.parentTaskId === 'ui-smoke-local-task');
@@ -568,6 +585,7 @@ async function exerciseDetailEditing(page) {
       slashTodoValue,
       clickedTodoValue,
       tabEditCheck,
+      progressEditorCheck,
       lunchTrackedSeconds: lunch?.trackedSeconds,
       lunchStart: lunch?.firstStartedAt,
       lunchCompletedAt: lunch?.completedAt,
@@ -576,7 +594,7 @@ async function exerciseDetailEditing(page) {
       detailUsesCustomCalendar,
       doneDateMoveCheck,
     };
-  }, { taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteBeforeSave, slashTodoValue, clickedTodoValue, tabEditCheck });
+  }, { taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteBeforeSave, slashTodoValue, clickedTodoValue, tabEditCheck, progressEditorCheck });
 
   return { ...editChecks, initialTitlePresentation, detailLayout, outsideClickKeepsDetailOpen };
 }
@@ -756,6 +774,16 @@ function assertDetailEditing(result) {
     editChecks.tabEditCheck?.activeElementId !== 'detail-note'
   ) {
     failures.push(`tab key did not insert a tab inside task details: ${JSON.stringify(editChecks.tabEditCheck)}`);
+  }
+
+  if (
+    editChecks.progressEditorCheck?.tagName !== 'TEXTAREA' ||
+    !editChecks.progressEditorCheck?.value?.startsWith('\t') ||
+    editChecks.progressEditorCheck?.selectionStart !== 1 ||
+    editChecks.progressEditorCheck?.activeElementId !== 'progress-label' ||
+    !editChecks.progressEditorCheck?.shiftTabMovedToProgressToggle
+  ) {
+    failures.push(`progress editor did not behave like task notes: ${JSON.stringify(editChecks.progressEditorCheck)}`);
   }
 
   if (
