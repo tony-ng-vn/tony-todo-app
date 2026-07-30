@@ -13,6 +13,7 @@ import {
   getMillisecondsUntilNextDay,
   getPendingTodos,
   getProgressSessions,
+  getTaskTimeSegments,
   formatDuration,
   getElapsedSeconds,
   getOpenTodoSections,
@@ -423,6 +424,13 @@ describe('todo day summary', () => {
     expect(state.todos[0]).toMatchObject({
       activeStartedAt: null,
       trackedSeconds: 125,
+      timeSegments: [
+        {
+          startedAt: '2026-06-08T08:00:00.000Z',
+          endedAt: '2026-06-08T08:02:05.000Z',
+          durationSeconds: 125,
+        },
+      ],
     });
   });
 
@@ -442,6 +450,45 @@ describe('todo day summary', () => {
     expect(state.todos[0]).toMatchObject({
       activeStartedAt: null,
       trackedSeconds: 12 * 60 + 30,
+      timeSegments: [
+        {
+          startedAt: '2026-06-08T08:00:00.000Z',
+          endedAt: '2026-06-08T08:05:00.000Z',
+          durationSeconds: 5 * 60,
+        },
+        {
+          startedAt: '2026-06-08T08:20:00.000Z',
+          endedAt: '2026-06-08T08:27:30.000Z',
+          durationSeconds: 7 * 60 + 30,
+        },
+      ],
+    });
+  });
+
+  it('ignores an invalid active start without losing existing time segments', () => {
+    const existingSegment = {
+      startedAt: '2026-06-08T08:00:00.000Z',
+      endedAt: '2026-06-08T08:05:00.000Z',
+      durationSeconds: 5 * 60,
+    };
+    const state = createInitialState([
+      {
+        id: 'invalid-timer',
+        title: 'Invalid timer',
+        createdAt: '2026-06-08T08:00:00.000Z',
+        completedAt: null,
+        activeStartedAt: 'not-a-date',
+        trackedSeconds: 5 * 60,
+        timeSegments: [existingSegment],
+      },
+    ]);
+
+    const paused = pauseTodoTimer(state, 'invalid-timer', new Date('2026-06-08T09:00:00.000Z'));
+
+    expect(paused.todos[0]).toMatchObject({
+      activeStartedAt: null,
+      trackedSeconds: 5 * 60,
+      timeSegments: [existingSegment],
     });
   });
 
@@ -457,6 +504,13 @@ describe('todo day summary', () => {
       completedAt: '2026-06-08T08:40:10.000Z',
       activeStartedAt: null,
       trackedSeconds: 1810,
+      timeSegments: [
+        {
+          startedAt: '2026-06-08T08:10:00.000Z',
+          endedAt: '2026-06-08T08:40:10.000Z',
+          durationSeconds: 1810,
+        },
+      ],
     });
     const completedSummaryItem = getDaySummary(state, '2026-06-08')
       .flatMap((section) => section.items)
@@ -500,6 +554,18 @@ describe('todo day summary', () => {
       firstStartedAt: new Date('2026-06-09T20:00:00').toISOString(),
       completedAt: doneAt.toISOString(),
       trackedSeconds: 23 * 60,
+      timeSegments: [
+        {
+          startedAt: new Date('2026-06-09T20:00:00').toISOString(),
+          endedAt: new Date('2026-06-09T20:10:00').toISOString(),
+          durationSeconds: 10 * 60,
+        },
+        {
+          startedAt: new Date('2026-06-09T20:15:00').toISOString(),
+          endedAt: doneAt.toISOString(),
+          durationSeconds: 13 * 60,
+        },
+      ],
     });
     expect(getPendingTodos(state).map((todo) => todo.id)).toContain(parentId);
     const summaryItem = getDaySummary(state, '2026-06-09')
@@ -511,6 +577,7 @@ describe('todo day summary', () => {
       progressLabel: 'pages 41-52',
       durationLabel: '23m',
     });
+    expect(getTaskTimeSegments(state, parentId)).toEqual(sessions[0].timeSegments);
   });
 
   it('preserves multiline progress indentation while editing', () => {

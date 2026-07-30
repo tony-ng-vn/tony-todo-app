@@ -40,6 +40,7 @@ export function addTodo(state, title, createdAt = new Date(), { dueDate = null }
         firstStartedAt: null,
         activeStartedAt: null,
         trackedSeconds: 0,
+        timeSegments: [],
         isProgressive: false,
         parentTaskId: null,
         isProgressSession: false,
@@ -53,16 +54,18 @@ export function completeTodo(state, todoId, completedAt = new Date()) {
   const doneAt = completedAt.toISOString();
   return {
     ...state,
-    todos: state.todos.map((todo) =>
-      todo.id === todoId
-        ? {
-            ...todo,
-            completedAt: doneAt,
-            activeStartedAt: null,
-            trackedSeconds: getElapsedSeconds(todo, completedAt),
-          }
-        : todo,
-    ),
+    todos: state.todos.map((todo) => {
+      if (todo.id !== todoId) {
+        return todo;
+      }
+
+      return {
+        ...todo,
+        ...closeActiveTimeSegment(todo, completedAt),
+        completedAt: doneAt,
+        activeStartedAt: null,
+      };
+    }),
   };
 }
 
@@ -70,17 +73,19 @@ export function failTodo(state, todoId, failedAt = new Date()) {
   const doneAt = failedAt.toISOString();
   return {
     ...state,
-    todos: state.todos.map((todo) =>
-      todo.id === todoId
-        ? {
-            ...todo,
-            completedAt: doneAt,
-            activeStartedAt: null,
-            trackedSeconds: getElapsedSeconds(todo, failedAt),
-            notionStatus: 'Failed',
-          }
-        : todo,
-    ),
+    todos: state.todos.map((todo) => {
+      if (todo.id !== todoId) {
+        return todo;
+      }
+
+      return {
+        ...todo,
+        ...closeActiveTimeSegment(todo, failedAt),
+        completedAt: doneAt,
+        activeStartedAt: null,
+        notionStatus: 'Failed',
+      };
+    }),
   };
 }
 
@@ -130,6 +135,13 @@ export function updateCompletedTodoTiming(state, todoId, startedAt, completedAt)
             activeStartedAt: null,
             completedAt: new Date(endTime).toISOString(),
             trackedSeconds,
+            timeSegments: [
+              {
+                startedAt: new Date(startTime).toISOString(),
+                endedAt: new Date(endTime).toISOString(),
+                durationSeconds: trackedSeconds,
+              },
+            ],
           }
         : todo,
     ),
@@ -146,11 +158,16 @@ export function startTodoTimer(state, todoId, startedAt = new Date()) {
         return todo;
       }
 
+      if (todo.activeStartedAt) {
+        return todo;
+      }
+
       return {
         ...todo,
         firstStartedAt: todo.firstStartedAt ?? startedAtIso,
         activeStartedAt: startedAtIso,
         trackedSeconds: normalizedTrackedSeconds(todo),
+        timeSegments: normalizeTimeSegments(todo.timeSegments),
       };
     }),
   };
@@ -163,8 +180,8 @@ export function pauseTodoTimer(state, todoId, pausedAt = new Date()) {
       todo.id === todoId && todo.activeStartedAt
         ? {
             ...todo,
+            ...closeActiveTimeSegment(todo, pausedAt),
             activeStartedAt: null,
-            trackedSeconds: getElapsedSeconds(todo, pausedAt),
           }
         : todo,
     ),
@@ -527,6 +544,7 @@ export function logProgressSession(state, todoId, completedAt = new Date()) {
               firstStartedAt: null,
               activeStartedAt: null,
               trackedSeconds: 0,
+              timeSegments: [],
             }
           : todo,
       ),
@@ -539,6 +557,21 @@ export function getProgressSessions(state, parentTaskId) {
   return state.todos
     .filter((todo) => todo.parentTaskId === parentTaskId && todo.isProgressSession)
     .toSorted((first, second) => new Date(second.completedAt) - new Date(first.completedAt));
+}
+
+export function getTaskTimeSegments(state, taskId) {
+  const task = state.todos.find((todo) => todo.id === taskId);
+  if (!task) {
+    return [];
+  }
+
+  const sessionSegments = task.isProgressive
+    ? getProgressSessions(state, taskId).flatMap((session) => normalizeTimeSegments(session.timeSegments))
+    : [];
+
+  return [...sessionSegments, ...normalizeTimeSegments(task.timeSegments)].toSorted(
+    (first, second) => new Date(first.startedAt) - new Date(second.startedAt),
+  );
 }
 
 export function reorderCompletedTodosForDay(state, dayKey, orderedIds) {
@@ -662,6 +695,80 @@ function normalizedTrackedSeconds(todo) {
   return Math.max(0, Math.floor(Number(todo.trackedSeconds ?? 0)));
 }
 
+function normalizeTimeSegments(segments) {
+  if (!Array.isArray(segments)) {
+    return [];
+  }
+
+  return segments
+    .map((segment) => {
+      if (!segment?.startedAt || !segment?.endedAt) {
+        return null;
+      }
+
+      const startedAt = new Date(segment?.startedAt);
+      const endedAt = new Date(segment?.endedAt);
+      if (Number.isNaN(startedAt.getTime()) || Number.isNaN(endedAt.getTime())) {
+        return null;
+      }
+
+      const rawDurationSeconds = Number(segment.durationSeconds);
+      const durationSeconds = Number.isFinite(rawDurationSeconds)
+        ? Math.max(0, Math.floor(rawDurationSeconds))
+        : getActiveSegmentSeconds(startedAt, endedAt);
+
+      return {
+        startedAt: startedAt.toISOString(),
+        endedAt: endedAt.toISOString(),
+        durationSeconds,
+      };
+    })
+    .filter(Boolean);
+}
+
+function closeActiveTimeSegment(todo, stoppedAt) {
+  const timeSegments = normalizeTimeSegments(todo.timeSegments);
+  if (!todo.activeStartedAt) {
+    return {
+      trackedSeconds: normalizedTrackedSeconds(todo),
+      timeSegments,
+    };
+  }
+
+  const startedAt = new Date(todo.activeStartedAt);
+  const endedAt = new Date(stoppedAt);
+  if (Number.isNaN(startedAt.getTime()) || Number.isNaN(endedAt.getTime())) {
+    return {
+      trackedSeconds: normalizedTrackedSeconds(todo),
+      timeSegments,
+    };
+  }
+
+  const normalizedEnd = new Date(Math.max(startedAt.getTime(), endedAt.getTime()));
+  const durationSeconds = getActiveSegmentSeconds(startedAt, normalizedEnd);
+
+  return {
+    trackedSeconds: normalizedTrackedSeconds(todo) + durationSeconds,
+    timeSegments: [
+      ...timeSegments,
+      {
+        startedAt: startedAt.toISOString(),
+        endedAt: normalizedEnd.toISOString(),
+        durationSeconds,
+      },
+    ],
+  };
+}
+
+function getActiveSegmentSeconds(startedAt, endedAt) {
+  if (Number.isNaN(startedAt.getTime()) || Number.isNaN(endedAt.getTime())) {
+    return 0;
+  }
+
+  const elapsed = Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000);
+  return Math.max(0, Math.min(elapsed, 24 * 60 * 60));
+}
+
 function normalizeTodo(todo) {
   return {
     ...todo,
@@ -674,6 +781,7 @@ function normalizeTodo(todo) {
     firstStartedAt: todo.firstStartedAt ?? null,
     activeStartedAt: todo.activeStartedAt ?? null,
     trackedSeconds: normalizedTrackedSeconds(todo),
+    timeSegments: normalizeTimeSegments(todo.timeSegments),
     isProgressive: Boolean(todo.isProgressive),
     parentTaskId: todo.parentTaskId ?? null,
     isProgressSession: Boolean(todo.isProgressSession),
@@ -683,7 +791,7 @@ function normalizeTodo(todo) {
 
 function createProgressSession(parent, completedAt) {
   const doneAt = completedAt.toISOString();
-  const trackedSeconds = getElapsedSeconds(parent, completedAt);
+  const stoppedTimer = closeActiveTimeSegment(parent, completedAt);
 
   return {
     ...normalizeTodo({
@@ -698,7 +806,8 @@ function createProgressSession(parent, completedAt) {
       progressLabel: parent.progressLabel ?? '',
       firstStartedAt: parent.firstStartedAt ?? null,
       activeStartedAt: null,
-      trackedSeconds,
+      trackedSeconds: stoppedTimer.trackedSeconds,
+      timeSegments: stoppedTimer.timeSegments,
     }),
   };
 }

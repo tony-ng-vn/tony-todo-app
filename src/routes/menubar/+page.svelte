@@ -33,7 +33,7 @@
     updateRemoteTodoTitle,
   } from '../../todoRemote.js';
 
-  const TIMER_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds'];
+  const TIMER_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds', 'timeSegments'];
   const THEME_STORAGE_KEY = 'done-log-theme';
 
   let state = createInitialState();
@@ -56,7 +56,8 @@
     latestProgressSession: getProgressSessions(state, todo.id)[0] ?? null,
   }));
   $: ongoingTodos = pendingTodos.filter((todo) => todo.activeStartedAt);
-  $: openTodos = pendingTodos.filter((todo) => !todo.activeStartedAt);
+  $: pausedTodos = pendingTodos.filter((todo) => !todo.activeStartedAt && todo.firstStartedAt);
+  $: openTodos = pendingTodos.filter((todo) => !todo.activeStartedAt && !todo.firstStartedAt);
 
   onMount(() => {
     useRemote = isInsForgeConfigured && !new URLSearchParams(window.location.search).has('local');
@@ -470,6 +471,32 @@
             />
           {:else}
             <p class="menubar-empty">No timers are running.</p>
+          {/each}
+        </div>
+      </section>
+
+      <section data-menubar-section="paused" aria-labelledby="menubar-paused-heading">
+        <div class="menubar-section-heading">
+          <h2 id="menubar-paused-heading">Paused</h2>
+          <span>{pausedTodos.length} paused</span>
+        </div>
+        <div class="menubar-section-list">
+          {#each pausedTodos as todo (todo.id)}
+            <MenubarTaskRow
+              {todo}
+              expanded={expandedTaskId === todo.id}
+              onToggleDetails={toggleDetails}
+              onTimerAction={handleTimerAction}
+              onComplete={handleComplete}
+              onTitleCommit={handleTitleCommit}
+              onNoteSave={handleNoteSave}
+              onProgressiveChange={handleProgressiveChange}
+              onProgressCommit={handleProgressCommit}
+              onDueDateChange={handleDueDateChange}
+              onDelete={handleDelete}
+            />
+          {:else}
+            <p class="menubar-empty">No paused tasks.</p>
           {/each}
         </div>
       </section>

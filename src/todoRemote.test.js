@@ -63,6 +63,13 @@ describe('todo remote mapping', () => {
           firstStartedAt: '2026-06-08T08:10:00.000Z',
           activeStartedAt: null,
           trackedSeconds: 1800,
+          timeSegments: [
+            {
+              startedAt: '2026-06-08T08:10:00.000Z',
+              endedAt: '2026-06-08T08:40:00.000Z',
+              durationSeconds: 1800,
+            },
+          ],
           isProgressive: true,
           parentTaskId: null,
           isProgressSession: false,
@@ -85,6 +92,13 @@ describe('todo remote mapping', () => {
       first_started_at: '2026-06-08T08:10:00.000Z',
       active_started_at: null,
       tracked_seconds: 1800,
+      time_segments: [
+        {
+          startedAt: '2026-06-08T08:10:00.000Z',
+          endedAt: '2026-06-08T08:40:00.000Z',
+          durationSeconds: 1800,
+        },
+      ],
       is_progressive: true,
       parent_task_id: null,
       is_progress_session: false,
@@ -108,6 +122,13 @@ describe('todo remote mapping', () => {
         first_started_at: '2026-06-08T08:10:00.000Z',
         active_started_at: null,
         tracked_seconds: 1800,
+        time_segments: [
+          {
+            startedAt: '2026-06-08T08:10:00.000Z',
+            endedAt: '2026-06-08T08:40:00.000Z',
+            durationSeconds: 1800,
+          },
+        ],
         is_progressive: true,
         parent_task_id: null,
         is_progress_session: false,
@@ -127,6 +148,13 @@ describe('todo remote mapping', () => {
       firstStartedAt: '2026-06-08T08:10:00.000Z',
       activeStartedAt: null,
       trackedSeconds: 1800,
+      timeSegments: [
+        {
+          startedAt: '2026-06-08T08:10:00.000Z',
+          endedAt: '2026-06-08T08:40:00.000Z',
+          durationSeconds: 1800,
+        },
+      ],
       isProgressive: true,
       parentTaskId: null,
       isProgressSession: false,
@@ -241,6 +269,13 @@ describe('todo remote mapping', () => {
       firstStartedAt: '2026-06-08T08:10:00.000Z',
       activeStartedAt: '2026-06-08T08:20:00.000Z',
       trackedSeconds: 600,
+      timeSegments: [
+        {
+          startedAt: '2026-06-08T08:10:00.000Z',
+          endedAt: '2026-06-08T08:20:00.000Z',
+          durationSeconds: 600,
+        },
+      ],
     });
 
     expect(calls[0]).toEqual(['from', 'todos']);
@@ -249,6 +284,13 @@ describe('todo remote mapping', () => {
       first_started_at: '2026-06-08T08:10:00.000Z',
       active_started_at: '2026-06-08T08:20:00.000Z',
       tracked_seconds: 600,
+      time_segments: [
+        {
+          startedAt: '2026-06-08T08:10:00.000Z',
+          endedAt: '2026-06-08T08:20:00.000Z',
+          durationSeconds: 600,
+        },
+      ],
     });
     expect(calls).toContainEqual(['eq', 'id', 'todo-1']);
     expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);

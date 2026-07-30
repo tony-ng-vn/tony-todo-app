@@ -11,6 +11,7 @@
 
   export let syncMessage = 'Local only';
   export let ongoingTodos = [];
+  export let pausedTodos = [];
   export let openTodoSections = [];
   export let openCount = 0;
   export let titleDraft = '';
@@ -113,6 +114,20 @@
       </li>
     {/if}
 
+    {#if pausedTodos.length}
+      <li class="task-list-section paused-task-section" aria-labelledby="paused-heading">
+        <div class="section-heading">
+          <h2 id="paused-heading">Paused</h2>
+          <span class="section-count">{pausedTodos.length} paused</span>
+        </div>
+        <ol class="task-section-list">
+          {#each pausedTodos as todo (todo.id)}
+            {@render taskRow(todo)}
+          {/each}
+        </ol>
+      </li>
+    {/if}
+
     {#each openTodoSections as section, index (section.id)}
       <li class="task-list-section" aria-labelledby={`open-${section.id}-heading`}>
         <div class="section-heading">
@@ -136,7 +151,7 @@
       </li>
     {/if}
 
-    {#if openCount === 0}
+    {#if openCount === 0 && ongoingTodos.length === 0 && pausedTodos.length === 0}
       <li class="empty-state">No open tasks. Add one when the next thing appears.</li>
     {/if}
   </ul>

@@ -2007,6 +2007,69 @@ h2 {
   padding-top: 2px;
 }
 
+.time-segment-history {
+  display: grid;
+  gap: 10px;
+  padding-top: 2px;
+}
+
+.time-segment-history h3,
+.time-segment-history p,
+.time-segment-history ol {
+  margin: 0;
+}
+
+.time-segment-history h3 {
+  color: var(--subtle);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.time-segment-history ol {
+  display: grid;
+  gap: 8px;
+  padding: 0;
+  list-style: none;
+}
+
+.time-segment-history li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  min-height: 52px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--block-surface);
+}
+
+.time-segment-history li > span,
+.time-segment-history strong {
+  color: var(--default);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.time-segment-history li > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px 6px;
+  min-width: 0;
+}
+
+.time-segment-history time {
+  color: var(--strong);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.time-segment-history small {
+  color: var(--subtle);
+  font-size: 11px;
+}
+
 .session-history h3,
 .session-history p,
 .session-history ol {

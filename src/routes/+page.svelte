@@ -29,6 +29,7 @@
     getMillisecondsUntilNextDay,
     getOpenTodoSections,
     getProgressSessions,
+    getTaskTimeSegments,
     logProgressSession,
     moveCompletedTodoToSummaryBucket,
     moveTodoToBoardColumn,
@@ -73,7 +74,7 @@
     snoozeLoop,
   } from '../loopRemote.js';
 
-  const TIMER_SYNC_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds'];
+  const TIMER_SYNC_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds', 'timeSegments'];
   const COMPLETION_SYNC_FIELDS = ['completedAt'];
   const THEME_STORAGE_KEY = 'done-log-theme';
   const VIEW_STORAGE_KEY = 'done-log-view';
@@ -129,7 +130,8 @@
   $: pendingTodos = getPendingTodos(state);
   $: pendingViewTodos = withLatestProgressSession(pendingTodos);
   $: ongoingTodos = pendingViewTodos.filter((todo) => todo.activeStartedAt);
-  $: openTodos = pendingViewTodos.filter((todo) => !todo.activeStartedAt);
+  $: pausedTodos = pendingViewTodos.filter((todo) => !todo.activeStartedAt && todo.firstStartedAt);
+  $: openTodos = pendingViewTodos.filter((todo) => !todo.activeStartedAt && !todo.firstStartedAt);
   $: openTodoSections = getOpenTodoSections(openTodos, new Date(`${currentDayKey}T00:00:00`));
   $: openCount = openTodos.length;
   $: summary = getDaySummary(state, selectedDay);
@@ -141,6 +143,7 @@
   );
   $: selectedTask = state.todos.find((todo) => todo.id === selectedTaskId);
   $: selectedTaskSessions = selectedTaskId ? getProgressSessions(state, selectedTaskId) : [];
+  $: selectedTaskTimeSegments = selectedTaskId ? getTaskTimeSegments(state, selectedTaskId) : [];
 
   onMount(() => {
     useRemote = isInsForgeConfigured && !new URLSearchParams(window.location.search).has('local');
@@ -1199,6 +1202,7 @@
     <TaskPanel
       {syncMessage}
       {ongoingTodos}
+      {pausedTodos}
       {openTodoSections}
       {openCount}
       bind:titleDraft
@@ -1252,6 +1256,7 @@
   <TaskDetail
     {selectedTask}
     {selectedTaskSessions}
+    {selectedTaskTimeSegments}
     bind:noteDraft
     onClose={closeTask}
     onNoteInput={handleNoteInput}

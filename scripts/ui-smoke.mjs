@@ -23,6 +23,7 @@ try {
     ...assertTimerControlLabel(desktop),
     ...assertTaskRowSpacing(desktop),
     ...assertOngoingSection(desktop),
+    ...assertPausedTimeline(desktop),
     ...assertFullScreenShell(desktop, '.workspace', 'workspace shell'),
     ...assertFixedDocumentScroll(desktop),
     ...assertRecapRhythm(desktop),
@@ -191,6 +192,22 @@ async function inspectViewport(viewport, isMobile) {
             trackedSeconds: index === 0 ? 180 : 0,
           })),
           {
+            id: 'ui-smoke-paused-task',
+            title: 'Paused task',
+            createdAt: completedAt(9, 10),
+            completedAt: null,
+            firstStartedAt: completedAt(9, 15),
+            activeStartedAt: null,
+            trackedSeconds: 10 * 60,
+            timeSegments: [
+              {
+                startedAt: completedAt(9, 15),
+                endedAt: completedAt(9, 25),
+                durationSeconds: 10 * 60,
+              },
+            ],
+          },
+          {
             id: 'ui-smoke-morning-task',
             title: 'Morning completed task',
             createdAt: completedAt(7, 0),
@@ -224,6 +241,7 @@ async function inspectViewport(viewport, isMobile) {
     );
   });
   await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
+  const pausedTimeline = isMobile ? null : await inspectPausedTimeline(page);
   const summaryTimeEdit = isMobile ? null : await exerciseSummaryTimeEditing(page);
   const taskFlowChecks = isMobile ? null : await exerciseParallelAndReopen(page);
   const editChecks = isMobile ? null : await exerciseDetailEditing(page);
@@ -360,7 +378,20 @@ async function inspectViewport(viewport, isMobile) {
   });
 
   await page.close();
-  return { viewport, editChecks, summaryTimeEdit, taskFlowChecks, ...metrics };
+  return { viewport, editChecks, pausedTimeline, summaryTimeEdit, taskFlowChecks, ...metrics };
+}
+
+async function inspectPausedTimeline(page) {
+  await page.click('[data-todo-id="ui-smoke-paused-task"] .open-task-button');
+  await page.waitForSelector('.time-segment-history');
+  const result = await page.evaluate(() => ({
+    heading: document.querySelector('.time-segment-history h3')?.textContent.trim(),
+    segments: Array.from(document.querySelectorAll('.time-segment-item')).map((segment) =>
+      segment.textContent.replace(/\s+/g, ' ').trim(),
+    ),
+  }));
+  await page.click('#detail-close');
+  return result;
 }
 
 async function exerciseSummaryTimeEditing(page) {
@@ -749,17 +780,28 @@ function assertTaskRowSpacing(result) {
 }
 
 function assertOngoingSection(result) {
-  const [ongoing, today, other] = result.taskSections;
+  const [ongoing, paused, today, other] = result.taskSections;
   return ongoing?.heading === 'Ongoing' &&
     ongoing?.ids.includes('ui-smoke-overflow-task-0') &&
+    paused?.heading === 'Paused' &&
+    paused?.ids.includes('ui-smoke-paused-task') &&
     today?.heading === 'Today todos' &&
     today.ids.includes('ui-smoke-today-task') &&
     other?.heading === 'Other todos' &&
     other.ids.includes('ui-smoke-local-task') &&
     !today?.ids.includes('ui-smoke-overflow-task-0') &&
+    !today?.ids.includes('ui-smoke-paused-task') &&
     !other?.ids.includes('ui-smoke-overflow-task-0')
     ? []
-    : [`running and dated tasks are not separated correctly: ${JSON.stringify(result.taskSections)}`];
+    : [`running, paused, and dated tasks are not separated correctly: ${JSON.stringify(result.taskSections)}`];
+}
+
+function assertPausedTimeline(result) {
+  return result.pausedTimeline?.heading === 'Time segments' &&
+    result.pausedTimeline.segments.length === 1 &&
+    result.pausedTimeline.segments[0].includes('10m')
+    ? []
+    : [`paused task timeline is missing or incomplete: ${JSON.stringify(result.pausedTimeline)}`];
 }
 
 function assertExists(result, selector, label) {
