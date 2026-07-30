@@ -22,6 +22,16 @@
   import { insforge, isInsForgeConfigured } from '../../insforgeClient.js';
   import { loadLocalState, reconcileRemoteState, saveLocalState } from '../../todoPersistence.js';
   import {
+    createDebouncedSaveQueue,
+    getPendingNoteEdits,
+    markNoteEditSynced,
+    preservePendingNotesDuringLoad,
+    readNoteEdit,
+    recordNoteEdit,
+    snapshotNoteEdits,
+    withNoteSaveLock,
+  } from '../../noteAutosave.js';
+  import {
     completeRemoteTodo,
     deleteRemoteTodo,
     insertRemoteTodo,
@@ -48,8 +58,10 @@
   let authLoading = false;
   let titleDraft = '';
   let expandedTaskId = null;
+  let noteSaveStatuses = {};
   let liveTimer = null;
   let refreshInFlight = false;
+  const noteAutosave = createDebouncedSaveQueue(saveNoteToRemote);
 
   $: pendingTodos = getPendingTodos(state).map((todo) => ({
     ...todo,
@@ -62,6 +74,7 @@
     useRemote = isInsForgeConfigured && !new URLSearchParams(window.location.search).has('local');
     syncMessage = useRemote ? 'Connecting' : 'Local only';
     state = loadLocalState();
+    queuePendingNoteSaves();
     applyStoredTheme();
     window.addEventListener('focus', refreshFromSource);
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -70,6 +83,7 @@
 
   onDestroy(() => {
     window.clearInterval(liveTimer);
+    void noteAutosave.flushAll().catch(() => {});
     window.removeEventListener('focus', refreshFromSource);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
   });
@@ -165,6 +179,7 @@
   }
 
   async function handleSignOut() {
+    await noteAutosave.flushAll().catch(() => {});
     await signOut(insforge);
     authUser = null;
     state = createInitialState();
@@ -173,11 +188,24 @@
   }
 
   async function hydrateRemoteTodos() {
+    queuePendingNoteSaves();
+    try {
+      await noteAutosave.flushAll();
+    } catch {
+      return;
+    }
+
     syncMessage = 'Loading cloud';
+    const noteEditsAtLoad = snapshotNoteEdits(state.todos.map((todo) => todo.id));
 
     try {
       const remoteTodos = await loadRemoteTodos(insforge, authUser.id);
-      state = reconcileRemoteState(state, remoteTodos);
+      const todoIds = new Set([...state.todos, ...remoteTodos].map((todo) => todo.id));
+      state = preservePendingNotesDuringLoad(
+        reconcileRemoteState(state, remoteTodos),
+        noteEditsAtLoad,
+        snapshotNoteEdits([...todoIds]),
+      );
       saveLocalState(state);
       renderSyncStatus();
     } catch (error) {
@@ -246,18 +274,73 @@
     await syncRemoteChange('Saving title', () => persistTodoTitle(after));
   }
 
-  async function handleNoteSave(todoId, note) {
-    const before = findTodo(todoId);
+  function handleNoteInput(todoId, note) {
     state = updateTodoNote(state, todoId, note);
-    const after = findTodo(todoId);
     saveLocalState(state);
+    const edit = recordNoteEdit(todoId, note);
+    setNoteSaveStatus(todoId, 'saving');
+    noteAutosave.schedule(todoId, edit);
+  }
 
-    if (!before || !after || before.note === after.note) {
-      renderSyncStatus();
+  async function saveNoteToRemote(todoId, edit) {
+    if (!useRemote || !authUser) {
+      setNoteSaveStatus(todoId, 'saved');
       return;
     }
 
-    await syncRemoteChange('Saving note', () => persistTodoNote(after));
+    await withNoteSaveLock(todoId, async () => {
+      const currentEdit = readNoteEdit(todoId);
+      if (!currentEdit || currentEdit.revision !== edit.revision) {
+        if (currentEdit) {
+          state = updateTodoNote(state, todoId, currentEdit.note);
+          setNoteSaveStatus(
+            todoId,
+            currentEdit.syncedRevision === currentEdit.revision ? 'saved' : 'saving',
+          );
+        }
+        return;
+      }
+
+      const todo = findTodo(todoId);
+      if (!todo) {
+        return;
+      }
+
+      const saved = await syncRemoteChange('Saving note', () =>
+        persistTodoNote({ ...todo, note: edit.note }),
+      );
+      if (saved) {
+        markNoteEditSynced(todoId, edit.revision);
+      }
+      if (readNoteEdit(todoId)?.revision === edit.revision) {
+        setNoteSaveStatus(todoId, saved ? 'saved' : 'error');
+      }
+      if (!saved) {
+        throw new Error('Note sync failed');
+      }
+    });
+  }
+
+  function queuePendingNoteSaves() {
+    let changed = false;
+
+    for (const { todo, edit } of getPendingNoteEdits(state.todos)) {
+      if (todo.note !== edit.note) {
+        state = updateTodoNote(state, todo.id, edit.note);
+        changed = true;
+      }
+
+      setNoteSaveStatus(todo.id, 'saving');
+      noteAutosave.schedule(todo.id, edit);
+    }
+
+    if (changed) {
+      saveLocalState(state);
+    }
+  }
+
+  function setNoteSaveStatus(todoId, status) {
+    noteSaveStatuses = { ...noteSaveStatuses, [todoId]: status };
   }
 
   async function handleProgressiveChange(todoId, isProgressive) {
@@ -317,15 +400,17 @@
   async function syncRemoteChange(message, action) {
     if (!useRemote || !authUser) {
       renderSyncStatus();
-      return;
+      return true;
     }
 
     syncMessage = message;
     try {
       await action();
       renderSyncStatus();
+      return true;
     } catch (error) {
       syncMessage = `Offline cache: ${error.message}`;
+      return false;
     }
   }
 
@@ -462,7 +547,8 @@
               onTimerAction={handleTimerAction}
               onComplete={handleComplete}
               onTitleCommit={handleTitleCommit}
-              onNoteSave={handleNoteSave}
+              onNoteInput={handleNoteInput}
+              noteSaveStatus={noteSaveStatuses[todo.id] ?? 'saved'}
               onProgressiveChange={handleProgressiveChange}
               onProgressCommit={handleProgressCommit}
               onDueDateChange={handleDueDateChange}
@@ -488,7 +574,8 @@
               onTimerAction={handleTimerAction}
               onComplete={handleComplete}
               onTitleCommit={handleTitleCommit}
-              onNoteSave={handleNoteSave}
+              onNoteInput={handleNoteInput}
+              noteSaveStatus={noteSaveStatuses[todo.id] ?? 'saved'}
               onProgressiveChange={handleProgressiveChange}
               onProgressCommit={handleProgressCommit}
               onDueDateChange={handleDueDateChange}
