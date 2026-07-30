@@ -33,6 +33,9 @@ try {
     ...assertExists(desktop, '.theme-toggle', 'theme toggle'),
     ...assertBucketLabels(desktop),
     ...assertIncludes(desktop.summaryDurations, '45m', 'summary duration text'),
+    ...assertStartsWith(desktop.summaryTiming, 'Start ', 'summary start time'),
+    ...assertStartsWith(desktop.summaryTiming, 'End ', 'summary end time'),
+    ...assertStartsWith(desktop.taskTiming, 'Started ', 'running task start label'),
     ...assertDraftInsertionCue(draftCue),
   ];
 
@@ -216,6 +219,8 @@ async function inspectViewport(viewport, isMobile) {
       },
       summaryBuckets: Array.from(document.querySelectorAll('.summary-section h3')).map((element) => element.textContent.trim()),
       summaryDurations: Array.from(document.querySelectorAll('.summary-duration')).map((element) => element.textContent.trim()),
+      summaryTiming: Array.from(document.querySelectorAll('.summary-timing span')).map((element) => element.textContent.trim()),
+      taskTiming: Array.from(document.querySelectorAll('.task-timing')).map((element) => element.textContent.trim()),
       taskSections: Array.from(document.querySelectorAll('.task-list-section')).map((section) => ({
         heading: section.querySelector('h2')?.textContent.trim(),
         count: section.querySelector('.section-count')?.textContent.trim(),
@@ -307,7 +312,7 @@ async function exerciseSummaryTimeEditing(page) {
   }));
   await page.keyboard.press('Escape');
 
-  await page.locator('[data-summary-id="ui-smoke-morning-task"] time').dblclick();
+  await page.locator('[data-summary-id="ui-smoke-morning-task"] .summary-time-button time').dblclick();
   await page.fill('#summary-time-edit-ui-smoke-morning-task', '05:00');
   await page.locator('#summary-time-edit-ui-smoke-morning-task').press('Enter');
 
@@ -319,7 +324,9 @@ async function exerciseSummaryTimeEditing(page) {
     return {
       completedHour: completedAt.getHours(),
       completedMinute: completedAt.getMinutes(),
-      displayedTime: document.querySelector('[data-summary-id="ui-smoke-morning-task"] time')?.textContent.trim(),
+      displayedTime: document.querySelector(
+        '[data-summary-id="ui-smoke-morning-task"] .summary-time-button time',
+      )?.textContent.trim(),
       inputStillOpen: Boolean(document.querySelector('#summary-time-edit-ui-smoke-morning-task')),
       summaryCalendarPresentation,
     };
@@ -693,6 +700,12 @@ function assertBucketLabels(result) {
 
 function assertIncludes(values, expected, label) {
   return values.includes(expected) ? [] : [`${label} does not include ${expected}; saw ${values.join(', ')}`];
+}
+
+function assertStartsWith(values, expected, label) {
+  return values.some((value) => value.startsWith(expected))
+    ? []
+    : [`${label} does not start with ${expected}; saw ${values.join(', ')}`];
 }
 
 function assertGlassSurface(result, selector, label) {

@@ -159,6 +159,7 @@ describe('todo day summary', () => {
         {
           id: todoId,
           title: 'Review prototype',
+          firstStartedAt: null,
           completedAt: doneAt.toISOString(),
           note: '',
           durationSeconds: 0,
@@ -296,6 +297,8 @@ describe('todo day summary', () => {
       trackedSeconds: 150 * 60,
     });
     expect(getDaySummary(state, '2026-06-10').flatMap((section) => section.items)[0]).toMatchObject({
+      firstStartedAt: '2026-06-10T13:15:00.000Z',
+      completedAt: '2026-06-10T15:45:00.000Z',
       durationSeconds: 150 * 60,
       durationLabel: '2h 30m',
     });

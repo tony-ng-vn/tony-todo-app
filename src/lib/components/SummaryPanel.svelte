@@ -2,6 +2,7 @@
   import { tick } from 'svelte';
   import CalendarPicker from './CalendarPicker.svelte';
   import { linkifyText } from '../../linkify.js';
+  import { formatTaskTimestamp } from '../../todoStore.js';
   import { iconPage } from './icons.js';
 
   export let summary = [];
@@ -122,6 +123,19 @@
                     {#if item.progressLabel}
                       <span class="summary-progress">{item.progressLabel}</span>
                     {/if}
+                    <span class="summary-timing" aria-label="Task start and end time">
+                      <span>
+                        Start
+                        {#if item.firstStartedAt}
+                          <time datetime={item.firstStartedAt}>{formatTaskTimestamp(item.firstStartedAt)}</time>
+                        {:else}
+                          not recorded
+                        {/if}
+                      </span>
+                      <span>
+                        End <time datetime={item.completedAt}>{formatTaskTimestamp(item.completedAt)}</time>
+                      </span>
+                    </span>
                     <span class="summary-duration">{item.durationLabel}</span>
                   </div>
                   <button type="button" class="open-task-button" on:click={(event) => onOpenTask(item.id, event.currentTarget)} aria-label={`Open ${item.title} details`}>

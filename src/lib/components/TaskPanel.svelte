@@ -1,5 +1,5 @@
 <script>
-  import { formatDuration, formatDueDate, getElapsedSeconds } from '../../todoStore.js';
+  import { formatDuration, formatDueDate, formatTaskTimestamp, getElapsedSeconds } from '../../todoStore.js';
   import { linkifyText } from '../../linkify.js';
   import { iconCheck, iconMoon, iconPage, iconPause, iconPlay, iconSun, iconX } from './icons.js';
 
@@ -208,6 +208,11 @@
           {isRunning ? 'Tracking' : 'Duration'} {formatDuration(elapsedSeconds)}
         {/if}
       </span>
+      {#if todo.firstStartedAt}
+        <span class="task-timing">
+          Started <time datetime={todo.firstStartedAt}>{formatTaskTimestamp(todo.firstStartedAt)}</time>
+        </span>
+      {/if}
       {#if todo.dueDate}
         <span class="task-due-badge" data-due-for={todo.id}>Due {formatDueDate(todo.dueDate)}</span>
       {/if}

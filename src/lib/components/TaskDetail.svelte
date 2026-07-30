@@ -2,6 +2,7 @@
   import { tick } from 'svelte';
   import CalendarPicker from './CalendarPicker.svelte';
   import { linkifyText } from '../../linkify.js';
+  import { formatTaskTimestamp } from '../../todoStore.js';
 
   export let selectedTask = null;
   export let noteDraft = '';
@@ -310,6 +311,30 @@
       </div>
     {/if}
     <p class="detail-meta" id="detail-meta">{detailMeta(selectedTask)}</p>
+    <dl class="detail-timeline" aria-label="Task start and end time">
+      <div>
+        <dt>Started</dt>
+        <dd>
+          {#if selectedTask.firstStartedAt}
+            <time datetime={selectedTask.firstStartedAt}>{formatTaskTimestamp(selectedTask.firstStartedAt)}</time>
+          {:else}
+            Not started
+          {/if}
+        </dd>
+      </div>
+      <div>
+        <dt>Ended</dt>
+        <dd>
+          {#if selectedTask.completedAt}
+            <time datetime={selectedTask.completedAt}>{formatTaskTimestamp(selectedTask.completedAt)}</time>
+          {:else if selectedTask.activeStartedAt}
+            In progress
+          {:else}
+            Not finished
+          {/if}
+        </dd>
+      </div>
+    </dl>
     <label class="detail-due-date">
       <span>Due date</span>
       <input

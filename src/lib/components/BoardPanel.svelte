@@ -1,7 +1,7 @@
 <script>
   import { tick } from 'svelte';
   import { linkifyText } from '../../linkify.js';
-  import { formatDueDate } from '../../todoStore.js';
+  import { formatDueDate, formatTaskTimestamp } from '../../todoStore.js';
   import { iconMoon, iconPlus, iconSun } from './icons.js';
 
   export let syncMessage = 'Local only';
@@ -203,6 +203,16 @@
                     {/if}
                     {#if todo.outcome === 'failed'}
                       <span class="board-card-failed">Failed</span>
+                    {/if}
+                    {#if todo.firstStartedAt}
+                      <span class="board-card-timing">
+                        Start <time datetime={todo.firstStartedAt}>{formatTaskTimestamp(todo.firstStartedAt)}</time>
+                      </span>
+                    {/if}
+                    {#if todo.completedAt}
+                      <span class="board-card-timing">
+                        End <time datetime={todo.completedAt}>{formatTaskTimestamp(todo.completedAt)}</time>
+                      </span>
                     {/if}
                     <span class="board-card-duration" title="Time spent on this task">
                       {todo.durationLabel}
