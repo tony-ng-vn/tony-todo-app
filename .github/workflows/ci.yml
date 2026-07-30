@@ -42,3 +42,18 @@ jobs:
 
       - name: Audit high-severity dependencies
         run: npm audit --audit-level=high
+
+  native-menubar:
+    name: Native menu bar
+    runs-on: macos-14
+    timeout-minutes: 10
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Test Swift menu bar host
+        run: swift test --package-path native
+
+      - name: Build release binary
+        run: swift build --package-path native -c release

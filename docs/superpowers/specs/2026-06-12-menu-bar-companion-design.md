@@ -43,7 +43,8 @@ The `/menubar` route should reuse the existing todo domain modules:
 
 The menu-bar route should not duplicate todo business logic. It should only provide a tighter layout and interaction model for the popover.
 
-For the native shell, start with Electron because this repo is already JavaScript/Svelte and the first goal is fast local usability. Electron can create a tray item and a frameless popover window that loads either the local dev URL or the deployed Vercel `/menubar` URL.
+For the native shell, use a small Swift executable with AppKit and WebKit.
+This follows Quill's single-binary `NSStatusItem` pattern and loads either the local development URL or the deployed Vercel `/menubar` URL in an `NSPopover`.
 
 ## User Experience
 
@@ -87,25 +88,25 @@ The menu-bar route should follow the same local/remote behavior as the main app:
 4. Save local state immediately.
 5. Sync remote mutations with `todoRemote`.
 
-The browser and Electron keep separate authentication sessions, but both use the same account-scoped `user_id` task set after sign-in.
+The browser and native WebKit shell keep separate authentication sessions, but both use the same account-scoped `user_id` task set after sign-in.
 
 First-version behavior:
 
-- Load the deployed Vercel `/menubar` URL in Electron so it uses the web runtime and remote InsForge behavior.
-- Reuse the current account authentication UI and require one sign-in inside the Electron profile.
+- Load the deployed Vercel `/menubar` URL in WebKit so it uses the web runtime and remote InsForge behavior.
+- Reuse the current account authentication UI and require one sign-in inside the native WebKit profile.
 - Refresh from the authoritative cloud task set whenever the popover regains focus.
 
 ## Native Shell
 
-Electron shell responsibilities:
+Native Swift shell responsibilities:
 
-- Create tray/menu-bar icon.
-- Toggle a frameless popover window on icon click.
-- Position the popover below the tray icon.
-- Hide the popover when it loses focus.
+- Create an AppKit `NSStatusItem` with a template SF Symbol.
+- Toggle an `NSPopover` on icon click.
+- Anchor the popover below the status item.
+- Use transient popover behavior so it hides when it loses focus.
 - Load the deployed `/menubar` URL by default.
 - In development, load the local Vite dev server `/menubar` URL.
-- Provide a Quit action in a fallback context menu if needed.
+- Provide Open Done Log and Quit actions in the right-click context menu.
 
 The shell should not own todo state.
 
@@ -130,7 +131,7 @@ Add or extend tests in small slices:
 - Smoke assertions for quick add, start timer, stop timer, finish task, and opening compact details.
 - Build verification with `npm run build`.
 
-Electron shell verification can be manual at first:
+Native shell verification includes Swift unit tests, a process smoke check, and a manual interaction pass:
 
 - app launches
 - icon appears in menu bar

@@ -5,7 +5,10 @@ It supports quick capture, ongoing and open task lists, timer controls, normal c
 
 ## Run Locally
 
-Install dependencies and start SvelteKit on the port used by the Electron development script:
+The native shell requires macOS 14 or newer and the Xcode command line tools.
+Run `xcode-select --install` if Swift is not already available.
+
+Install dependencies and start SvelteKit on the port used by the native development script:
 
 ```bash
 npm install
@@ -19,7 +22,7 @@ npm run menubar:dev
 ```
 
 The development command opens `http://127.0.0.1:5176/menubar?local=1`.
-Local mode stores data in the Electron browser profile and does not connect to InsForge.
+Local mode stores data in the native WebKit profile and does not connect to InsForge.
 
 ## Run Against the Deployed App
 
@@ -29,8 +32,10 @@ Start the shell without a local override:
 npm run menubar
 ```
 
+The first run compiles the small Swift host.
+The command remains open while the menu bar app is running, and Control+C quits it.
 The default URL is `https://tony-todo-app.vercel.app/menubar`.
-The Electron browser profile has its own authentication session, so sign in once inside the popover to use the same account-backed task set as the full app.
+The native WebKit profile has its own authentication session, so sign in once inside the popover to use the same account-backed task set as the full app.
 
 Set `DONE_LOG_MENUBAR_URL` to test another deployment:
 
@@ -60,7 +65,7 @@ With the development server running on port 5176, run:
 npm test
 UI_SMOKE_URL=http://127.0.0.1:5176 npm run test:ui
 npm run test:menubar
-npm run test:electron
+npm run test:native-menubar
 npm run menubar:check
 npm run build
 ```
@@ -68,11 +73,12 @@ npm run build
 For the manual native check:
 
 1. Run `npm run menubar:dev`.
-2. Click the Done Log tray icon and confirm the popover appears below it.
-3. Add a task and confirm it appears under Open.
-4. Start and pause the task.
-5. Expand the task, edit its fields, and confirm the note saves automatically.
-6. Click outside the popover and confirm it hides.
-7. Reopen it and confirm the task state remains.
-8. Use Open full app and confirm the root app opens in the default browser.
-9. Right-click the tray icon and confirm Open Done Log and Quit are available.
+2. Confirm the checkmark circle is visible in the macOS menu bar.
+3. Click the Done Log tray icon and confirm the popover appears below it.
+4. Add a task and confirm it appears under Open.
+5. Start and pause the task.
+6. Expand the task, edit its fields, and confirm the note saves automatically.
+7. Click outside the popover and confirm it hides.
+8. Reopen it and confirm the task state remains.
+9. Use Open full app and confirm the root app opens in the default browser.
+10. Right-click the tray icon and confirm Open Done Log and Quit are available.

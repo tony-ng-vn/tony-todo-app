@@ -39,4 +39,6 @@
 - The companion uses the app's current account-based `user_id` sync instead of the design document's older anonymous `client_id` handoff.
 - The compact route lists only ongoing and open tasks, so the full app remains responsible for the completed-task timing editor.
 - Added Playwright coverage for quick capture, parallel start and pause, normal completion, progressive session logging, inline title and note edits, progress, due date, progressive toggle, delete, compact overflow, and hidden scrollbars.
-- Added Electron configuration tests and a real launch smoke check so the native runtime, route loading, and on-screen positioning are verified separately from the browser route.
+- Added Swift configuration, navigation, permission, and single-instance tests plus a process smoke check that waits for the menu bar route to load.
+- Replaced the raw Electron shell with a Swift `NSStatusItem`, `NSPopover`, and `WKWebView` host after Electron failed to register a visible macOS status item.
+- The native host follows Quill's single-binary approach, keeps the existing `/menubar` web UI, avoids the Electron download, and verifies the status item with Swift unit and process smoke checks.
