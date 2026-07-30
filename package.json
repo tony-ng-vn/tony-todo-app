@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "TZ=America/Los_Angeles vitest run",
+    "test": "vitest run",
     "test:electron": "vitest run electron/shellConfig.test.js",
     "test:ui": "node scripts/ui-smoke.mjs",
     "test:menubar": "node scripts/menubar-smoke.mjs",
