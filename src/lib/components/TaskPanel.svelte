@@ -2,6 +2,7 @@
   import { formatDuration, formatDueDate, getElapsedSeconds } from '../../todoStore.js';
   import { linkifyText } from '../../linkify.js';
   import { iconCheck, iconMoon, iconPage, iconPause, iconPlay, iconSun, iconX } from './icons.js';
+  import WorkspaceTabs from './WorkspaceTabs.svelte';
 
   export let syncMessage = 'Local only';
   export let ongoingTodos = [];
@@ -65,41 +66,7 @@
     </div>
   </div>
 
-  <div class="view-toggle" role="group" aria-label="Workspace view">
-    <button
-      type="button"
-      class="view-toggle-button"
-      class:is-active={viewMode === 'flow'}
-      aria-current={viewMode === 'flow' ? 'page' : undefined}
-      on:click={() => onViewChange?.('flow')}
-    >
-      Tasks
-    </button>
-    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('board')}>
-      Board
-    </button>
-    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('calendar')}>
-      Calendar
-    </button>
-    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('inbox')}>
-      Inbox{inboxCount ? ` (${inboxCount})` : ''}
-    </button>
-    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('waiting')}>
-      Waiting{waitingCount ? ` (${waitingCount})` : ''}
-    </button>
-    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('history')}>
-      History
-    </button>
-    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('meetings')}>
-      Meetings
-    </button>
-    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('profile')}>
-      Profile
-    </button>
-    <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('settings')}>
-      Settings
-    </button>
-  </div>
+  <WorkspaceTabs currentView={viewMode} {inboxCount} {waitingCount} {onViewChange} />
 
   <form class="new-task-form" id="new-task-form" on:submit|preventDefault={onSubmit}>
     <label for="todo-title">New task</label>

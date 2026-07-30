@@ -1,4 +1,6 @@
 <script>
+  import WorkspaceTabs from './WorkspaceTabs.svelte';
+
   export let loops = [];
   export let inboxCount = 0;
   export let waitingCount = 0;
@@ -12,21 +14,7 @@
       <h2 id="history-heading">History</h2>
       <span class="panel-count">{loops.length} dismissed</span>
     </div>
-    <div class="view-toggle" role="group" aria-label="Workspace view">
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('flow')}>Tasks</button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('board')}>Board</button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('calendar')}>Calendar</button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('inbox')}>
-        Inbox{inboxCount ? ` (${inboxCount})` : ''}
-      </button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('waiting')}>
-        Waiting{waitingCount ? ` (${waitingCount})` : ''}
-      </button>
-      <button type="button" class="view-toggle-button is-active" aria-current="page">History</button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('meetings')}>Meetings</button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('profile')}>Profile</button>
-      <button type="button" class="view-toggle-button" on:click={() => onViewChange?.('settings')}>Settings</button>
-    </div>
+    <WorkspaceTabs currentView="history" {inboxCount} {waitingCount} {onViewChange} />
   </div>
   <p class="panel-note">Loops you dismissed as not-a-task. Restore one if it was a mistake.</p>
 

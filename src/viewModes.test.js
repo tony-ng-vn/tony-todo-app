@@ -1,14 +1,23 @@
 import { describe, expect, it } from 'vitest';
-import { VIEW_MODES, normalizeViewMode } from './viewModes.js';
+import { VIEW_MODES, WORKSPACE_TABS, normalizeViewMode } from './viewModes.js';
 
 describe('view modes', () => {
-  it('includes profile as a first-class view', () => {
-    expect(VIEW_MODES).toContain('profile');
+  it('keeps settings and removes the duplicate profile view', () => {
+    expect(VIEW_MODES).toContain('settings');
+    expect(VIEW_MODES).not.toContain('profile');
+  });
+
+  it('uses the same view definitions for routing and navigation', () => {
+    expect(WORKSPACE_TABS.map((tab) => tab.id)).toEqual(VIEW_MODES);
   });
 
   it('keeps a known view mode unchanged', () => {
     expect(normalizeViewMode('board')).toBe('board');
-    expect(normalizeViewMode('profile')).toBe('profile');
+    expect(normalizeViewMode('settings')).toBe('settings');
+  });
+
+  it('migrates a saved profile view to settings', () => {
+    expect(normalizeViewMode('profile')).toBe('settings');
   });
 
   it('falls back to flow for anything unknown', () => {
