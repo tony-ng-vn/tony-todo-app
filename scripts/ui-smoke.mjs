@@ -52,6 +52,11 @@ try {
 async function inspectWorkspaceNavigation(viewport) {
   const page = await browser.newPage({ viewport });
   await page.addInitScript(() => {
+    if (sessionStorage.getItem('ui-smoke-navigation-seeded')) {
+      return;
+    }
+
+    sessionStorage.setItem('ui-smoke-navigation-seeded', '1');
     localStorage.setItem('done-log-client-id', 'ui-smoke-navigation');
     localStorage.setItem('done-log-state', JSON.stringify({ todos: [] }));
     localStorage.setItem('done-log-view', 'flow');
