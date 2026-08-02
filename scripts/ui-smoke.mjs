@@ -9,6 +9,7 @@ try {
   const mobile = await inspectViewport({ width: 390, height: 844 }, true);
   const desktop = await inspectViewport({ width: 1366, height: 900 }, false);
   const draftCue = await inspectDraftInsertionCue({ width: 1366, height: 900 });
+  const boardCardLayout = await inspectBoardCardLayout({ width: 1366, height: 900 });
   const navigation = await inspectWorkspaceNavigation({ width: 1366, height: 900 });
   const failures = [
     ...assertNoOverflow(mobile),
@@ -23,6 +24,8 @@ try {
     ...assertTimerControlLabel(desktop),
     ...assertTaskRowSpacing(desktop),
     ...assertOngoingSection(desktop),
+    ...assertManualTiming(desktop),
+    ...assertBoardCardLayout(boardCardLayout),
     ...assertPausedTimeline(desktop),
     ...assertFullScreenShell(desktop, '.workspace', 'workspace shell'),
     ...assertFixedDocumentScroll(desktop),
@@ -154,6 +157,61 @@ async function inspectDraftInsertionCue(viewport) {
   return { ...draftMetrics, ...taskMetrics };
 }
 
+async function inspectBoardCardLayout(viewport) {
+  const page = await browser.newPage({ viewport });
+  await page.addInitScript(() => {
+    const now = new Date();
+    const dayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const at = (hour, minute) =>
+      new Date(
+        `${dayKey}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`,
+      ).toISOString();
+    localStorage.setItem('done-log-client-id', 'ui-smoke-board-card');
+    localStorage.setItem('done-log-view', 'board');
+    localStorage.setItem(
+      'done-log-state',
+      JSON.stringify({
+        todos: [
+          {
+            id: 'ui-smoke-board-progress',
+            title: 'Board progress wrapping task',
+            createdAt: at(8, 0),
+            completedAt: at(12, 0),
+            firstStartedAt: at(11, 0),
+            trackedSeconds: 3600,
+            progressLabel:
+              'A long progress note that should wrap inside the card instead of becoming a giant pill that pushes the timing details out of view.',
+          },
+        ],
+      }),
+    );
+  });
+  await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
+  await page.waitForSelector('.board-card-progress');
+  const result = await page.evaluate(() => {
+    const progress = document.querySelector('.board-card-progress');
+    const meta = document.querySelector('.board-card-meta');
+    const timing = document.querySelector('.board-card-timing');
+    const label = timing?.querySelector('.board-card-timing-label');
+    const time = timing?.querySelector('time');
+    const progressStyle = progress ? getComputedStyle(progress) : null;
+    const timingStyle = timing ? getComputedStyle(timing) : null;
+    return {
+      progressWidth: Math.round(progress?.getBoundingClientRect().width ?? 0),
+      metaWidth: Math.round(meta?.getBoundingClientRect().width ?? 0),
+      progressDisplay: progressStyle?.display,
+      progressBorderRadius: progressStyle?.borderRadius,
+      progressWhiteSpace: progressStyle?.whiteSpace,
+      progressOverflowWrap: progressStyle?.overflowWrap,
+      timingGap: Number.parseFloat(timingStyle?.gap ?? '0'),
+      timingLabelWidth: Math.round(label?.getBoundingClientRect().width ?? 0),
+      timingTimeWidth: Math.round(time?.getBoundingClientRect().width ?? 0),
+    };
+  });
+  await page.close();
+  return result;
+}
+
 async function inspectViewport(viewport, isMobile) {
   const page = await browser.newPage({ viewport, isMobile });
   await page.addInitScript(() => {
@@ -179,6 +237,14 @@ async function inspectViewport(viewport, isMobile) {
             id: 'ui-smoke-today-task',
             title: 'Today section task',
             createdAt: completedAt(9, 5),
+            completedAt: null,
+            note: '',
+          },
+          {
+            id: 'ui-smoke-manual-timing-task',
+            title: 'Manual timing task',
+            createdAt: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
+            dueDate: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
             completedAt: null,
             note: '',
           },
@@ -241,6 +307,7 @@ async function inspectViewport(viewport, isMobile) {
     );
   });
   await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
+  const manualTiming = isMobile ? null : await exerciseManualTiming(page);
   const pausedTimeline = isMobile ? null : await inspectPausedTimeline(page);
   const summaryTimeEdit = isMobile ? null : await exerciseSummaryTimeEditing(page);
   const taskFlowChecks = isMobile ? null : await exerciseParallelAndReopen(page);
@@ -378,7 +445,67 @@ async function inspectViewport(viewport, isMobile) {
   });
 
   await page.close();
-  return { viewport, editChecks, pausedTimeline, summaryTimeEdit, taskFlowChecks, ...metrics };
+  return {
+    viewport,
+    editChecks,
+    manualTiming,
+    pausedTimeline,
+    summaryTimeEdit,
+    taskFlowChecks,
+    ...metrics,
+  };
+}
+
+async function exerciseManualTiming(page) {
+  await page.click('[data-todo-id="ui-smoke-manual-timing-task"] .open-task-button');
+  await page.waitForSelector('.detail-start-picker');
+
+  async function choosePastDateTime(selector, hour, minute, period, choosePreviousMonth = true) {
+    await page.locator(selector).click();
+    await page.waitForSelector('.calendar-popover');
+    if (choosePreviousMonth) {
+      const currentMonthTitle = await page.locator('.calendar-month-title').textContent();
+      await page.locator('.calendar-nav button[aria-label="Previous month"]').click();
+      await page.waitForFunction(
+        (previousTitle) =>
+          document.querySelector('.calendar-month-title')?.textContent !== previousTitle,
+        currentMonthTitle,
+      );
+      await page.locator('.calendar-day:not(.is-muted)').last().click();
+    }
+    await page.fill('.calendar-hour-input', String(hour).padStart(2, '0'));
+    await page.fill('.calendar-minute-input', String(minute).padStart(2, '0'));
+    await page.locator('.calendar-period-button', { hasText: period }).click();
+    await page.click('.calendar-apply');
+  }
+
+  await choosePastDateTime('.detail-end-picker', 10, 0, 'AM');
+  await choosePastDateTime('.detail-start-picker', 11, 0, 'AM');
+  const invalidError = await page.locator('.detail-timing-error').textContent();
+
+  await choosePastDateTime('.detail-start-picker', 9, 0, 'AM', false);
+  await page.waitForFunction(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    return Boolean(state.todos.find((item) => item.id === 'ui-smoke-manual-timing-task')?.completedAt);
+  });
+  const result = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    const task = state.todos.find((item) => item.id === 'ui-smoke-manual-timing-task');
+    const completedAt = task?.completedAt ? new Date(task.completedAt) : null;
+    return {
+      completed: Boolean(task?.completedAt),
+      trackedSeconds: task?.trackedSeconds,
+      completedDayKey: completedAt
+        ? `${completedAt.getFullYear()}-${String(completedAt.getMonth() + 1).padStart(2, '0')}-${String(completedAt.getDate()).padStart(2, '0')}`
+        : null,
+    };
+  });
+  result.invalidError = invalidError?.trim() ?? '';
+  await page.click('#detail-close');
+  await page.locator('#summary-date').click();
+  await page.waitForSelector('.calendar-popover');
+  await page.locator('.calendar-footer button', { hasText: 'Today' }).click();
+  return result;
 }
 
 async function inspectPausedTimeline(page) {
@@ -408,11 +535,23 @@ async function exerciseSummaryTimeEditing(page) {
   }));
   await page.keyboard.press('Escape');
 
+  await page.locator('[data-summary-id="ui-smoke-lunch-task"] .summary-time-button time').dblclick();
+  await page.fill('#summary-time-edit-ui-smoke-lunch-task', '11:00');
+  await page.locator('#summary-time-edit-ui-smoke-lunch-task').press('Enter');
+  const invalidEndError = await page
+    .locator('#summary-time-error-ui-smoke-lunch-task')
+    .textContent();
+  const invalidInputStillOpen = Boolean(
+    await page.locator('#summary-time-edit-ui-smoke-lunch-task').count(),
+  );
+  await page.fill('#summary-time-edit-ui-smoke-lunch-task', '12:20');
+  await page.locator('#summary-time-edit-ui-smoke-lunch-task').press('Enter');
+
   await page.locator('[data-summary-id="ui-smoke-morning-task"] .summary-time-button time').dblclick();
   await page.fill('#summary-time-edit-ui-smoke-morning-task', '05:00');
   await page.locator('#summary-time-edit-ui-smoke-morning-task').press('Enter');
 
-  const result = await page.evaluate((summaryCalendarPresentation) => {
+  const result = await page.evaluate(({ summaryCalendarPresentation, invalidEndError, invalidInputStillOpen }) => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     const todo = state.todos.find((item) => item.id === 'ui-smoke-morning-task');
     const completedAt = new Date(todo.completedAt);
@@ -425,8 +564,14 @@ async function exerciseSummaryTimeEditing(page) {
       )?.textContent.trim(),
       inputStillOpen: Boolean(document.querySelector('#summary-time-edit-ui-smoke-morning-task')),
       summaryCalendarPresentation,
+      invalidEndError,
+      invalidInputStillOpen,
     };
-  }, summaryCalendarPresentation);
+  }, {
+    summaryCalendarPresentation,
+    invalidEndError: invalidEndError?.trim() ?? '',
+    invalidInputStillOpen,
+  });
 
   await page.click('[data-summary-id="ui-smoke-morning-task"] .open-task-button');
   await page.waitForSelector('.detail-start-picker');
@@ -776,20 +921,55 @@ function assertTaskRowSpacing(result) {
 }
 
 function assertOngoingSection(result) {
-  const [ongoing, paused, today, other] = result.taskSections;
+  const ongoing = result.taskSections.find((section) => section.heading === 'Ongoing');
+  const todayIndex = result.taskSections.findIndex((section) => section.heading === 'Today todos');
+  const pausedIndex = result.taskSections.findIndex((section) => section.heading === 'Paused');
+  const today = result.taskSections[todayIndex];
+  const paused = result.taskSections[pausedIndex];
+  const dated = result.taskSections.find((section) => section.ids.includes('ui-smoke-local-task'));
   return ongoing?.heading === 'Ongoing' &&
     ongoing?.ids.includes('ui-smoke-overflow-task-0') &&
+    ongoing?.ids[0] === 'ui-smoke-overflow-task-1' &&
     paused?.heading === 'Paused' &&
     paused?.ids.includes('ui-smoke-paused-task') &&
     today?.heading === 'Today todos' &&
     today.ids.includes('ui-smoke-today-task') &&
-    other?.heading === 'Other todos' &&
-    other.ids.includes('ui-smoke-local-task') &&
+    dated?.heading === 'Jun 8, 2026' &&
+    dated.ids.includes('ui-smoke-local-task') &&
+    todayIndex >= 0 &&
+    pausedIndex > todayIndex &&
     !today?.ids.includes('ui-smoke-overflow-task-0') &&
     !today?.ids.includes('ui-smoke-paused-task') &&
-    !other?.ids.includes('ui-smoke-overflow-task-0')
+    !dated?.ids.includes('ui-smoke-overflow-task-0')
     ? []
     : [`running, paused, and dated tasks are not separated correctly: ${JSON.stringify(result.taskSections)}`];
+}
+
+function assertManualTiming(result) {
+  const timing = result.manualTiming;
+  const now = new Date();
+  const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  return timing?.invalidError === 'Start time must be before end time.' &&
+    timing.completed === true &&
+    timing.trackedSeconds === 60 * 60 &&
+    timing.completedDayKey !== todayKey
+    ? []
+    : [
+        `manual timing controls did not validate and complete a past-date task: ${JSON.stringify(timing)}`,
+      ];
+}
+
+function assertBoardCardLayout(result) {
+  return result.progressDisplay === 'block' &&
+    result.progressWhiteSpace === 'normal' &&
+    result.progressOverflowWrap === 'anywhere' &&
+    result.progressWidth <= result.metaWidth &&
+    Number.parseFloat(result.progressBorderRadius) <= 12 &&
+    result.timingGap >= 4 &&
+    result.timingLabelWidth > 0 &&
+    result.timingTimeWidth > 0
+    ? []
+    : [`board card progress/timing layout is not restrained: ${JSON.stringify(result)}`];
 }
 
 function assertPausedTimeline(result) {
@@ -870,7 +1050,9 @@ function assertDetailEditing(result) {
     !summaryTimeEdit ||
     summaryTimeEdit.completedHour !== 5 ||
     summaryTimeEdit.completedMinute !== 0 ||
-    summaryTimeEdit.inputStillOpen
+    summaryTimeEdit.inputStillOpen ||
+    summaryTimeEdit.invalidEndError !== 'End time must be after start time.' ||
+    !summaryTimeEdit.invalidInputStillOpen
   ) {
     failures.push(`summary time inline edit failed: ${JSON.stringify(summaryTimeEdit)}`);
   }

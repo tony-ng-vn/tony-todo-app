@@ -40,7 +40,7 @@
     setTodoDueDate,
     setTodoProgressive,
     startTodoTimer,
-    updateCompletedTodoTiming,
+    updateTodoTiming,
     updateTodoCompletedAt,
     updateTodoNote,
     updateTodoProgress,
@@ -106,7 +106,8 @@
   let authError = '';
   let authLoading = false;
   let titleDraft = '';
-  let dueDateDraft = '';
+  let dueDateDraft = formatDayKey(new Date());
+  let lastSelectedDayForDraft = dueDateDraft;
   let draftTitle = '';
   let selectedTaskId = null;
   let editingTaskId = null;
@@ -160,6 +161,11 @@
   $: selectedNoteSaveStatus = noteSaveStatuses[selectedTaskId] ?? 'saved';
   $: selectedTaskSessions = selectedTaskId ? getProgressSessions(state, selectedTaskId) : [];
   $: selectedTaskTimeSegments = selectedTaskId ? getTaskTimeSegments(state, selectedTaskId) : [];
+
+  $: if (selectedDay !== lastSelectedDayForDraft && dueDateDraft === lastSelectedDayForDraft) {
+    dueDateDraft = selectedDay;
+    lastSelectedDayForDraft = selectedDay;
+  }
 
   onMount(() => {
     useRemote = isInsForgeConfigured && !new URLSearchParams(window.location.search).has('local');
@@ -215,7 +221,9 @@
 
   async function handleSubmit() {
     const existingIds = new Set(state.todos.map((todo) => todo.id));
-    state = addTodo(state, titleDraft, new Date(), { dueDate: dueDateInputToIso(dueDateDraft) });
+    state = addTodo(state, titleDraft, new Date(), {
+      dueDate: dueDateInputToIso(dueDateDraft || selectedDay),
+    });
     const createdTodo = state.todos.find((todo) => !existingIds.has(todo.id));
 
     if (!createdTodo) {
@@ -225,7 +233,8 @@
     newlyAddedTodoId = createdTodo.id;
     draftTitle = '';
     titleDraft = '';
-    dueDateDraft = '';
+    dueDateDraft = selectedDay;
+    lastSelectedDayForDraft = selectedDay;
     saveLocalState(state);
     window.setTimeout(() => {
       if (newlyAddedTodoId === createdTodo.id) {
@@ -259,7 +268,9 @@
     if (!beforeTodo?.isProgressive && selectedTaskId === todoId) {
       selectedTaskId = null;
     }
-    selectedDay = formatDayKey(new Date());
+    selectedDay = completedTodo?.completedAt
+      ? formatDayKey(new Date(completedTodo.completedAt))
+      : formatDayKey(new Date());
     saveLocalState(state);
 
     if (beforeTodo?.isProgressive) {
@@ -283,7 +294,9 @@
     if (selectedTaskId === todoId) {
       selectedTaskId = null;
     }
-    selectedDay = formatDayKey(new Date());
+    selectedDay = failedTodo?.completedAt
+      ? formatDayKey(new Date(failedTodo.completedAt))
+      : formatDayKey(new Date());
     saveLocalState(state);
     await syncRemoteChange('Saving failed task', () => persistCompletedTodo(failedTodo));
   }
@@ -293,7 +306,23 @@
     state = action === 'pause' ? pauseTodoTimer(state, todoId) : startTodoTimer(state, todoId);
     const changedTodos = getTimerChangedTodos(beforeTodos, state.todos);
     saveLocalState(state);
+    if (action === 'start') {
+      await revealTodo(todoId);
+    }
     await syncRemoteChange('Saving time', () => Promise.all(changedTodos.map((todo) => persistTodoTimer(todo))));
+  }
+
+  async function revealTodo(todoId) {
+    await tick();
+    const row = document.querySelector(`[data-todo-id="${CSS.escape(todoId)}"]`);
+    if (!row) {
+      return;
+    }
+
+    row.scrollIntoView({
+      block: 'nearest',
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
   }
 
   async function startTitleEdit(todoId) {
@@ -458,7 +487,9 @@
       if (!beforeTodo?.isProgressive && selectedTaskId === todoId) {
         selectedTaskId = null;
       }
-      selectedDay = formatDayKey(new Date());
+      selectedDay = completedTodo?.completedAt
+        ? formatDayKey(new Date(completedTodo.completedAt))
+        : formatDayKey(new Date());
     }
 
     saveLocalState(state);
@@ -482,7 +513,7 @@
 
   async function handleCreateTaskInColumn(columnId, title) {
     const existingIds = new Set(state.todos.map((todo) => todo.id));
-    state = addTodo(state, title);
+    state = addTodo(state, title, new Date(), { dueDate: dueDateInputToIso(selectedDay) });
 
     if (columnId === 'in_progress' || columnId === 'done') {
       const created = state.todos.find((todo) => !existingIds.has(todo.id));
@@ -506,7 +537,9 @@
 
     if (columnId === 'done') {
       triggerCompletionCue(createdTodo);
-      selectedDay = formatDayKey(new Date());
+      selectedDay = createdTodo?.completedAt
+        ? formatDayKey(new Date(createdTodo.completedAt))
+        : formatDayKey(new Date());
       await syncRemoteChange('Saving', () => persistNewTodo(createdTodo));
       return;
     }
@@ -660,12 +693,18 @@
 
   async function handleCompletedAtChange(todoId, dateValue, timeValue) {
     if (!dateValue || !timeValue) {
-      return;
+      return { ok: false, error: 'Choose a valid end date and time.' };
     }
 
     const completedAt = new Date(`${dateValue}T${timeValue}`);
     if (Number.isNaN(completedAt.getTime())) {
-      return;
+      return { ok: false, error: 'Choose a valid end date and time.' };
+    }
+
+    const todo = findTodo(todoId);
+    const startedAt = todo?.firstStartedAt ? new Date(todo.firstStartedAt) : null;
+    if (startedAt && !Number.isNaN(startedAt.getTime()) && startedAt >= completedAt) {
+      return { ok: false, error: 'End time must be after start time.' };
     }
 
     const beforeTodos = state.todos;
@@ -673,44 +712,58 @@
     const changedTodos = getCompletionChangedTodos(beforeTodos, state.todos);
 
     if (changedTodos.length === 0) {
-      return;
+      return { ok: false, error: 'The finish time could not be updated.' };
     }
 
     selectedDay = formatDayKey(completedAt);
     saveLocalState(state);
     await syncRemoteChange('Saving finish time', () => persistCompletionChangedTodos(changedTodos));
+    return { ok: true };
   }
 
   async function handleCompletedTimingChange(todoId, startedAt, completedAt) {
+    const start = new Date(startedAt);
+    const end = new Date(completedAt);
+    if (
+      Number.isNaN(start.getTime()) ||
+      Number.isNaN(end.getTime()) ||
+      start.getTime() >= end.getTime()
+    ) {
+      return { ok: false, error: 'Start time must be before end time.' };
+    }
+
     const beforeTodos = state.todos;
-    state = updateCompletedTodoTiming(state, todoId, startedAt, completedAt);
-    const changedTodos = getTodosWithChangedFields(beforeTodos, state.todos, [
+    const nextState = updateTodoTiming(state, todoId, startedAt, completedAt);
+    const changedTodos = getTodosWithChangedFields(beforeTodos, nextState.todos, [
       ...TIMER_SYNC_FIELDS,
       ...COMPLETION_SYNC_FIELDS,
     ]);
-    const updatedTodo = findTodo(todoId);
+    const updatedTodo = nextState.todos.find((todo) => todo.id === todoId);
+
+    if (changedTodos.length === 0 || !updatedTodo) {
+      return { ok: false, error: 'This task timing could not be updated.' };
+    }
+
+    state = nextState;
 
     if (updatedTodo?.completedAt) {
       selectedDay = formatDayKey(new Date(updatedTodo.completedAt));
     }
 
-    if (changedTodos.length === 0) {
-      return;
-    }
-
     saveLocalState(state);
     await syncRemoteChange('Saving time', () => persistCompletionChangedTodos(changedTodos));
+    return { ok: true };
   }
 
   async function handleSummaryCompletedTimeChange(todoId, timeValue) {
     const todo = findTodo(todoId);
     if (!todo?.completedAt) {
-      return;
+      return { ok: false, error: 'The finish time could not be updated.' };
     }
 
     const completedAt = new Date(todo.completedAt);
     const dateValue = `${completedAt.getFullYear()}-${String(completedAt.getMonth() + 1).padStart(2, '0')}-${String(completedAt.getDate()).padStart(2, '0')}`;
-    await handleCompletedAtChange(todoId, dateValue, timeValue);
+    return handleCompletedAtChange(todoId, dateValue, timeValue);
   }
 
   async function handleDeleteTask(todoId) {
@@ -1346,7 +1399,6 @@
     onDetailTitleCommit={handleDetailTitleCommit}
     onProgressiveChange={handleProgressiveChange}
     onProgressInput={handleProgressInput}
-    onCompletedDateChange={handleCompletedAtChange}
     onCompletedTimingChange={handleCompletedTimingChange}
     onDueDateChange={handleDueDateChange}
     onDeleteTask={handleDeleteTask}

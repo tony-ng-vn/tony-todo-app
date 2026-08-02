@@ -14,7 +14,6 @@
   export let onDetailTitleCommit;
   export let onProgressiveChange;
   export let onProgressInput;
-  export let onCompletedDateChange;
   export let onCompletedTimingChange;
   export let onDueDateChange;
   export let onDeleteTask;
@@ -24,12 +23,23 @@
 
   let activeDetailTaskId = null;
   let editingDetailTitle = false;
+  let timingDraftTaskId = null;
+  let timingDraftStart = '';
+  let timingDraftEnd = '';
+  let timingError = '';
 
   $: noteTodos = parseNoteTodos(noteDraft);
 
   $: if (selectedTask?.id !== activeDetailTaskId) {
     activeDetailTaskId = selectedTask?.id ?? null;
     editingDetailTitle = false;
+  }
+
+  $: if (selectedTask?.id !== timingDraftTaskId) {
+    timingDraftTaskId = selectedTask?.id ?? null;
+    timingDraftStart = completedStartValue(selectedTask);
+    timingDraftEnd = completedEndValue(selectedTask);
+    timingError = '';
   }
 
   async function startDetailTitleEdit() {
@@ -45,7 +55,7 @@
   }
 
   function completedStartValue(todo) {
-    return todo?.completedAt && todo.firstStartedAt ? toDateTimeLocalValue(todo.firstStartedAt) : '';
+    return todo?.firstStartedAt ? toDateTimeLocalValue(todo.firstStartedAt) : '';
   }
 
   function completedEndValue(todo) {
@@ -64,32 +74,58 @@
     onDueDateChange?.(selectedTask.id, event.currentTarget.value);
   }
 
-  function completedTimeValue(todo) {
-    const dateTimeValue = completedEndValue(todo);
-    return dateTimeValue ? dateTimeValue.split('T')[1] : '';
-  }
-
-  function handleDoneDateChange(value) {
+  async function handleDoneDateChange(value) {
     if (!selectedTask?.completedAt || !value) {
       return;
     }
 
-    onCompletedDateChange(selectedTask.id, value, completedTimeValue(selectedTask));
-  }
-
-  function handleTimingChange(field, value) {
-    if (!selectedTask?.completedAt) {
+    const endTime = (timingDraftEnd || completedEndValue(selectedTask)).split('T')[1];
+    if (!endTime) {
       return;
     }
 
-    const startedAt = field === 'start' ? value : completedStartValue(selectedTask);
-    const completedAt = field === 'end' ? value : completedEndValue(selectedTask);
+    timingDraftEnd = `${value}T${endTime}`;
+    await saveTimingDraft();
+  }
+
+  async function handleTimingChange(field, value) {
+    if (!selectedTask?.id) {
+      return;
+    }
+
+    if (field === 'start') {
+      timingDraftStart = value;
+    } else {
+      timingDraftEnd = value;
+    }
+    timingError = '';
+
+    await saveTimingDraft();
+  }
+
+  async function saveTimingDraft() {
+    const startedAt = timingDraftStart;
+    const completedAt = timingDraftEnd;
 
     if (!startedAt || !completedAt) {
       return;
     }
 
-    onCompletedTimingChange(selectedTask.id, startedAt, completedAt);
+    const start = new Date(startedAt);
+    const end = new Date(completedAt);
+    if (
+      Number.isNaN(start.getTime()) ||
+      Number.isNaN(end.getTime()) ||
+      start.getTime() >= end.getTime()
+    ) {
+      timingError = 'Start time must be before end time.';
+      return;
+    }
+
+    const result = await onCompletedTimingChange?.(selectedTask.id, startedAt, completedAt);
+    if (result?.ok === false) {
+      timingError = result.error ?? 'The task timing could not be updated.';
+    }
   }
 
   async function handleNoteTextareaInput(event) {
@@ -324,8 +360,8 @@
         on:change={handleDueDateInput}
       />
     </label>
-    {#if selectedTask.completedAt}
-      <div class="detail-timing-controls" aria-label="Task timing">
+    <div class="detail-timing-controls" aria-label="Task timing">
+      {#if selectedTask.completedAt}
         <label>
           <span>Done date</span>
           <CalendarPicker
@@ -335,31 +371,34 @@
             onChange={handleDoneDateChange}
           />
         </label>
-        <label>
-          <span>Start time</span>
-          {#if !selectedTask.firstStartedAt}
-            <small class="detail-start-missing">Not recorded</small>
-          {/if}
-          <CalendarPicker
-            mode="datetime"
-            triggerClass="detail-start-picker"
-            label="Change task start time"
-            value={completedStartValue(selectedTask)}
-            onChange={(nextValue) => handleTimingChange('start', nextValue)}
-          />
-        </label>
-        <label>
-          <span>End time</span>
-          <CalendarPicker
-            mode="datetime"
-            triggerClass="detail-end-picker"
-            label="Change task end time"
-            value={completedEndValue(selectedTask)}
-            onChange={(nextValue) => handleTimingChange('end', nextValue)}
-          />
-        </label>
-      </div>
-    {/if}
+      {/if}
+      <label>
+        <span>Start time</span>
+        {#if !selectedTask.firstStartedAt}
+          <small class="detail-start-missing">Not recorded</small>
+        {/if}
+        <CalendarPicker
+          mode="datetime"
+          triggerClass="detail-start-picker"
+          label="Change task start time"
+          value={timingDraftStart}
+          onChange={(nextValue) => handleTimingChange('start', nextValue)}
+        />
+      </label>
+      <label>
+        <span>End time</span>
+        <CalendarPicker
+          mode="datetime"
+          triggerClass="detail-end-picker"
+          label="Change task end time"
+          value={timingDraftEnd}
+          onChange={(nextValue) => handleTimingChange('end', nextValue)}
+        />
+      </label>
+      {#if timingError}
+        <p class="detail-timing-error" role="alert" aria-live="polite">{timingError}</p>
+      {/if}
+    </div>
     <div class="time-segment-history" aria-label="Time segments">
       <h3>Time segments</h3>
       {#if selectedTaskTimeSegments.length}

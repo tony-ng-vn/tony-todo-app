@@ -22,10 +22,12 @@
 
   let editingTimeId = null;
   let timeDraft = '';
+  let timeError = '';
 
   async function startTimeEdit(item) {
     editingTimeId = item.id;
     timeDraft = timeInputValue(item.completedAt);
+    timeError = '';
     await tick();
     document.querySelector(`#summary-time-edit-${CSS.escape(item.id)}`)?.focus();
     document.querySelector(`#summary-time-edit-${CSS.escape(item.id)}`)?.select();
@@ -33,18 +35,25 @@
 
   async function commitTimeEdit(item) {
     const nextTime = timeDraft.trim();
-    editingTimeId = null;
-
     if (!nextTime || nextTime === timeInputValue(item.completedAt)) {
+      editingTimeId = null;
       return;
     }
 
-    await onCompletedTimeChange(item.id, nextTime);
+    const result = await onCompletedTimeChange(item.id, nextTime);
+    if (result?.ok === false) {
+      timeError = result.error ?? 'End time must be after start time.';
+      return;
+    }
+
+    editingTimeId = null;
+    timeError = '';
   }
 
   function handleTimeKeydown(event, item) {
     if (event.key === 'Escape') {
       editingTimeId = null;
+      timeError = '';
       return;
     }
 
@@ -101,9 +110,16 @@
                       step="60"
                       bind:value={timeDraft}
                       aria-label={`Edit ${item.title} finished time`}
+                      aria-invalid={Boolean(timeError)}
+                      aria-describedby={timeError ? `summary-time-error-${item.id}` : undefined}
                       on:keydown={(event) => handleTimeKeydown(event, item)}
                       on:focusout={() => commitTimeEdit(item)}
                     />
+                    {#if timeError}
+                      <span class="summary-time-error" id={`summary-time-error-${item.id}`} role="alert">
+                        {timeError}
+                      </span>
+                    {/if}
                   {:else}
                     <button
                       type="button"

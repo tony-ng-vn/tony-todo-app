@@ -1,5 +1,5 @@
 <script>
-  import { onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount, tick } from 'svelte';
   import '../../styles.css';
   import AuthGate from '../../lib/components/AuthGate.svelte';
   import MenubarTaskRow from '../../lib/components/MenubarTaskRow.svelte';
@@ -7,6 +7,8 @@
     addTodo,
     createInitialState,
     deleteTodo,
+    getOpenTodoSections,
+    getCompletedTodoSections,
     getPendingTodos,
     getProgressSessions,
     logProgressSession,
@@ -15,6 +17,7 @@
     setTodoDueDate,
     setTodoProgressive,
     startTodoTimer,
+    updateTodoTiming,
     updateTodoNote,
     updateTodoProgress,
     updateTodoTitle,
@@ -46,6 +49,13 @@
   } from '../../todoRemote.js';
 
   const TIMER_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds', 'timeSegments'];
+  const TIMING_FIELDS = [
+    'firstStartedAt',
+    'activeStartedAt',
+    'completedAt',
+    'trackedSeconds',
+    'timeSegments',
+  ];
   const THEME_STORAGE_KEY = 'done-log-theme';
 
   let state = createInitialState();
@@ -72,7 +82,11 @@
   $: pendingTodoGroups = partitionPendingTodos(pendingTodos);
   $: ongoingTodos = pendingTodoGroups.ongoing;
   $: pausedTodos = pendingTodoGroups.paused;
-  $: openTodos = pendingTodoGroups.ready;
+  $: openTodoSections = getOpenTodoSections(pendingTodoGroups.ready, new Date());
+  $: todayOpenSection = openTodoSections.find((section) => section.isToday) ?? null;
+  $: datedOpenSections = openTodoSections.filter((section) => !section.isToday);
+  $: openTodos = openTodoSections.flatMap((section) => section.items);
+  $: completedTodoSections = getCompletedTodoSections(state, new Date());
 
   onMount(() => {
     useRemote = isInsForgeConfigured && !new URLSearchParams(window.location.search).has('local');
@@ -219,7 +233,8 @@
 
   async function handleAdd() {
     const existingIds = new Set(state.todos.map((todo) => todo.id));
-    state = addTodo(state, titleDraft);
+    const createdAt = new Date();
+    state = addTodo(state, titleDraft, createdAt);
     const createdTodo = state.todos.find((todo) => !existingIds.has(todo.id));
 
     if (!createdTodo) {
@@ -236,9 +251,21 @@
     state = action === 'pause' ? pauseTodoTimer(state, todoId) : startTodoTimer(state, todoId);
     const changedTodos = getChangedTodos(beforeTodos, state.todos, TIMER_FIELDS);
     saveLocalState(state);
+    if (action === 'start') {
+      await revealTodo(todoId);
+    }
     await syncRemoteChange('Saving time', () =>
       Promise.all(changedTodos.map((todo) => persistTodoTimer(todo))),
     );
+  }
+
+  async function revealTodo(todoId) {
+    await tick();
+    const row = document.querySelector(`[data-menubar-id="${CSS.escape(todoId)}"]`);
+    row?.scrollIntoView({
+      block: 'nearest',
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth',
+    });
   }
 
   async function handleComplete(todoId) {
@@ -378,6 +405,22 @@
     }
 
     await syncRemoteChange('Saving due date', () => persistTodoDueDate(after));
+  }
+
+  async function handleTimingChange(todoId, startedAt, completedAt) {
+    const beforeTodos = state.todos;
+    state = updateTodoTiming(state, todoId, startedAt, completedAt);
+    const changedTodos = getChangedTodos(beforeTodos, state.todos, TIMING_FIELDS);
+
+    if (changedTodos.length === 0) {
+      renderSyncStatus();
+      return;
+    }
+
+    saveLocalState(state);
+    await syncRemoteChange('Saving timing', () =>
+      Promise.all(changedTodos.map((todo) => persistCompletedTodo(todo))),
+    );
   }
 
   async function handleDelete(todoId) {
@@ -552,6 +595,34 @@
         </div>
       </section>
 
+      <section data-menubar-section="ready" aria-labelledby="menubar-ready-heading">
+        <div class="menubar-section-heading">
+          <h2 id="menubar-ready-heading">Today</h2>
+          <span>{todayOpenSection?.items.length ?? 0} ready</span>
+        </div>
+        <div class="menubar-date-groups">
+          {#if todayOpenSection}
+            <div
+              class="menubar-date-group"
+              data-menubar-date-group={todayOpenSection.id}
+              data-menubar-is-today="true"
+            >
+              <div class="menubar-date-heading">
+                <h3>{todayOpenSection.label}</h3>
+                <span>{todayOpenSection.items.length}</span>
+              </div>
+              <div class="menubar-section-list">
+                {#each todayOpenSection.items as todo (todo.id)}
+                  {@render taskRow(todo)}
+                {/each}
+              </div>
+            </div>
+          {:else}
+            <p class="menubar-empty">Nothing ready for today.</p>
+          {/if}
+        </div>
+      </section>
+
       <section data-menubar-section="paused" aria-labelledby="menubar-paused-heading">
         <div class="menubar-section-heading">
           <h2 id="menubar-paused-heading">Paused</h2>
@@ -566,19 +637,60 @@
         </div>
       </section>
 
-      <section data-menubar-section="open" aria-labelledby="menubar-open-heading">
-        <div class="menubar-section-heading">
-          <h2 id="menubar-open-heading">Open</h2>
-          <span>{openTodos.length} ready</span>
-        </div>
-        <div class="menubar-section-list">
-          {#each openTodos as todo (todo.id)}
-            {@render taskRow(todo)}
-          {:else}
-            <p class="menubar-empty">Nothing open. Capture the next thing above.</p>
-          {/each}
-        </div>
-      </section>
+      {#if datedOpenSections.length}
+        <section data-menubar-section="dated-ready" aria-labelledby="menubar-dated-ready-heading">
+          <div class="menubar-section-heading">
+            <h2 id="menubar-dated-ready-heading">Other dates</h2>
+            <span>{datedOpenSections.reduce((count, section) => count + section.items.length, 0)} ready</span>
+          </div>
+          <div class="menubar-date-groups">
+            {#each datedOpenSections as section (section.id)}
+              <div
+                class="menubar-date-group"
+                data-menubar-date-group={section.id}
+                data-menubar-is-today="false"
+              >
+                <div class="menubar-date-heading">
+                  <h3>{section.label}</h3>
+                  <span>{section.items.length}</span>
+                </div>
+                <div class="menubar-section-list">
+                  {#each section.items as todo (todo.id)}
+                    {@render taskRow(todo)}
+                  {/each}
+                </div>
+              </div>
+            {/each}
+          </div>
+        </section>
+      {/if}
+
+      {#if completedTodoSections.length}
+        <section data-menubar-section="finished" aria-labelledby="menubar-finished-heading">
+          <div class="menubar-section-heading">
+            <h2 id="menubar-finished-heading">Finished</h2>
+            <span>{completedTodoSections.reduce((count, section) => count + section.items.length, 0)} done</span>
+          </div>
+          <div class="menubar-date-groups">
+            {#each completedTodoSections as section (section.id)}
+              <div
+                class="menubar-date-group"
+                data-menubar-completed-date-group={section.id}
+              >
+                <div class="menubar-date-heading">
+                  <h3>{section.label}</h3>
+                  <span>{section.items.length}</span>
+                </div>
+                <div class="menubar-section-list">
+                  {#each section.items as todo (todo.id)}
+                    {@render taskRow(todo)}
+                  {/each}
+                </div>
+              </div>
+            {/each}
+          </div>
+        </section>
+      {/if}
     </div>
   </main>
 {/if}
@@ -596,6 +708,7 @@
     onProgressiveChange={handleProgressiveChange}
     onProgressCommit={handleProgressCommit}
     onDueDateChange={handleDueDateChange}
+    onTimingChange={handleTimingChange}
     onDelete={handleDelete}
   />
 {/snippet}
@@ -766,6 +879,36 @@
   .menubar-section-list {
     display: grid;
     gap: 7px;
+  }
+
+  .menubar-date-groups {
+    display: grid;
+    gap: 12px;
+  }
+
+  .menubar-date-group {
+    display: grid;
+    gap: 6px;
+  }
+
+  .menubar-date-heading {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 0 2px;
+  }
+
+  .menubar-date-heading h3 {
+    margin: 0;
+    color: var(--subtle);
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .menubar-date-heading span {
+    color: var(--subtle);
+    font-size: 10px;
   }
 
   .menubar-empty {

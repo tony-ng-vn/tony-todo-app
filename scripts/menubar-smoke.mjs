@@ -10,6 +10,12 @@ try {
   await page.emulateMedia({ reducedMotion: 'reduce' });
   await page.addInitScript(() => {
     const now = Date.now();
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    const twoDaysAgo = new Date(today);
+    twoDaysAgo.setDate(twoDaysAgo.getDate() - 2);
     localStorage.setItem(
       'done-log-state',
       JSON.stringify({
@@ -33,6 +39,7 @@ try {
             firstStartedAt: null,
             activeStartedAt: null,
             trackedSeconds: 0,
+            dueDate: today.toISOString(),
           },
           {
             id: 'menubar-paused',
@@ -50,6 +57,7 @@ try {
                 durationSeconds: 5 * 60,
               },
             ],
+            dueDate: today.toISOString(),
           },
           {
             id: 'menubar-progressive',
@@ -62,6 +70,7 @@ try {
             trackedSeconds: 0,
             isProgressive: true,
             progressLabel: 'Chapter 2',
+            dueDate: yesterday.toISOString(),
           },
           {
             id: 'menubar-delete',
@@ -72,6 +81,7 @@ try {
             firstStartedAt: null,
             activeStartedAt: null,
             trackedSeconds: 0,
+            dueDate: twoDaysAgo.toISOString(),
           },
         ],
       }),
@@ -83,22 +93,35 @@ try {
 
   const initial = await page.evaluate(() => {
     const ongoing = document.querySelector('[data-menubar-section="ongoing"]');
+    const ready = document.querySelector('[data-menubar-section="ready"]');
     const paused = document.querySelector('[data-menubar-section="paused"]');
-    const open = document.querySelector('[data-menubar-section="open"]');
     const shellStyle = getComputedStyle(document.querySelector('.menubar-shell'));
     return {
       title: document.querySelector('.menubar-heading')?.textContent.trim(),
       sync: document.querySelector('.menubar-sync')?.textContent.trim(),
       openCount: document.querySelector('.menubar-count')?.textContent.trim(),
       sectionsInOrder:
-        ongoing?.getBoundingClientRect().top < paused?.getBoundingClientRect().top &&
-        paused?.getBoundingClientRect().top < open?.getBoundingClientRect().top,
+        ongoing?.getBoundingClientRect().top < ready?.getBoundingClientRect().top &&
+        ready?.getBoundingClientRect().top < paused?.getBoundingClientRect().top,
       runningVisible: Boolean(document.querySelector('[data-menubar-id="menubar-running"]')),
       pausedVisible: Boolean(document.querySelector('[data-menubar-id="menubar-paused"]')),
       runningStarted: document.querySelector(
         '[data-menubar-id="menubar-running"] .menubar-task-started',
       )?.textContent.trim(),
       openVisible: Boolean(document.querySelector('[data-menubar-id="menubar-open"]')),
+      readyDateGroups: [...document.querySelectorAll('[data-menubar-date-group]')].map((group) => ({
+        id: group.getAttribute('data-menubar-date-group'),
+        isToday: group.getAttribute('data-menubar-is-today'),
+      })),
+      todayReadyBeforePaused:
+        document
+          .querySelector('[data-menubar-date-group][data-menubar-is-today="true"]')
+          ?.getBoundingClientRect().top < paused?.getBoundingClientRect().top,
+      pausedBeforePastReady:
+        paused?.getBoundingClientRect().top <
+        document
+          .querySelector('[data-menubar-date-group][data-menubar-is-today="false"]')
+          ?.getBoundingClientRect().top,
       fullAppHref: document.querySelector('.menubar-open-full')?.getAttribute('href'),
       scrollWidth: document.documentElement.scrollWidth,
       clientWidth: document.documentElement.clientWidth,
@@ -139,11 +162,24 @@ try {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     return state.todos.some((todo) => todo.title === 'Captured from menu bar');
   });
-
   await page.click('[data-menubar-id="menubar-open"] .menubar-start');
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     return state.todos.find((todo) => todo.id === 'menubar-open')?.activeStartedAt;
+  });
+  await page.waitForFunction(() =>
+    Boolean(
+      document
+        .querySelector('[data-menubar-id="menubar-open"]')
+        ?.closest('[data-menubar-section="ongoing"]'),
+    ),
+  );
+  const startedPresentation = await page.evaluate(() => {
+    const row = document.querySelector('[data-menubar-id="menubar-open"]');
+    return {
+      visible: Boolean(row),
+      remainsInOngoing: Boolean(row?.closest('[data-menubar-section="ongoing"]')),
+    };
   });
   const parallelTimers = await page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
@@ -186,6 +222,60 @@ try {
       .querySelector('[data-menubar-details="menubar-open"] .menubar-note-save-status')
       ?.textContent.trim(),
   }));
+
+  await page.fill(
+    '[data-menubar-details="menubar-open"] input[aria-label^="Start time"]',
+    '2026-07-30T00:00',
+  );
+  await page.fill(
+    '[data-menubar-details="menubar-open"] input[aria-label^="End time"]',
+    '2026-07-29T00:00',
+  );
+  await page.waitForSelector('[data-menubar-details="menubar-open"] .menubar-timing-error');
+  const invalidTimingMessage = await page
+    .locator('[data-menubar-details="menubar-open"] .menubar-timing-error')
+    .textContent();
+  const timingInputCount = await page
+    .locator('[data-menubar-details="menubar-open"] input[type="datetime-local"]')
+    .count();
+  await page.fill(
+    '[data-menubar-details="menubar-open"] input[aria-label^="End time"]',
+    '2026-07-30T01:00',
+  );
+  await page.waitForFunction(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    const todo = state.todos.find((item) => item.id === 'menubar-open');
+    return Boolean(todo?.completedAt) && !todo?.activeStartedAt;
+  });
+  await page.waitForFunction(() =>
+    Boolean(
+      document
+        .querySelector('[data-menubar-id="menubar-open"]')
+        ?.closest('[data-menubar-section="finished"]'),
+    ),
+  );
+  await page.waitForSelector('[data-menubar-details="menubar-open"]');
+  await page.fill(
+    '[data-menubar-details="menubar-open"] input[aria-label^="Start time"]',
+    '2026-07-29T23:00',
+  );
+  await page.fill(
+    '[data-menubar-details="menubar-open"] input[aria-label^="End time"]',
+    '2026-07-30T02:00',
+  );
+  await page.waitForFunction(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    const todo = state.todos.find((item) => item.id === 'menubar-open');
+    return todo?.trackedSeconds === 3 * 60 * 60;
+  });
+  await page.click('[data-menubar-id="menubar-open"] .menubar-details-toggle');
+
+  await page.click('[data-menubar-id="menubar-paused"] .menubar-finish');
+  await page.waitForFunction(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    const todo = state.todos.find((item) => item.id === 'menubar-paused');
+    return Boolean(todo?.completedAt) && !todo?.activeStartedAt;
+  });
 
   await page.click('[data-menubar-id="menubar-progressive"] .menubar-details-toggle');
   await page.fill('[data-menubar-details="menubar-progressive"] .menubar-progress-input', 'Chapter');
@@ -233,19 +323,15 @@ try {
     return !state.todos.some((todo) => todo.id === 'menubar-delete');
   });
 
-  await page.click('[data-menubar-id="menubar-open"] .menubar-finish');
-  await page.waitForFunction(() => {
-    const state = JSON.parse(localStorage.getItem('done-log-state'));
-    return Boolean(state.todos.find((todo) => todo.id === 'menubar-open')?.completedAt);
-  });
-
   const final = await page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     return {
       added: state.todos.some((todo) => todo.title === 'Captured from menu bar'),
+      addedDueDate: state.todos.find((todo) => todo.title === 'Captured from menu bar')?.dueDate,
       renamed: state.todos.find((todo) => todo.id === 'menubar-open')?.title,
       note: state.todos.find((todo) => todo.id === 'menubar-open')?.note,
       completed: Boolean(state.todos.find((todo) => todo.id === 'menubar-open')?.completedAt),
+      pausedCompleted: Boolean(state.todos.find((todo) => todo.id === 'menubar-paused')?.completedAt),
       progress: state.todos.find((todo) => todo.id === 'menubar-progressive')?.progressLabel,
       dueDate: state.todos.find((todo) => todo.id === 'menubar-progressive')?.dueDate,
       progressSession: state.todos.some(
@@ -265,6 +351,14 @@ try {
   if (!initial.sectionsInOrder || !initial.runningVisible || !initial.pausedVisible || !initial.openVisible) {
     failures.push(`task sections are incomplete or out of order: ${JSON.stringify(initial)}`);
   }
+  if (
+    !initial.readyDateGroups.length ||
+    initial.readyDateGroups[0]?.isToday !== 'true' ||
+    !initial.todayReadyBeforePaused ||
+    !initial.pausedBeforePastReady
+  ) {
+    failures.push(`ready task date groups are not newest first: ${JSON.stringify(initial)}`);
+  }
   if (!initial.runningStarted?.startsWith('Started ')) {
     failures.push(`running task start time is missing: ${JSON.stringify(initial)}`);
   }
@@ -281,11 +375,23 @@ try {
   if (!parallelTimers.includes('menubar-running') || !parallelTimers.includes('menubar-open')) {
     failures.push(`menu bar diverged from parallel timer behavior: ${JSON.stringify(parallelTimers)}`);
   }
+  if (!startedPresentation.visible || !startedPresentation.remainsInOngoing) {
+    failures.push(
+      `started task disappeared from the ongoing section: ${JSON.stringify(startedPresentation)}`,
+    );
+  }
+  if (timingInputCount !== 2 || invalidTimingMessage?.trim() !== 'Start must be before end.') {
+    failures.push(
+      `timing controls did not validate strictly: ${JSON.stringify({ timingInputCount, invalidTimingMessage })}`,
+    );
+  }
   if (
     !final.added ||
+    !final.addedDueDate ||
     final.renamed !== 'Renamed in menu bar' ||
     final.note !== 'Compact\tnote' ||
     !final.completed ||
+    !final.pausedCompleted ||
     final.progress !== 'Chapter\t3' ||
     !final.dueDate?.startsWith('2026-08-01') ||
     !final.progressSession ||
