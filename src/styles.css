@@ -76,6 +76,19 @@
     var(--shadow-soft);
 }
 
+@supports (backdrop-filter: blur(1px)) {
+  .workspace {
+    backdrop-filter: blur(28px) saturate(1.2);
+  }
+
+  .task-panel,
+  .summary-panel,
+  .flow-rail,
+  .task-detail {
+    backdrop-filter: blur(24px) saturate(1.12);
+  }
+}
+
 .task-panel {
   display: flex;
   flex-direction: column;
