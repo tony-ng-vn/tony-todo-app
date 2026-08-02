@@ -181,12 +181,14 @@
                     {/if}
                     {#if todo.firstStartedAt}
                       <span class="board-card-timing">
-                        Start <time datetime={todo.firstStartedAt}>{formatTaskTimestamp(todo.firstStartedAt)}</time>
+                        <span class="board-card-timing-label">Start</span>
+                        <time datetime={todo.firstStartedAt}>{formatTaskTimestamp(todo.firstStartedAt)}</time>
                       </span>
                     {/if}
                     {#if todo.completedAt}
                       <span class="board-card-timing">
-                        End <time datetime={todo.completedAt}>{formatTaskTimestamp(todo.completedAt)}</time>
+                        <span class="board-card-timing-label">End</span>
+                        <time datetime={todo.completedAt}>{formatTaskTimestamp(todo.completedAt)}</time>
                       </span>
                     {/if}
                     <span class="board-card-duration" title="Time spent on this task">

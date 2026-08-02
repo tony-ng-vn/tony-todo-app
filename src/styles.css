@@ -843,10 +843,16 @@ h2 {
 }
 
 .board-card-timing {
+  display: flex;
   flex-basis: 100%;
   padding: 0;
+  gap: 6px;
   color: var(--subtle);
   font-variant-numeric: tabular-nums;
+}
+
+.board-card-timing-label {
+  flex: 0 0 auto;
 }
 
 .board-card.is-running .board-card-duration {
@@ -855,8 +861,18 @@ h2 {
 }
 
 .board-card-progress {
+  display: block;
+  flex: 1 1 100%;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  box-sizing: border-box;
   background: var(--board-not-started-soft);
   color: var(--strong);
+  border-radius: 8px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+  white-space: normal;
 }
 
 .board-card-failed {
@@ -1635,6 +1651,14 @@ h2 {
   font-weight: 500;
 }
 
+.summary-time-error {
+  display: block;
+  max-width: 12rem;
+  color: var(--danger, #b44b45);
+  font-size: 0.72rem;
+  line-height: 1.25;
+}
+
 .summary-time-input {
   width: 72px;
   height: 34px;
@@ -1952,6 +1976,15 @@ h2 {
   color: var(--subtle);
   font-size: 12px;
   font-weight: 500;
+}
+
+.detail-timing-error {
+  grid-column: 1 / -1;
+  margin: -2px 0 0;
+  color: var(--danger, #b44b45);
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.35;
 }
 
 .detail-timing-controls input {

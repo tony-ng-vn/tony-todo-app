@@ -10,6 +10,7 @@ import {
   getBoardColumns,
   getBoardColumnId,
   getCalendarMonth,
+  getCompletedTodoSections,
   getDaySummary,
   getMillisecondsUntilNextDay,
   getPendingTodos,
@@ -28,6 +29,7 @@ import {
   setTodoProgressive,
   startTodoTimer,
   deleteTodo,
+  updateTodoTiming,
   updateCompletedTodoTiming,
   updateTodoCompletedAt,
   updateTodoProgress,
@@ -65,7 +67,7 @@ describe('calendar month', () => {
     const byKey = Object.fromEntries(cells.map((cell) => [cell.dateKey, cell]));
 
     const jul15 = byKey['2026-07-15'];
-    expect(jul15.items.map((item) => item.title)).toEqual(['Ship A', 'Ship B']);
+    expect(jul15.items.map((item) => item.title)).toEqual(['Ship B', 'Ship A']);
     expect(jul15.inMonth).toBe(true);
     expect(jul15.isToday).toBe(true);
 
@@ -81,18 +83,15 @@ describe('calendar month', () => {
 });
 
 describe('todo day summary', () => {
-  it('keeps active todos ordered by creation time', () => {
+  it('keeps active todos ordered newest first by creation time', () => {
     let state = createInitialState();
     state = addTodo(state, 'Draft landing page', new Date('2026-06-08T08:10:00'));
     state = addTodo(state, 'Send invoice', new Date('2026-06-08T08:05:00'));
 
-    expect(getPendingTodos(state).map((todo) => todo.title)).toEqual([
-      'Send invoice',
-      'Draft landing page',
-    ]);
+    expect(getPendingTodos(state).map((todo) => todo.title)).toEqual(['Draft landing page', 'Send invoice']);
   });
 
-  it('groups open todos into today and other sections', () => {
+  it('groups open todos by assigned date, newest date first, with newest tasks first', () => {
     let state = createInitialState();
     state = addTodo(state, 'Yesterday task', new Date('2026-06-16T08:00:00'));
     state = addTodo(state, 'Today task', new Date('2026-06-17T09:00:00'));
@@ -100,24 +99,55 @@ describe('todo day summary', () => {
 
     const sections = getOpenTodoSections(getPendingTodos(state), new Date('2026-06-17T12:00:00'));
 
-    expect(sections).toEqual([
-      {
-        id: 'today',
-        label: 'Today todos',
-        items: [expect.objectContaining({ title: 'Today task' })],
-      },
-      {
-        id: 'other',
-        label: 'Other todos',
-        items: [
-          expect.objectContaining({ title: 'Yesterday task' }),
-          expect.objectContaining({ title: 'Tomorrow task' }),
-        ],
-      },
+    expect(
+      sections.map(({ id, label, isToday, items }) => ({
+        id,
+        label,
+        isToday,
+        titles: items.map((item) => item.title),
+      })),
+    ).toEqual([
+      { id: '2026-06-18', label: 'Jun 18, 2026', isToday: false, titles: ['Tomorrow task'] },
+      { id: '2026-06-17', label: 'Today todos', isToday: true, titles: ['Today task'] },
+      { id: '2026-06-16', label: 'Jun 16, 2026', isToday: false, titles: ['Yesterday task'] },
     ]);
   });
 
-  it('puts open todos without a valid created date in other todos', () => {
+  it('groups completed todos by finish date with newest groups and tasks first', () => {
+    const state = createInitialState([
+      {
+        id: 'older-day',
+        title: 'Older day',
+        createdAt: '2026-06-15T08:00:00.000Z',
+        completedAt: '2026-06-15T18:00:00.000Z',
+      },
+      {
+        id: 'newer-first',
+        title: 'Newer first',
+        createdAt: '2026-06-16T08:00:00.000Z',
+        completedAt: '2026-06-16T17:00:00.000Z',
+      },
+      {
+        id: 'newer-last',
+        title: 'Newer last',
+        createdAt: '2026-06-16T09:00:00.000Z',
+        completedAt: '2026-06-16T19:00:00.000Z',
+      },
+    ]);
+
+    expect(
+      getCompletedTodoSections(state, new Date('2026-06-16T12:00:00.000Z')).map((section) => ({
+        id: section.id,
+        label: section.label,
+        titles: section.items.map((item) => item.title),
+      })),
+    ).toEqual([
+      { id: '2026-06-16', label: 'Today finished', titles: ['Newer last', 'Newer first'] },
+      { id: '2026-06-15', label: 'Jun 15, 2026', titles: ['Older day'] },
+    ]);
+  });
+
+  it('puts legacy open todos without a usable assigned date in an undated group', () => {
     const state = createInitialState([
       {
         id: 'legacy-task',
@@ -129,8 +159,10 @@ describe('todo day summary', () => {
 
     expect(getOpenTodoSections(getPendingTodos(state), new Date('2026-06-17T12:00:00'))).toEqual([
       {
-        id: 'other',
-        label: 'Other todos',
+        id: 'undated',
+        label: 'Undated tasks',
+        dateKey: null,
+        isToday: false,
         items: [expect.objectContaining({ id: 'legacy-task' })],
       },
     ]);
@@ -242,7 +274,7 @@ describe('todo day summary', () => {
 
     const summary = getDaySummary(state, '2026-06-08');
 
-    expect(summary[0].items.map((item) => item.title)).toEqual(['Midnight task', 'Before sunrise']);
+    expect(summary[0].items.map((item) => item.title)).toEqual(['Before sunrise', 'Midnight task']);
     expect(summary[1].items.map((item) => item.title)).toEqual(['After sunrise']);
     expect(summary[4].items.map((item) => item.title)).toEqual(['Late task']);
   });
@@ -313,7 +345,7 @@ describe('todo day summary', () => {
 
     const summaryTitles = getDaySummary(state, '2026-06-08')[2].items.map((item) => item.title);
     expect(summaryTitles).toEqual(['Second', 'First']);
-    expect(new Date(state.todos[1].completedAt) < new Date(state.todos[0].completedAt)).toBe(true);
+    expect(new Date(state.todos[1].completedAt) > new Date(state.todos[0].completedAt)).toBe(true);
   });
 
   it('updates the finished date and time for a completed todo without changing its duration', () => {
@@ -335,6 +367,24 @@ describe('todo day summary', () => {
       title: 'File receipt',
       durationLabel: '17m',
     });
+  });
+
+  it('rejects a completion time that is not after the recorded start', () => {
+    const startedAt = new Date('2026-06-09T21:00:00.000Z');
+    let state = createInitialState([
+      {
+        id: 'timed-task',
+        title: 'Timed task',
+        createdAt: '2026-06-09T20:00:00.000Z',
+        firstStartedAt: startedAt.toISOString(),
+        completedAt: '2026-06-09T22:00:00.000Z',
+      },
+    ]);
+    const original = state;
+
+    state = updateTodoCompletedAt(state, 'timed-task', startedAt);
+
+    expect(state).toBe(original);
   });
 
   it('updates completed task start and end times to recalculate duration', () => {
@@ -361,6 +411,107 @@ describe('todo day summary', () => {
       completedAt: '2026-06-10T15:45:00.000Z',
       durationSeconds: 150 * 60,
       durationLabel: '2h 30m',
+    });
+  });
+
+  it('allows manual start and end times on an open task, including past dates', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Backfill work', new Date('2026-06-10T08:00:00.000Z'));
+    const todoId = state.todos[0].id;
+
+    state = updateTodoTiming(
+      state,
+      todoId,
+      '2026-06-01T13:15:00.000Z',
+      '2026-06-01T15:45:00.000Z',
+    );
+
+    expect(state.todos[0]).toMatchObject({
+      firstStartedAt: '2026-06-01T13:15:00.000Z',
+      activeStartedAt: null,
+      completedAt: '2026-06-01T15:45:00.000Z',
+      trackedSeconds: 150 * 60,
+      timeSegments: [
+        {
+          startedAt: '2026-06-01T13:15:00.000Z',
+          endedAt: '2026-06-01T15:45:00.000Z',
+        },
+      ],
+    });
+  });
+
+  it('allows manual timing edits on a progressive session task', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Read chapter', new Date('2026-06-10T08:00:00.000Z'));
+    const parentId = state.todos[0].id;
+    state = setTodoProgressive(state, parentId, true);
+    state = startTodoTimer(state, parentId, new Date('2026-06-10T09:00:00.000Z'));
+    state = logProgressSession(state, parentId, new Date('2026-06-10T09:30:00.000Z'));
+    const sessionId = getProgressSessions(state, parentId)[0].id;
+
+    state = updateTodoTiming(
+      state,
+      sessionId,
+      '2026-06-09T14:00:00.000Z',
+      '2026-06-09T15:00:00.000Z',
+    );
+
+    expect(state.todos.find((todo) => todo.id === sessionId)).toMatchObject({
+      firstStartedAt: '2026-06-09T14:00:00.000Z',
+      completedAt: '2026-06-09T15:00:00.000Z',
+      trackedSeconds: 60 * 60,
+    });
+    expect(state.todos.find((todo) => todo.id === parentId)?.completedAt).toBeNull();
+  });
+
+  it('rejects reversed and equal manual timing without swapping or mutating the task', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Keep timing valid', new Date('2026-06-10T08:00:00.000Z'));
+    const todoId = state.todos[0].id;
+    const original = state;
+
+    expect(
+      updateTodoTiming(state, todoId, '2026-06-01T15:45:00.000Z', '2026-06-01T13:15:00.000Z'),
+    ).toBe(original);
+    expect(
+      updateTodoTiming(state, todoId, '2026-06-01T13:15:00.000Z', '2026-06-01T13:15:00.000Z'),
+    ).toBe(original);
+  });
+
+  it('finishes a paused task at the end of its most recent recorded segment', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Finish paused work', new Date('2026-06-10T08:00:00.000Z'));
+    const todoId = state.todos[0].id;
+    state = startTodoTimer(state, todoId, new Date('2026-06-10T23:00:00.000Z'));
+    state = pauseTodoTimer(state, todoId, new Date('2026-06-10T23:20:00.000Z'));
+
+    state = completeTodo(state, todoId, new Date('2026-06-10T16:00:00.000Z'));
+
+    expect(state.todos[0]).toMatchObject({
+      completedAt: '2026-06-10T23:20:00.000Z',
+      activeStartedAt: null,
+      trackedSeconds: 20 * 60,
+    });
+    expect(getDaySummary(state, '2026-06-10').flatMap((section) => section.items)[0]).toMatchObject({
+      id: todoId,
+      completedAt: '2026-06-10T23:20:00.000Z',
+    });
+    expect(getDaySummary(state, '2026-06-11').flatMap((section) => section.items)).toEqual([]);
+  });
+
+  it('finishes a paused progressive session at its most recent segment end', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Log paused progress', new Date('2026-06-10T08:00:00.000Z'));
+    const parentId = state.todos[0].id;
+    state = setTodoProgressive(state, parentId, true);
+    state = startTodoTimer(state, parentId, new Date('2026-06-10T23:00:00.000Z'));
+    state = pauseTodoTimer(state, parentId, new Date('2026-06-10T23:20:00.000Z'));
+
+    state = logProgressSession(state, parentId, new Date('2026-06-10T16:00:00.000Z'));
+
+    expect(getProgressSessions(state, parentId)[0]).toMatchObject({
+      completedAt: '2026-06-10T23:20:00.000Z',
+      trackedSeconds: 20 * 60,
     });
   });
 
@@ -395,14 +546,23 @@ describe('todo day summary', () => {
       ],
     });
 
-    const adjustedTodo = state.todos[0];
     state = updateCompletedTodoTiming(
       state,
       todoId,
       new Date('2026-06-10T08:30:00.000Z'),
       new Date('2026-06-10T09:45:00.000Z'),
     );
-    expect(state.todos[0]).toEqual(adjustedTodo);
+    expect(state.todos[0]).toMatchObject({
+      firstStartedAt: '2026-06-10T08:30:00.000Z',
+      completedAt: '2026-06-10T09:45:00.000Z',
+      trackedSeconds: 75 * 60,
+      timeSegments: [
+        {
+          startedAt: '2026-06-10T08:30:00.000Z',
+          endedAt: '2026-06-10T09:45:00.000Z',
+        },
+      ],
+    });
   });
 
   it('deletes a todo and its progress sessions', () => {
@@ -777,6 +937,28 @@ describe('board view columns', () => {
     expect(columns[3].items.map((todo) => todo.title)).toEqual(['Today done']);
   });
 
+  it('keeps each board column newest first and leaves a started task in ongoing state', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Older ready', new Date('2026-06-08T08:00:00'));
+    state = addTodo(state, 'Newer ready', new Date('2026-06-08T09:00:00'));
+    const olderId = state.todos[0].id;
+    const newerId = state.todos[1].id;
+
+    state = startTodoTimer(state, olderId, new Date('2026-06-08T09:15:00'));
+
+    const columns = getBoardColumns(state, { dayKey: '2026-06-08' });
+
+    expect(columns.find((column) => column.id === 'not_started').items.map((todo) => todo.id)).toEqual([
+      newerId,
+    ]);
+    expect(columns.find((column) => column.id === 'in_progress').items.map((todo) => todo.id)).toEqual([
+      olderId,
+    ]);
+    expect(partitionPendingTodos(getPendingTodos(state)).ongoing.map((todo) => todo.id)).toEqual([
+      olderId,
+    ]);
+  });
+
   it('starts the timer when a task moves from not started to in progress', () => {
     let state = createInitialState();
     state = addTodo(state, 'Write brief', new Date('2026-06-08T08:00:00'));
@@ -867,10 +1049,10 @@ describe('board view columns', () => {
 });
 
 describe('task due dates', () => {
-  it('defaults a new todo to no due date', () => {
+  it('assigns a new todo to its creation date when no date is chosen', () => {
     let state = createInitialState();
     state = addTodo(state, 'No deadline', new Date('2026-06-08T08:00:00'));
-    expect(state.todos.at(-1).dueDate).toBeNull();
+    expect(state.todos.at(-1).dueDate).toBe(new Date(2026, 5, 8).toISOString());
   });
 
   it('stores a due date passed at creation time', () => {

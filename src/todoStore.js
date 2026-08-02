@@ -38,6 +38,8 @@ export function addTodo(state, title, createdAt = new Date(), { dueDate = null }
     return state;
   }
 
+  const assignedDate = normalizeAssignedDate(dueDate, createdAt);
+
   return {
     ...state,
     todos: [
@@ -47,7 +49,7 @@ export function addTodo(state, title, createdAt = new Date(), { dueDate = null }
         title: cleanTitle,
         createdAt: createdAt.toISOString(),
         completedAt: null,
-        dueDate: dueDate ?? null,
+        dueDate: assignedDate,
         note: '',
         source: 'app',
         notionPageId: null,
@@ -67,7 +69,6 @@ export function addTodo(state, title, createdAt = new Date(), { dueDate = null }
 }
 
 export function completeTodo(state, todoId, completedAt = new Date()) {
-  const doneAt = completedAt.toISOString();
   return {
     ...state,
     todos: state.todos.map((todo) => {
@@ -75,10 +76,12 @@ export function completeTodo(state, todoId, completedAt = new Date()) {
         return todo;
       }
 
+      const doneAt = getCompletionTimestamp(todo, completedAt);
+
       return {
         ...todo,
-        ...closeActiveTimeSegment(todo, completedAt),
-        completedAt: doneAt,
+        ...closeActiveTimeSegment(todo, doneAt),
+        completedAt: doneAt.toISOString(),
         activeStartedAt: null,
       };
     }),
@@ -86,7 +89,6 @@ export function completeTodo(state, todoId, completedAt = new Date()) {
 }
 
 export function failTodo(state, todoId, failedAt = new Date()) {
-  const doneAt = failedAt.toISOString();
   return {
     ...state,
     todos: state.todos.map((todo) => {
@@ -94,10 +96,12 @@ export function failTodo(state, todoId, failedAt = new Date()) {
         return todo;
       }
 
+      const doneAt = getCompletionTimestamp(todo, failedAt);
+
       return {
         ...todo,
-        ...closeActiveTimeSegment(todo, failedAt),
-        completedAt: doneAt,
+        ...closeActiveTimeSegment(todo, doneAt),
+        completedAt: doneAt.toISOString(),
         activeStartedAt: null,
         notionStatus: 'Failed',
       };
@@ -106,7 +110,18 @@ export function failTodo(state, todoId, failedAt = new Date()) {
 }
 
 export function updateTodoCompletedAt(state, todoId, completedAt) {
-  const doneAt = completedAt.toISOString();
+  const doneDate = new Date(completedAt);
+  if (Number.isNaN(doneDate.getTime())) {
+    return state;
+  }
+
+  const todo = state.todos.find((item) => item.id === todoId);
+  const startedAt = todo?.firstStartedAt ? new Date(todo.firstStartedAt) : null;
+  if (startedAt && !Number.isNaN(startedAt.getTime()) && startedAt >= doneDate) {
+    return state;
+  }
+
+  const doneAt = doneDate.toISOString();
 
   return {
     ...state,
@@ -130,28 +145,34 @@ export function deleteTodo(state, todoId) {
 }
 
 export function updateCompletedTodoTiming(state, todoId, startedAt, completedAt) {
+  return updateTodoTiming(state, todoId, startedAt, completedAt);
+}
+
+export function updateTodoTiming(state, todoId, startedAt, completedAt) {
   const start = new Date(startedAt);
   const end = new Date(completedAt);
 
-  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start >= end) {
     return state;
   }
 
-  const startTime = Math.min(start.getTime(), end.getTime());
-  const endTime = Math.max(start.getTime(), end.getTime());
+  const startTime = start.getTime();
+  const endTime = end.getTime();
 
   return {
     ...state,
     todos: state.todos.map((todo) => {
-      if (todo.id !== todoId || !todo.completedAt) {
+      if (todo.id !== todoId) {
         return todo;
       }
 
       const existingSegments = normalizeTimeSegments(todo.timeSegments);
-      const timeSegments = updateTimeSegmentBounds(existingSegments, startTime, endTime);
-      if (!timeSegments) {
-        return todo;
-      }
+      const timeSegments = updateTimeSegmentBounds(existingSegments, startTime, endTime) ?? [
+        {
+          startedAt: new Date(startTime).toISOString(),
+          endedAt: new Date(endTime).toISOString(),
+        },
+      ];
 
       return {
         ...todo,
@@ -225,7 +246,7 @@ export function reopenTodo(state, todoId) {
 export function getPendingTodos(state) {
   return state.todos
     .filter((todo) => !todo.completedAt && !todo.isProgressSession)
-    .toSorted((first, second) => new Date(first.createdAt) - new Date(second.createdAt));
+    .toSorted(compareTodosNewestFirst);
 }
 
 export function getBoardColumnId(todo) {
@@ -258,7 +279,9 @@ export function partitionPendingTodos(todos) {
     }
   }
 
-  return groups;
+  return Object.fromEntries(
+    Object.entries(groups).map(([key, items]) => [key, items.toSorted(compareTodosNewestFirst)]),
+  );
 }
 
 // Board filter presets keyed off a task's due date. 'all' shows everything;
@@ -402,24 +425,75 @@ function enrichBoardItem(todo, now) {
 
 export function getOpenTodoSections(todos, currentDate = new Date()) {
   const currentDayKey = formatDayKey(currentDate);
-  const sections = [
-    { id: 'today', label: 'Today todos', items: [] },
-    { id: 'other', label: 'Other todos', items: [] },
-  ];
+  const sectionsByDate = new Map();
 
-  for (const todo of todos) {
-    const createdAt = new Date(todo.createdAt);
-    const section = !Number.isNaN(createdAt.getTime()) && formatDayKey(createdAt) === currentDayKey ? sections[0] : sections[1];
-    section.items.push(todo);
+  for (const todo of todos.toSorted(compareTodosNewestFirst)) {
+    const dayKey = getTodoAssignedDayKey(todo);
+    const sectionId = dayKey ?? 'undated';
+    if (!sectionsByDate.has(sectionId)) {
+      sectionsByDate.set(sectionId, {
+        id: sectionId,
+        label:
+          dayKey === currentDayKey
+            ? 'Today todos'
+            : dayKey
+              ? formatDateGroupLabel(dayKey)
+              : 'Undated tasks',
+        dateKey: dayKey,
+        isToday: dayKey === currentDayKey,
+        items: [],
+      });
+    }
+    sectionsByDate.get(sectionId).items.push(todo);
   }
 
-  return sections.filter((section) => section.items.length > 0);
+  return [...sectionsByDate.values()]
+    .map((section) => ({ ...section, items: section.items.toSorted(compareTodosNewestFirst) }))
+    .toSorted((first, second) => {
+      if (!first.dateKey) return 1;
+      if (!second.dateKey) return -1;
+      return second.dateKey.localeCompare(first.dateKey);
+    });
 }
 
 export function getCompletedTodos(state) {
   return state.todos
     .filter((todo) => todo.completedAt)
-    .toSorted((first, second) => new Date(first.completedAt) - new Date(second.completedAt));
+    .toSorted((first, second) => {
+      const firstTime = new Date(first.completedAt).getTime();
+      const secondTime = new Date(second.completedAt).getTime();
+      const safeFirstTime = Number.isNaN(firstTime) ? -Infinity : firstTime;
+      const safeSecondTime = Number.isNaN(secondTime) ? -Infinity : secondTime;
+      return safeSecondTime - safeFirstTime;
+    });
+}
+
+export function getCompletedTodoSections(state, currentDate = new Date()) {
+  const currentDayKey = formatDayKey(currentDate);
+  const sectionsByDate = new Map();
+
+  for (const todo of getCompletedTodos(state)) {
+    const completedDate = new Date(todo.completedAt);
+    if (Number.isNaN(completedDate.getTime())) {
+      continue;
+    }
+
+    const dayKey = formatDayKey(completedDate);
+    if (!sectionsByDate.has(dayKey)) {
+      sectionsByDate.set(dayKey, {
+        id: dayKey,
+        label: dayKey === currentDayKey ? 'Today finished' : formatDateGroupLabel(dayKey),
+        dateKey: dayKey,
+        isToday: dayKey === currentDayKey,
+        items: [],
+      });
+    }
+    sectionsByDate.get(dayKey).items.push(todo);
+  }
+
+  return [...sectionsByDate.values()].toSorted((first, second) =>
+    second.dateKey.localeCompare(first.dateKey),
+  );
 }
 
 // Month grid of completed tasks, grouped by the day each task was finished.
@@ -586,7 +660,7 @@ export function logProgressSession(state, todoId, completedAt = new Date()) {
     return completeTodo(state, todoId, completedAt);
   }
 
-  const session = createProgressSession(parent, completedAt);
+  const session = createProgressSession(parent, getCompletionTimestamp(parent, completedAt));
 
   return {
     ...state,
@@ -644,9 +718,12 @@ export function reorderCompletedTodosForDay(state, dayKey, orderedIds) {
     ...orderedIds.map((id) => existingById.get(id)).filter(Boolean),
     ...completedForDay.filter((todo) => !orderedIds.includes(todo.id)),
   ];
-  const firstCompletion = new Date(completedForDay[0].completedAt);
+  const latestCompletion = new Date(completedForDay[0].completedAt);
   const nextCompletedAtById = new Map(
-    orderedForDay.map((todo, index) => [todo.id, new Date(firstCompletion.getTime() + index * 60_000).toISOString()]),
+    orderedForDay.map((todo, index) => [
+      todo.id,
+      new Date(latestCompletion.getTime() - index * 60_000).toISOString(),
+    ]),
   );
 
   return {
@@ -677,7 +754,10 @@ export function moveCompletedTodoToSummaryBucket(state, dayKey, todoId, bucketLa
       ? [...targetIds, todoId]
       : [...targetIds.slice(0, targetIndex), todoId, ...targetIds.slice(targetIndex)];
   const completedAtById = new Map(
-    orderedTargetIds.map((id, index) => [id, completedAtForBucketPosition(dayKey, bucketLabel, index)]),
+    orderedTargetIds.map((id, index) => [
+      id,
+      completedAtForBucketPosition(dayKey, bucketLabel, index, orderedTargetIds.length),
+    ]),
   );
 
   return {
@@ -752,6 +832,65 @@ export function createTodoId(title, date) {
 
 function normalizedTrackedSeconds(todo) {
   return Math.max(0, Math.floor(Number(todo.trackedSeconds ?? 0)));
+}
+
+function compareTodosNewestFirst(first, second) {
+  const firstCreatedAt = new Date(first.createdAt).getTime();
+  const secondCreatedAt = new Date(second.createdAt).getTime();
+  const firstTime = Number.isNaN(firstCreatedAt) ? -Infinity : firstCreatedAt;
+  const secondTime = Number.isNaN(secondCreatedAt) ? -Infinity : secondCreatedAt;
+  return secondTime - firstTime;
+}
+
+function normalizeAssignedDate(dueDate, createdAt) {
+  const explicitDate = dueDate ? new Date(dueDate) : null;
+  if (explicitDate && !Number.isNaN(explicitDate.getTime())) {
+    return explicitDate.toISOString();
+  }
+
+  const creationDate = new Date(createdAt);
+  if (Number.isNaN(creationDate.getTime())) {
+    return null;
+  }
+
+  creationDate.setHours(0, 0, 0, 0);
+  return creationDate.toISOString();
+}
+
+function getTodoAssignedDayKey(todo) {
+  const assignedDate = todo?.dueDate ? new Date(todo.dueDate) : null;
+  if (assignedDate && !Number.isNaN(assignedDate.getTime())) {
+    return formatDayKey(assignedDate);
+  }
+
+  const createdDate = new Date(todo?.createdAt);
+  return Number.isNaN(createdDate.getTime()) ? null : formatDayKey(createdDate);
+}
+
+function formatDateGroupLabel(dayKey) {
+  const date = new Date(`${dayKey}T00:00:00`);
+  return new Intl.DateTimeFormat('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  }).format(date);
+}
+
+function getCompletionTimestamp(todo, requestedAt) {
+  const requestedDate = new Date(requestedAt);
+  if (!isPausedTodo(todo)) {
+    return requestedDate;
+  }
+
+  const lastSegmentEnd = normalizeTimeSegments(todo.timeSegments)
+    .map((segment) => new Date(segment.endedAt))
+    .filter((date) => !Number.isNaN(date.getTime()))
+    .toSorted((first, second) => second - first)[0];
+  return lastSegmentEnd && !Number.isNaN(lastSegmentEnd.getTime()) ? lastSegmentEnd : requestedDate;
+}
+
+function isPausedTodo(todo) {
+  return Boolean(todo && !todo.completedAt && todo.firstStartedAt && !todo.activeStartedAt);
 }
 
 function normalizeTimeSegments(segments) {
@@ -896,9 +1035,9 @@ function createProgressSessionId(parentId, completedAt) {
   return `${completedAt.getTime()}-${parentId.slice(0, 24)}-session`;
 }
 
-function completedAtForBucketPosition(dayKey, bucketLabel, index) {
+function completedAtForBucketPosition(dayKey, bucketLabel, index, itemCount) {
   const bucket = SUMMARY_BUCKETS.find((candidate) => candidate.label === bucketLabel);
-  return new Date(bucket.startAt(dayKey).getTime() + index * 60_000).toISOString();
+  return new Date(bucket.startAt(dayKey).getTime() + (itemCount - index - 1) * 60_000).toISOString();
 }
 
 function getSanFranciscoSunrise(dayKey) {

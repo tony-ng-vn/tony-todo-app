@@ -18,6 +18,7 @@
   export let onProgressiveChange;
   export let onProgressCommit;
   export let onDueDateChange;
+  export let onTimingChange;
   export let onDelete;
 
   let draftTodoId = null;
@@ -25,6 +26,11 @@
   let progressDraft = '';
   let sourceNote = '';
   let sourceProgress = '';
+  let timingStartDraft = '';
+  let timingEndDraft = '';
+  let sourceTimingStart = '';
+  let sourceTimingEnd = '';
+  let timingError = '';
 
   $: {
     const nextNote = todo.note ?? '';
@@ -36,6 +42,11 @@
       sourceProgress = nextProgress;
       noteDraft = nextNote;
       progressDraft = nextProgress;
+      sourceTimingStart = dateTimeLocalValue(todo.firstStartedAt);
+      sourceTimingEnd = dateTimeLocalValue(todo.completedAt);
+      timingStartDraft = sourceTimingStart;
+      timingEndDraft = sourceTimingEnd;
+      timingError = '';
     } else {
       if (nextNote !== sourceNote) {
         sourceNote = nextNote;
@@ -46,10 +57,23 @@
         sourceProgress = nextProgress;
         progressDraft = nextProgress;
       }
+
+      const nextTimingStart = dateTimeLocalValue(todo.firstStartedAt);
+      const nextTimingEnd = dateTimeLocalValue(todo.completedAt);
+      if (nextTimingStart !== sourceTimingStart) {
+        sourceTimingStart = nextTimingStart;
+        timingStartDraft = nextTimingStart;
+      }
+
+      if (nextTimingEnd !== sourceTimingEnd) {
+        sourceTimingEnd = nextTimingEnd;
+        timingEndDraft = nextTimingEnd;
+      }
     }
   }
 
   $: isRunning = Boolean(todo.activeStartedAt);
+  $: isCompleted = Boolean(todo.completedAt);
   $: duration = formatDuration(getElapsedSeconds(todo));
 
   function dueDateValue(dueDate) {
@@ -66,6 +90,55 @@
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  }
+
+  function dateTimeLocalValue(timestamp) {
+    if (!timestamp) {
+      return '';
+    }
+
+    const date = new Date(timestamp);
+    if (Number.isNaN(date.getTime())) {
+      return '';
+    }
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${year}-${month}-${day}T${hours}:${minutes}`;
+  }
+
+  function handleTimingInput(field, value) {
+    if (field === 'start') {
+      timingStartDraft = value;
+    } else {
+      timingEndDraft = value;
+    }
+
+    timingError = validateTiming();
+    if (!timingError) {
+      onTimingChange(todo.id, timingStartDraft, timingEndDraft);
+    }
+  }
+
+  function validateTiming() {
+    if (!timingStartDraft || !timingEndDraft) {
+      return 'Choose both a start and end time.';
+    }
+
+    const start = new Date(timingStartDraft);
+    const end = new Date(timingEndDraft);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+      return 'Enter valid start and end times.';
+    }
+
+    if (start.getTime() >= end.getTime()) {
+      return 'Start must be before end.';
+    }
+
+    return '';
   }
 
   function handleTitleKeydown(event) {
@@ -112,40 +185,42 @@
     >
       <span class="menubar-task-title">{todo.title}</span>
       <span class="menubar-task-meta">
-        {isRunning ? 'Tracking' : 'Duration'} {duration}
+        {isCompleted ? 'Finished' : isRunning ? 'Tracking' : 'Duration'} {duration}
         {#if todo.dueDate} - due {formatDueDate(todo.dueDate)}{/if}
       </span>
       {#if todo.firstStartedAt}
         <span class="menubar-task-started">
-          Started <time datetime={todo.firstStartedAt}>{formatTaskTimestamp(todo.firstStartedAt)}</time>
+          Started{' '}<time datetime={todo.firstStartedAt}>{formatTaskTimestamp(todo.firstStartedAt)}</time>
         </span>
       {/if}
       {#if todo.progressLabel}
         <span class="menubar-task-progress">{todo.progressLabel}</span>
       {/if}
     </button>
-    <div class="menubar-task-actions">
-      <button
-        type="button"
-        class:menubar-pause={isRunning}
-        class:menubar-start={!isRunning}
-        class="menubar-icon-button"
-        aria-label={`${isRunning ? 'Pause' : 'Start'} ${todo.title}`}
-        title={isRunning ? 'Pause' : 'Start'}
-        on:click={() => onTimerAction(isRunning ? 'pause' : 'start', todo.id)}
-      >
-        {@html isRunning ? iconPause() : iconPlay()}
-      </button>
-      <button
-        type="button"
-        class="menubar-icon-button menubar-finish"
-        aria-label={`${todo.isProgressive ? 'Log progress for' : 'Finish'} ${todo.title}`}
-        title={todo.isProgressive ? 'Log progress' : 'Finish'}
-        on:click={() => onComplete(todo.id)}
-      >
-        {@html iconCheck()}
-      </button>
-    </div>
+    {#if !isCompleted}
+      <div class="menubar-task-actions">
+        <button
+          type="button"
+          class:menubar-pause={isRunning}
+          class:menubar-start={!isRunning}
+          class="menubar-icon-button"
+          aria-label={`${isRunning ? 'Pause' : 'Start'} ${todo.title}`}
+          title={isRunning ? 'Pause' : 'Start'}
+          on:click={() => onTimerAction(isRunning ? 'pause' : 'start', todo.id)}
+        >
+          {@html isRunning ? iconPause() : iconPlay()}
+        </button>
+        <button
+          type="button"
+          class="menubar-icon-button menubar-finish"
+          aria-label={`${todo.isProgressive ? 'Log progress for' : 'Finish'} ${todo.title}`}
+          title={todo.isProgressive ? 'Log progress' : 'Finish'}
+          on:click={() => onComplete(todo.id)}
+        >
+          {@html iconCheck()}
+        </button>
+      </div>
+    {/if}
   </div>
 
   {#if expanded}
@@ -209,6 +284,40 @@
           on:change={(event) => onDueDateChange(todo.id, event.currentTarget.value)}
         />
       </label>
+
+      <div class="menubar-timing-controls" aria-label="Task timing">
+        <div class="menubar-timing-heading">
+          <strong>Start and end time</strong>
+          <small>{isCompleted ? 'Update the recorded timing.' : 'Saving timing finishes this task.'}</small>
+        </div>
+        <label>
+          <span>Start</span>
+          <input
+            type="datetime-local"
+            value={timingStartDraft}
+            aria-label={`Start time for ${todo.title}`}
+            aria-invalid={Boolean(timingError)}
+            aria-describedby={timingError ? `menubar-timing-error-${todo.id}` : undefined}
+            on:change={(event) => handleTimingInput('start', event.currentTarget.value)}
+          />
+        </label>
+        <label>
+          <span>End</span>
+          <input
+            type="datetime-local"
+            value={timingEndDraft}
+            aria-label={`End time for ${todo.title}`}
+            aria-invalid={Boolean(timingError)}
+            aria-describedby={timingError ? `menubar-timing-error-${todo.id}` : undefined}
+            on:change={(event) => handleTimingInput('end', event.currentTarget.value)}
+          />
+        </label>
+        {#if timingError}
+          <p class="menubar-timing-error" id={`menubar-timing-error-${todo.id}`} role="alert">
+            {timingError}
+          </p>
+        {/if}
+      </div>
 
       <div class="menubar-detail-footer">
         <span>{isRunning ? `Live ${duration}` : `Tracked ${duration}`}</span>
@@ -352,6 +461,7 @@
 
   .menubar-task-details input[type='text'],
   .menubar-task-details input[type='date'],
+  .menubar-task-details input[type='datetime-local'],
   .menubar-task-details textarea {
     width: 100%;
     min-width: 0;
@@ -365,7 +475,8 @@
   }
 
   .menubar-task-details input[type='text'],
-  .menubar-task-details input[type='date'] {
+  .menubar-task-details input[type='date'],
+  .menubar-task-details input[type='datetime-local'] {
     min-height: 38px;
   }
 
@@ -380,6 +491,39 @@
   .menubar-delete:focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 1px;
+  }
+
+  .menubar-timing-controls {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+    padding-top: 2px;
+  }
+
+  .menubar-timing-heading,
+  .menubar-timing-error {
+    grid-column: 1 / -1;
+  }
+
+  .menubar-timing-heading {
+    display: grid;
+    gap: 2px;
+  }
+
+  .menubar-timing-heading strong {
+    color: var(--default);
+    font-size: 11px;
+  }
+
+  .menubar-timing-heading small {
+    color: var(--subtle);
+    font-size: 10px;
+  }
+
+  .menubar-timing-error {
+    margin: 0;
+    color: var(--danger, #d85c52);
+    font-size: 10px;
   }
 
   .menubar-note-save-status {

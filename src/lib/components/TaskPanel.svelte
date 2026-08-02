@@ -40,6 +40,9 @@
   export let onViewChange;
   export let showSignOut = false;
   export let onSignOut;
+
+  $: todayOpenSection = openTodoSections.find((section) => section.isToday);
+  $: datedOpenSections = openTodoSections.filter((section) => !section.isToday);
 </script>
 
 <section
@@ -75,7 +78,7 @@
   <WorkspaceTabs currentView={viewMode} {inboxCount} {waitingCount} {onViewChange} />
 
   <form class="new-task-form" id="new-task-form" on:submit|preventDefault={onSubmit}>
-    <label for="todo-title">New task</label>
+    <label for="todo-title">New task - assigned to the selected date</label>
     <div class="input-row">
       <input
         id="todo-title"
@@ -91,8 +94,8 @@
         name="dueDate"
         type="date"
         class="new-task-due"
-        aria-label="Due date (optional)"
-        title="Due date (optional)"
+        aria-label="Assigned date"
+        title="Assigned date"
         bind:value={dueDateDraft}
       />
       <button type="submit">Add</button>
@@ -114,6 +117,22 @@
       </li>
     {/if}
 
+    {#if todayOpenSection}
+      <li class="task-list-section" aria-labelledby="open-today-heading">
+        <div class="section-heading">
+          <h2 id="open-today-heading">{todayOpenSection.label}</h2>
+          <span class="section-count" id="open-count">
+            {draggedSummaryId ? 'Drop to reopen' : `${todayOpenSection.items.length} open`}
+          </span>
+        </div>
+        <ol class="task-section-list">
+          {#each todayOpenSection.items as todo (todo.id)}
+            {@render taskRow(todo)}
+          {/each}
+        </ol>
+      </li>
+    {/if}
+
     {#if pausedTodos.length}
       <li class="task-list-section paused-task-section" aria-labelledby="paused-heading">
         <div class="section-heading">
@@ -128,11 +147,11 @@
       </li>
     {/if}
 
-    {#each openTodoSections as section, index (section.id)}
+    {#each datedOpenSections as section, index (section.id)}
       <li class="task-list-section" aria-labelledby={`open-${section.id}-heading`}>
         <div class="section-heading">
           <h2 id={`open-${section.id}-heading`}>{section.label}</h2>
-          <span class="section-count" id={index === 0 ? 'open-count' : undefined}>
+          <span class="section-count" id={!todayOpenSection && index === 0 ? 'open-count' : undefined}>
             {draggedSummaryId && index === 0 ? 'Drop to reopen' : `${section.items.length} open`}
           </span>
         </div>
