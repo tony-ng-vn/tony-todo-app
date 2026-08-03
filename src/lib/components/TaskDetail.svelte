@@ -2,6 +2,7 @@
   import { tick } from 'svelte';
   import CalendarPicker from './CalendarPicker.svelte';
   import { linkifyText } from '../../linkify.js';
+  import { expandTodoCommand, parseNoteTodos, toggleNoteTodo } from '../../noteTodos.js';
   import { formatTaskTimestamp } from '../../todoStore.js';
 
   export let selectedTask = null;
@@ -163,46 +164,8 @@
     return handleTextareaKeydown(event, (nextValue) => onProgressInput(selectedTask.id, nextValue));
   }
 
-  function parseNoteTodos(note) {
-    return note
-      .split('\n')
-      .map((line, index) => {
-        const match = line.match(/^-\s+\[( |x|X)\]\s+(.*)$/);
-        return match
-          ? {
-              lineIndex: index,
-              done: match[1].toLowerCase() === 'x',
-              label: match[2],
-            }
-          : null;
-      })
-      .filter(Boolean);
-  }
-
   function handleTodoToggle(item) {
-    const lines = noteDraft.split('\n');
-    const marker = item.done ? ' ' : 'x';
-    lines[item.lineIndex] = `- [${marker}] ${item.label}`;
-    onNoteInput(lines.join('\n'));
-  }
-
-  function expandTodoCommand(value, cursor) {
-    const lineStart = value.lastIndexOf('\n', Math.max(0, cursor - 1)) + 1;
-    const lineEndIndex = value.indexOf('\n', cursor);
-    const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
-    const line = value.slice(lineStart, lineEnd);
-    const match = line.match(/^\/todo(?:\s+)?(.*)$/);
-
-    if (!match) {
-      return { value, cursor, changed: false };
-    }
-
-    const replacement = `- [ ] ${match[1] ?? ''}`;
-    return {
-      value: `${value.slice(0, lineStart)}${replacement}${value.slice(lineEnd)}`,
-      cursor: lineStart + replacement.length,
-      changed: true,
-    };
+    onNoteInput(toggleNoteTodo(noteDraft, item.lineIndex));
   }
 
   function toDateTimeLocalValue(dateLike) {
@@ -325,7 +288,7 @@
             on:click={() => handleTodoToggle(item)}
             aria-pressed={item.done}
           >
-            <span class="note-todo-checkbox" aria-hidden="true">{item.done ? '✓' : ''}</span>
+            <span class="note-todo-checkbox" aria-hidden="true"></span>
             <span>{item.label}</span>
           </button>
         {/each}

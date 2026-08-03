@@ -1919,6 +1919,15 @@ h2 {
   line-height: 1;
 }
 
+.note-todo-item.is-done .note-todo-checkbox::after {
+  width: 8px;
+  height: 4px;
+  border-bottom: 1.5px solid currentColor;
+  border-left: 1.5px solid currentColor;
+  content: '';
+  transform: translateY(-1px) rotate(-45deg);
+}
+
 .note-todo-item.is-done {
   color: var(--subtle);
 }
