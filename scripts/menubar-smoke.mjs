@@ -224,6 +224,31 @@ try {
   }));
 
   await page.fill(
+    '[data-menubar-details="menubar-open"] .menubar-note-input',
+    '/todo Review menu bar',
+  );
+  await page.waitForFunction(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    return state.todos.find((todo) => todo.id === 'menubar-open')?.note === '- [ ] Review menu bar';
+  });
+  const slashTodoPresentation = await page.evaluate(() => {
+    const details = document.querySelector('[data-menubar-details="menubar-open"]');
+    return {
+      note: details?.querySelector('.menubar-note-input')?.value,
+      label: details?.querySelector('.note-todo-item')?.textContent.trim(),
+      pressed: details?.querySelector('.note-todo-item')?.getAttribute('aria-pressed'),
+    };
+  });
+  await page.click('[data-menubar-details="menubar-open"] .note-todo-item');
+  await page.waitForFunction(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    return state.todos.find((todo) => todo.id === 'menubar-open')?.note === '- [x] Review menu bar';
+  });
+  const toggledTodoPressed = await page
+    .locator('[data-menubar-details="menubar-open"] .note-todo-item')
+    .getAttribute('aria-pressed');
+
+  await page.fill(
     '[data-menubar-details="menubar-open"] input[aria-label^="Start time"]',
     '2026-07-30T00:00',
   );
@@ -389,7 +414,7 @@ try {
     !final.added ||
     !final.addedDueDate ||
     final.renamed !== 'Renamed in menu bar' ||
-    final.note !== 'Compact\tnote' ||
+    final.note !== '- [x] Review menu bar' ||
     !final.completed ||
     !final.pausedCompleted ||
     final.progress !== 'Chapter\t3' ||
@@ -402,6 +427,16 @@ try {
     final.nativeDateTimeInputs !== 0
   ) {
     failures.push(`compact task flow failed: ${JSON.stringify(final)}`);
+  }
+  if (
+    slashTodoPresentation.note !== '- [ ] Review menu bar' ||
+    slashTodoPresentation.label !== 'Review menu bar' ||
+    slashTodoPresentation.pressed !== 'false' ||
+    toggledTodoPressed !== 'true'
+  ) {
+    failures.push(
+      `menu bar note todo behavior diverged from the full app: ${JSON.stringify({ slashTodoPresentation, toggledTodoPressed })}`,
+    );
   }
 
   if (failures.length) {

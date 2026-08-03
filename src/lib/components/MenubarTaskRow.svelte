@@ -1,4 +1,6 @@
 <script>
+  import { tick } from 'svelte';
+  import { expandTodoCommand, parseNoteTodos, toggleNoteTodo } from '../../noteTodos.js';
   import {
     formatDueDate,
     formatDuration,
@@ -75,6 +77,7 @@
   $: isRunning = Boolean(todo.activeStartedAt);
   $: isCompleted = Boolean(todo.completedAt);
   $: duration = formatDuration(getElapsedSeconds(todo));
+  $: noteTodos = parseNoteTodos(noteDraft);
 
   function dueDateValue(dueDate) {
     if (!dueDate) {
@@ -167,6 +170,24 @@
     noteDraft = nextNote;
     onNoteInput(todo.id, nextNote);
   }
+
+  async function handleNoteTextareaInput(event) {
+    const textarea = event.currentTarget;
+    const expanded = expandTodoCommand(
+      textarea.value,
+      textarea.selectionStart ?? textarea.value.length,
+    );
+    updateNoteDraft(expanded.value);
+
+    if (expanded.changed) {
+      await tick();
+      textarea.setSelectionRange(expanded.cursor, expanded.cursor);
+    }
+  }
+
+  function handleTodoToggle(item) {
+    updateNoteDraft(toggleNoteTodo(noteDraft, item.lineIndex));
+  }
 </script>
 
 <article
@@ -240,12 +261,28 @@
         <span>Note</span>
         <textarea
           class="menubar-note-input"
-          bind:value={noteDraft}
+          value={noteDraft}
           rows="3"
-          on:input={(event) => onNoteInput(todo.id, event.currentTarget.value)}
+          on:input={handleNoteTextareaInput}
           on:keydown={(event) => handleTextareaTab(event, updateNoteDraft)}
         ></textarea>
       </label>
+      {#if noteTodos.length}
+        <div class="note-todo-list" aria-label="Note todos">
+          {#each noteTodos as item (item.lineIndex)}
+            <button
+              type="button"
+              class:is-done={item.done}
+              class="note-todo-item"
+              on:click={() => handleTodoToggle(item)}
+              aria-pressed={item.done}
+            >
+              <span class="note-todo-checkbox" aria-hidden="true"></span>
+              <span>{item.label}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
       <span class="menubar-note-save-status" aria-live="polite">
         {noteSaveStatus === 'saving'
           ? 'Saving note...'
@@ -486,6 +523,7 @@
 
   .menubar-task-details input:focus-visible,
   .menubar-task-details textarea:focus-visible,
+  .note-todo-item:focus-visible,
   .menubar-details-toggle:focus-visible,
   .menubar-icon-button:focus-visible,
   .menubar-delete:focus-visible {
