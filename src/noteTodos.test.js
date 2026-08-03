@@ -23,6 +23,16 @@ describe('note todos', () => {
     });
   });
 
+  it('does not expand words that only start with the todo command', () => {
+    const note = '/todoist Review menu bar';
+
+    expect(expandTodoCommand(note, note.length)).toEqual({
+      value: note,
+      cursor: note.length,
+      changed: false,
+    });
+  });
+
   it('parses and toggles note todo lines without changing surrounding notes', () => {
     const note = 'Context\n- [ ] First task\n- [X] Finished task';
 

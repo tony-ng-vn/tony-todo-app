@@ -21,7 +21,7 @@ export function expandTodoCommand(value, cursor) {
   const lineEndIndex = value.indexOf('\n', cursor);
   const lineEnd = lineEndIndex === -1 ? value.length : lineEndIndex;
   const line = value.slice(lineStart, lineEnd);
-  const match = line.match(/^\/todo(?:\s+)?(.*)$/);
+  const match = line.match(/^\/todo(?:\s+(.*))?$/);
 
   if (!match) {
     return { value, cursor, changed: false };

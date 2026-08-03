@@ -1922,8 +1922,8 @@ h2 {
 .note-todo-item.is-done .note-todo-checkbox::after {
   width: 8px;
   height: 4px;
-  border-bottom: 1.5px solid currentColor;
-  border-left: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentcolor;
+  border-left: 1.5px solid currentcolor;
   content: '';
   transform: translateY(-1px) rotate(-45deg);
 }
