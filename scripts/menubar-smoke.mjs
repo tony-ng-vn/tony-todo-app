@@ -286,6 +286,28 @@ try {
 
   await page.fill(
     '[data-menubar-details="menubar-open"] .menubar-note-input',
+    '\tIndented line',
+  );
+  await page.locator('[data-menubar-details="menubar-open"] .menubar-note-input').press('End');
+  await page.locator('[data-menubar-details="menubar-open"] .menubar-note-input').press('Enter');
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
+  await page.waitForFunction(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    return state.todos.find((todo) => todo.id === 'menubar-open')?.note === '\tIndented line\n\t';
+  });
+  const enterIndentPresentation = await page.evaluate(() => {
+    const textarea = document.querySelector(
+      '[data-menubar-details="menubar-open"] .menubar-note-input',
+    );
+    return {
+      note: textarea?.value,
+      selectionStart: textarea?.selectionStart,
+      focused: document.activeElement === textarea,
+    };
+  });
+
+  await page.fill(
+    '[data-menubar-details="menubar-open"] .menubar-note-input',
     '/todo Review menu bar',
   );
   await page.waitForFunction(() => {
@@ -551,6 +573,15 @@ try {
   ) {
     failures.push(
       `menu bar note todo behavior diverged from the full app: ${JSON.stringify({ slashTodoPresentation, toggledTodoPressed })}`,
+    );
+  }
+  if (
+    enterIndentPresentation.note !== '\tIndented line\n\t' ||
+    enterIndentPresentation.selectionStart !== 16 ||
+    !enterIndentPresentation.focused
+  ) {
+    failures.push(
+      `menu bar enter key did not preserve note indentation: ${JSON.stringify(enterIndentPresentation)}`,
     );
   }
 

@@ -1,6 +1,7 @@
 <script>
   import { tick } from 'svelte';
   import { expandTodoCommand, parseNoteTodos, toggleNoteTodo } from '../../noteTodos.js';
+  import { getTextareaKeyEdit } from '../../textareaEditing.js';
   import {
     formatDueDate,
     formatDuration,
@@ -190,19 +191,29 @@
     }
   }
 
-  function handleTextareaTab(event, updateDraft) {
-    if (event.key !== 'Tab' || event.shiftKey) {
+  function handleTextareaKeydown(event, updateDraft) {
+    if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
+
+    const textarea = event.currentTarget;
+    const start = textarea.selectionStart ?? textarea.value.length;
+    const end = textarea.selectionEnd ?? start;
+    const edit = getTextareaKeyEdit({
+      value: textarea.value,
+      selectionStart: start,
+      selectionEnd: end,
+      key: event.key,
+      shiftKey: event.shiftKey,
+    });
+    if (!edit) {
       return;
     }
 
     event.preventDefault();
-    const textarea = event.currentTarget;
-    const start = textarea.selectionStart ?? textarea.value.length;
-    const end = textarea.selectionEnd ?? start;
-    const nextValue = `${textarea.value.slice(0, start)}\t${textarea.value.slice(end)}`;
-    updateDraft(nextValue);
+    updateDraft(edit.value);
 
-    requestAnimationFrame(() => textarea.setSelectionRange(start + 1, start + 1));
+    requestAnimationFrame(() => textarea.setSelectionRange(edit.cursor, edit.cursor));
   }
 
   function updateNoteDraft(nextNote) {
@@ -307,7 +318,7 @@
           value={noteDraft}
           rows="3"
           on:input={handleNoteTextareaInput}
-          on:keydown={(event) => handleTextareaTab(event, updateNoteDraft)}
+          on:keydown={(event) => handleTextareaKeydown(event, updateNoteDraft)}
         ></textarea>
       </label>
       {#if noteTodos.length}
@@ -350,7 +361,7 @@
             class="menubar-progress-input"
             bind:value={progressDraft}
             rows="2"
-            on:keydown={(event) => handleTextareaTab(event, (value) => (progressDraft = value))}
+            on:keydown={(event) => handleTextareaKeydown(event, (value) => (progressDraft = value))}
             on:focusout={() => onProgressCommit(todo.id, progressDraft)}
           ></textarea>
         </label>

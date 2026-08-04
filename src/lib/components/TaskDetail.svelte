@@ -3,6 +3,7 @@
   import CalendarPicker from './CalendarPicker.svelte';
   import { linkifyText } from '../../linkify.js';
   import { expandTodoCommand, parseNoteTodos, toggleNoteTodo } from '../../noteTodos.js';
+  import { getTextareaKeyEdit } from '../../textareaEditing.js';
   import { formatTaskTimestamp, getDefaultTaskStartTimestamp } from '../../todoStore.js';
 
   export let selectedTask = null;
@@ -200,19 +201,29 @@
   }
 
   async function handleTextareaKeydown(event, onInput) {
-    if (event.key !== 'Tab' || event.shiftKey) {
+    if (event.isComposing || event.altKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
+
+    const textarea = event.currentTarget;
+    const selectionStart = textarea.selectionStart ?? textarea.value.length;
+    const selectionEnd = textarea.selectionEnd ?? selectionStart;
+    const edit = getTextareaKeyEdit({
+      value: textarea.value,
+      selectionStart,
+      selectionEnd,
+      key: event.key,
+      shiftKey: event.shiftKey,
+    });
+    if (!edit) {
       return;
     }
 
     event.preventDefault();
-    const textarea = event.currentTarget;
-    const selectionStart = textarea.selectionStart ?? textarea.value.length;
-    const selectionEnd = textarea.selectionEnd ?? selectionStart;
-    const nextValue = `${textarea.value.slice(0, selectionStart)}\t${textarea.value.slice(selectionEnd)}`;
-    onInput(nextValue);
+    onInput(edit.value);
 
     await tick();
-    textarea.setSelectionRange(selectionStart + 1, selectionStart + 1);
+    textarea.setSelectionRange(edit.cursor, edit.cursor);
   }
 
   function handleNoteTextareaKeydown(event) {

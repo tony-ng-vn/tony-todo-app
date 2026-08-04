@@ -792,6 +792,17 @@ async function exerciseDetailEditing(page) {
     selectionStart: document.querySelector('#detail-note')?.selectionStart,
     activeElementId: document.activeElement?.id,
   }));
+  await page.keyboard.press('End');
+  await page.keyboard.press('Enter');
+  await page.waitForFunction(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    return state.todos.find((item) => item.id === 'ui-smoke-local-task')?.note === '\t- [x] Follow up with USCIS\n\t';
+  });
+  const enterIndentCheck = await page.evaluate(() => ({
+    noteValue: document.querySelector('#detail-note')?.value,
+    selectionStart: document.querySelector('#detail-note')?.selectionStart,
+    activeElementId: document.activeElement?.id,
+  }));
 
   await page.mouse.click(24, 24);
   await page.waitForTimeout(120);
@@ -919,7 +930,7 @@ async function exerciseDetailEditing(page) {
     return !state.todos.some((item) => item.id === 'ui-smoke-evening-task');
   });
 
-  const editChecks = await page.evaluate(({ taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteAfterInput, slashTodoValue, clickedTodoValue, tabEditCheck, progressEditorCheck }) => {
+  const editChecks = await page.evaluate(({ taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteAfterInput, slashTodoValue, clickedTodoValue, tabEditCheck, enterIndentCheck, progressEditorCheck }) => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     const todo = state.todos.find((item) => item.id === 'ui-smoke-local-task');
     const session = state.todos.find((item) => item.parentTaskId === 'ui-smoke-local-task');
@@ -943,6 +954,7 @@ async function exerciseDetailEditing(page) {
       slashTodoValue,
       clickedTodoValue,
       tabEditCheck,
+      enterIndentCheck,
       progressEditorCheck,
       lunchTrackedSeconds: lunch?.trackedSeconds,
       lunchStart: lunch?.firstStartedAt,
@@ -952,7 +964,7 @@ async function exerciseDetailEditing(page) {
       detailUsesCustomCalendar,
       doneDateMoveCheck,
     };
-  }, { taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteAfterInput, slashTodoValue, clickedTodoValue, tabEditCheck, progressEditorCheck });
+  }, { taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteAfterInput, slashTodoValue, clickedTodoValue, tabEditCheck, enterIndentCheck, progressEditorCheck });
 
   return { ...editChecks, initialTitlePresentation, detailLayout, outsideClickKeepsDetailOpen };
 }
@@ -1179,7 +1191,7 @@ function assertDetailEditing(result) {
     failures.push(`missing start time does not default to creation time: ${JSON.stringify(summaryTimeEdit)}`);
   }
 
-  if (editChecks.storedNote !== '\t- [x] Follow up with USCIS' || editChecks.storedTitle !== 'Smoke renamed task') {
+  if (editChecks.storedNote !== '\t- [x] Follow up with USCIS\n\t' || editChecks.storedTitle !== 'Smoke renamed task') {
     failures.push(`detail editing failed: ${JSON.stringify(editChecks)}`);
   }
 
@@ -1197,6 +1209,14 @@ function assertDetailEditing(result) {
     editChecks.tabEditCheck?.activeElementId !== 'detail-note'
   ) {
     failures.push(`tab key did not insert a tab inside task details: ${JSON.stringify(editChecks.tabEditCheck)}`);
+  }
+
+  if (
+    editChecks.enterIndentCheck?.noteValue !== '\t- [x] Follow up with USCIS\n\t' ||
+    editChecks.enterIndentCheck?.selectionStart !== 29 ||
+    editChecks.enterIndentCheck?.activeElementId !== 'detail-note'
+  ) {
+    failures.push(`enter key did not preserve note indentation: ${JSON.stringify(editChecks.enterIndentCheck)}`);
   }
 
   if (
