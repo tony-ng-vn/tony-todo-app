@@ -625,6 +625,21 @@ export function formatTaskTimestamp(timestamp) {
   }).format(date);
 }
 
+export function getDefaultTaskStartTimestamp(todo) {
+  for (const timestamp of [todo?.firstStartedAt, todo?.createdAt]) {
+    if (!timestamp) {
+      continue;
+    }
+
+    const date = new Date(timestamp);
+    if (!Number.isNaN(date.getTime())) {
+      return date.toISOString();
+    }
+  }
+
+  return null;
+}
+
 export function setTodoProgressive(state, todoId, isProgressive) {
   return {
     ...state,
