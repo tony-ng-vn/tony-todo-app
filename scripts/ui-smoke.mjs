@@ -25,6 +25,7 @@ try {
     ...assertTimerControlLabel(desktop),
     ...assertTaskRowSpacing(desktop),
     ...assertCalendarConsistency(desktop),
+    ...assertNewTaskCalendarClear(desktop),
     ...assertOngoingSection(desktop),
     ...assertManualTiming(desktop),
     ...assertBoardCardLayout(boardCardLayout),
@@ -385,6 +386,7 @@ async function inspectViewport(viewport, isMobile) {
   const summaryTimeEdit = isMobile ? null : await exerciseSummaryTimeEditing(page);
   const taskFlowChecks = isMobile ? null : await exerciseParallelAndReopen(page);
   const editChecks = isMobile ? null : await exerciseDetailEditing(page);
+  const newTaskCalendarClear = isMobile ? null : await exerciseNewTaskCalendarClear(page);
 
   const metrics = await page.evaluate(() => {
     function rectFor(selector) {
@@ -539,7 +541,22 @@ async function inspectViewport(viewport, isMobile) {
     pausedTimeline,
     summaryTimeEdit,
     taskFlowChecks,
+    newTaskCalendarClear,
     ...metrics,
+  };
+}
+
+async function exerciseNewTaskCalendarClear(page) {
+  await page.locator('#todo-due-date').click();
+  await page.locator('.calendar-footer button', { hasText: 'Today' }).click();
+  await page.locator('#todo-due-date').click();
+  const clearAvailable = Boolean(
+    await page.locator('.calendar-footer button', { hasText: 'Clear' }).count(),
+  );
+  await page.locator('.calendar-footer button', { hasText: 'Clear' }).click();
+  return {
+    clearAvailable,
+    triggerText: (await page.locator('#todo-due-date').textContent())?.trim() ?? '',
   };
 }
 
@@ -1112,6 +1129,13 @@ function assertCalendarConsistency(result) {
     presentation.hasSummaryPicker
     ? []
     : [`calendar controls are not using the shared picker: ${JSON.stringify(presentation)}`];
+}
+
+function assertNewTaskCalendarClear(result) {
+  return result.newTaskCalendarClear?.clearAvailable &&
+    result.newTaskCalendarClear.triggerText === 'Select date'
+    ? []
+    : [`new-task assigned date could not be cleared: ${JSON.stringify(result.newTaskCalendarClear)}`];
 }
 
 function assertPausedTimeline(result) {

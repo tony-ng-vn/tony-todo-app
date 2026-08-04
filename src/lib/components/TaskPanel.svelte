@@ -96,6 +96,7 @@
           value={dueDateDraft}
           label="Assigned date"
           triggerClass="new-task-due"
+          allowClear={true}
           onChange={(nextDate) => (dueDateDraft = nextDate)}
         />
       </div>
