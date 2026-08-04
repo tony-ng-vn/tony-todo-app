@@ -89,6 +89,16 @@ describe('todo day summary', () => {
     let state = addTodo(createInitialState(), 'Draft landing page', createdAt);
 
     expect(getDefaultTaskStartTimestamp(state.todos[0])).toBe(createdAt.toISOString());
+    expect(
+      getDefaultTaskStartTimestamp({ ...state.todos[0], firstStartedAt: 'not-a-date' }),
+    ).toBe(createdAt.toISOString());
+    expect(
+      getDefaultTaskStartTimestamp({
+        ...state.todos[0],
+        firstStartedAt: 'not-a-date',
+        createdAt: 'not-a-date',
+      }),
+    ).toBeNull();
 
     state = startTodoTimer(state, state.todos[0].id, new Date('2026-06-08T09:15:00.000Z'));
 

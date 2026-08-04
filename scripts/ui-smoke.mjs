@@ -589,6 +589,7 @@ async function exerciseSummaryTimeEditing(page) {
         minute: '2-digit',
       }).format(createdAt),
       disclosure: document.querySelector('.detail-start-missing')?.textContent.trim(),
+      firstStartedAt: todo.firstStartedAt,
     };
   });
   await page.click('#detail-close');
@@ -1080,7 +1081,8 @@ function assertDetailEditing(result) {
 
   if (
     summaryTimeEdit.missingStart?.pickerText !== summaryTimeEdit.missingStart?.expectedPickerText ||
-    summaryTimeEdit.missingStart?.disclosure !== 'Defaults to creation time'
+    summaryTimeEdit.missingStart?.disclosure !== 'Defaults to creation time' ||
+    summaryTimeEdit.missingStart?.firstStartedAt !== null
   ) {
     failures.push(`missing start time does not default to creation time: ${JSON.stringify(summaryTimeEdit)}`);
   }

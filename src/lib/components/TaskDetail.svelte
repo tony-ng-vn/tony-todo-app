@@ -56,7 +56,8 @@
   }
 
   function completedStartValue(todo) {
-    return toDateTimeLocalValue(getDefaultTaskStartTimestamp(todo));
+    const timestamp = getDefaultTaskStartTimestamp(todo);
+    return timestamp ? toDateTimeLocalValue(timestamp) : '';
   }
 
   function completedEndValue(todo) {
