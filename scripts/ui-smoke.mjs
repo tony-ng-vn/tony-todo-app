@@ -575,10 +575,23 @@ async function exerciseSummaryTimeEditing(page) {
 
   await page.click('[data-summary-id="ui-smoke-morning-task"] .open-task-button');
   await page.waitForSelector('.detail-start-picker');
-  const missingStart = await page.evaluate(() => ({
-    pickerText: document.querySelector('.detail-start-picker')?.textContent.trim(),
-    disclosure: document.querySelector('.detail-start-missing')?.textContent.trim(),
-  }));
+  const missingStart = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    const todo = state.todos.find((item) => item.id === 'ui-smoke-morning-task');
+    const createdAt = new Date(todo.createdAt);
+
+    return {
+      pickerText: document.querySelector('.detail-start-picker')?.textContent.trim(),
+      expectedPickerText: new Intl.DateTimeFormat([], {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      }).format(createdAt),
+      disclosure: document.querySelector('.detail-start-missing')?.textContent.trim(),
+      firstStartedAt: todo.firstStartedAt,
+    };
+  });
   await page.click('#detail-close');
 
   return { ...result, missingStart };
@@ -1067,10 +1080,11 @@ function assertDetailEditing(result) {
   }
 
   if (
-    summaryTimeEdit.missingStart?.pickerText !== 'Select time' ||
-    summaryTimeEdit.missingStart?.disclosure !== 'Not recorded'
+    summaryTimeEdit.missingStart?.pickerText !== summaryTimeEdit.missingStart?.expectedPickerText ||
+    summaryTimeEdit.missingStart?.disclosure !== 'Defaults to creation time' ||
+    summaryTimeEdit.missingStart?.firstStartedAt !== null
   ) {
-    failures.push(`missing start time is not disclosed clearly: ${JSON.stringify(summaryTimeEdit)}`);
+    failures.push(`missing start time does not default to creation time: ${JSON.stringify(summaryTimeEdit)}`);
   }
 
   if (editChecks.storedNote !== '\t- [x] Follow up with USCIS' || editChecks.storedTitle !== 'Smoke renamed task') {

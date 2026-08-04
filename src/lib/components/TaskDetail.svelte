@@ -3,7 +3,7 @@
   import CalendarPicker from './CalendarPicker.svelte';
   import { linkifyText } from '../../linkify.js';
   import { expandTodoCommand, parseNoteTodos, toggleNoteTodo } from '../../noteTodos.js';
-  import { formatTaskTimestamp } from '../../todoStore.js';
+  import { formatTaskTimestamp, getDefaultTaskStartTimestamp } from '../../todoStore.js';
 
   export let selectedTask = null;
   export let noteDraft = '';
@@ -56,7 +56,8 @@
   }
 
   function completedStartValue(todo) {
-    return todo?.firstStartedAt ? toDateTimeLocalValue(todo.firstStartedAt) : '';
+    const timestamp = getDefaultTaskStartTimestamp(todo);
+    return timestamp ? toDateTimeLocalValue(timestamp) : '';
   }
 
   function completedEndValue(todo) {
@@ -338,7 +339,7 @@
       <label>
         <span>Start time</span>
         {#if !selectedTask.firstStartedAt}
-          <small class="detail-start-missing">Not recorded</small>
+          <small class="detail-start-missing">Defaults to creation time</small>
         {/if}
         <CalendarPicker
           mode="datetime"

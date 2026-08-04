@@ -5,6 +5,7 @@
     formatDueDate,
     formatDuration,
     formatTaskTimestamp,
+    getDefaultTaskStartTimestamp,
     getElapsedSeconds,
   } from '../../todoStore.js';
   import { iconCheck, iconPage, iconPause, iconPlay, iconX } from './icons.js';
@@ -44,7 +45,7 @@
       sourceProgress = nextProgress;
       noteDraft = nextNote;
       progressDraft = nextProgress;
-      sourceTimingStart = dateTimeLocalValue(todo.firstStartedAt);
+      sourceTimingStart = dateTimeLocalValue(getDefaultTaskStartTimestamp(todo));
       sourceTimingEnd = dateTimeLocalValue(todo.completedAt);
       timingStartDraft = sourceTimingStart;
       timingEndDraft = sourceTimingEnd;
@@ -60,7 +61,7 @@
         progressDraft = nextProgress;
       }
 
-      const nextTimingStart = dateTimeLocalValue(todo.firstStartedAt);
+      const nextTimingStart = dateTimeLocalValue(getDefaultTaskStartTimestamp(todo));
       const nextTimingEnd = dateTimeLocalValue(todo.completedAt);
       if (nextTimingStart !== sourceTimingStart) {
         sourceTimingStart = nextTimingStart;

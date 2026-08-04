@@ -162,6 +162,24 @@ try {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     return state.todos.some((todo) => todo.title === 'Captured from menu bar');
   });
+  const createdTask = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    const todo = state.todos.find((item) => item.title === 'Captured from menu bar');
+    const createdAt = new Date(todo.createdAt);
+
+    return {
+      id: todo.id,
+      expected: `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, '0')}-${String(createdAt.getDate()).padStart(2, '0')}T${String(createdAt.getHours()).padStart(2, '0')}:${String(createdAt.getMinutes()).padStart(2, '0')}`,
+      firstStartedAt: todo.firstStartedAt,
+    };
+  });
+  await page.click(`[data-menubar-id="${createdTask.id}"] .menubar-details-toggle`);
+  const createdTimingDefault = {
+    ...createdTask,
+    value: await page.inputValue(
+      `[data-menubar-details="${createdTask.id}"] input[aria-label^="Start time for"]`,
+    ),
+  };
   await page.click('[data-menubar-id="menubar-open"] .menubar-start');
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
@@ -399,6 +417,14 @@ try {
   }
   if (!parallelTimers.includes('menubar-running') || !parallelTimers.includes('menubar-open')) {
     failures.push(`menu bar diverged from parallel timer behavior: ${JSON.stringify(parallelTimers)}`);
+  }
+  if (
+    createdTimingDefault.value !== createdTimingDefault.expected ||
+    createdTimingDefault.firstStartedAt !== null
+  ) {
+    failures.push(
+      `new task start time does not default to creation time: ${JSON.stringify(createdTimingDefault)}`,
+    );
   }
   if (!startedPresentation.visible || !startedPresentation.remainsInOngoing) {
     failures.push(

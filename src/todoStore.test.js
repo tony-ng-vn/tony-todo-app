@@ -18,6 +18,7 @@ import {
   getTaskTimeSegments,
   formatDuration,
   getElapsedSeconds,
+  getDefaultTaskStartTimestamp,
   getOpenTodoSections,
   logProgressSession,
   moveCompletedTodoToSummaryBucket,
@@ -83,6 +84,27 @@ describe('calendar month', () => {
 });
 
 describe('todo day summary', () => {
+  it('defaults timing entry to the task creation time until a start is recorded', () => {
+    const createdAt = new Date('2026-06-08T08:10:00.000Z');
+    let state = addTodo(createInitialState(), 'Draft landing page', createdAt);
+
+    expect(getDefaultTaskStartTimestamp(state.todos[0])).toBe(createdAt.toISOString());
+    expect(
+      getDefaultTaskStartTimestamp({ ...state.todos[0], firstStartedAt: 'not-a-date' }),
+    ).toBe(createdAt.toISOString());
+    expect(
+      getDefaultTaskStartTimestamp({
+        ...state.todos[0],
+        firstStartedAt: 'not-a-date',
+        createdAt: 'not-a-date',
+      }),
+    ).toBeNull();
+
+    state = startTodoTimer(state, state.todos[0].id, new Date('2026-06-08T09:15:00.000Z'));
+
+    expect(getDefaultTaskStartTimestamp(state.todos[0])).toBe('2026-06-08T09:15:00.000Z');
+  });
+
   it('keeps active todos ordered newest first by creation time', () => {
     let state = createInitialState();
     state = addTodo(state, 'Draft landing page', new Date('2026-06-08T08:10:00'));
