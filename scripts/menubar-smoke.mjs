@@ -2,12 +2,22 @@ import { chromium } from 'playwright';
 
 const targetUrl = new URL(process.env.UI_SMOKE_URL ?? 'http://127.0.0.1:5176/menubar');
 targetUrl.searchParams.set('local', '1');
+const expectUpdateAvailable = process.env.EXPECT_UPDATE_AVAILABLE === '1';
 
 const browser = await chromium.launch({ headless: true });
 
 try {
   const page = await browser.newPage({ viewport: { width: 420, height: 640 } });
   await page.emulateMedia({ reducedMotion: 'reduce' });
+  if (expectUpdateAvailable) {
+    await page.route('**/_app/version.json', (route) =>
+      route.fulfill({
+        contentType: 'application/json',
+        body: JSON.stringify({ version: 'newer-deployment' }),
+        headers: { 'cache-control': 'no-store' },
+      }),
+    );
+  }
   await page.addInitScript(() => {
     const now = Date.now();
     const today = new Date(now);
@@ -137,6 +147,8 @@ try {
           ?.getBoundingClientRect().top,
       fullAppHref: document.querySelector('.menubar-open-full')?.getAttribute('href'),
       updateButtonLabel: document.querySelector('.menubar-update')?.textContent.trim(),
+      updateAvailable: document.querySelector('.menubar-update')?.classList.contains('is-available'),
+      updateLiveRegion: document.querySelector('.menubar-update')?.getAttribute('aria-live'),
       scrollWidth: document.documentElement.scrollWidth,
       clientWidth: document.documentElement.clientWidth,
       scrollbarWidth: shellStyle.scrollbarWidth,
@@ -498,7 +510,9 @@ try {
   }
   if (initial.fullAppHref !== '/') failures.push(`full app link is wrong: ${JSON.stringify(initial)}`);
   if (
-    initial.updateButtonLabel !== 'Update' ||
+    initial.updateButtonLabel !== (expectUpdateAvailable ? 'Update available' : 'Update') ||
+    initial.updateAvailable !== expectUpdateAvailable ||
+    initial.updateLiveRegion !== 'polite' ||
     !manualUpdate.keptLocalMode ||
     !manualUpdate.hasCacheBuster
   ) {
