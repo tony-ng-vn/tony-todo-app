@@ -186,6 +186,59 @@ export function updateTodoTiming(state, todoId, startedAt, completedAt) {
   };
 }
 
+export function updateTodoTimeSegments(state, todoId, segments) {
+  if (!Array.isArray(segments) || segments.length === 0) {
+    return state;
+  }
+
+  const timeSegments = segments
+    .map((segment) => {
+      const startedAt = new Date(segment?.startedAt);
+      const endedAt = new Date(segment?.endedAt);
+      if (
+        Number.isNaN(startedAt.getTime()) ||
+        Number.isNaN(endedAt.getTime()) ||
+        startedAt >= endedAt
+      ) {
+        return null;
+      }
+
+      return {
+        startedAt: startedAt.toISOString(),
+        endedAt: endedAt.toISOString(),
+      };
+    })
+    .filter(Boolean);
+
+  if (timeSegments.length !== segments.length) {
+    return state;
+  }
+
+  timeSegments.sort((first, second) => new Date(first.startedAt) - new Date(second.startedAt));
+  const firstStartedAt = timeSegments[0].startedAt;
+  const completedAt = timeSegments.reduce(
+    (latest, segment) =>
+      new Date(segment.endedAt) > new Date(latest) ? segment.endedAt : latest,
+    timeSegments[0].endedAt,
+  );
+
+  return {
+    ...state,
+    todos: state.todos.map((todo) =>
+      todo.id === todoId
+        ? {
+            ...todo,
+            firstStartedAt,
+            activeStartedAt: null,
+            completedAt,
+            trackedSeconds: totalTimeSegmentSeconds(timeSegments),
+            timeSegments,
+          }
+        : todo,
+    ),
+  };
+}
+
 export function startTodoTimer(state, todoId, startedAt = new Date()) {
   const startedAtIso = startedAt.toISOString();
 

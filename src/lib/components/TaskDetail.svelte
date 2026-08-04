@@ -9,13 +9,12 @@
   export let noteDraft = '';
   export let noteSaveStatus = 'saved';
   export let selectedTaskSessions = [];
-  export let selectedTaskTimeSegments = [];
   export let onClose;
   export let onNoteInput;
   export let onDetailTitleCommit;
   export let onProgressiveChange;
   export let onProgressInput;
-  export let onCompletedTimingChange;
+  export let onTimeSegmentsChange;
   export let onDueDateChange;
   export let onDeleteTask;
   export let formatDuration;
@@ -25,8 +24,8 @@
   let activeDetailTaskId = null;
   let editingDetailTitle = false;
   let timingDraftTaskId = null;
-  let timingDraftStart = '';
-  let timingDraftEnd = '';
+  let timingDraftSource = '';
+  let timingDraftBlocks = [];
   let timingError = '';
 
   $: noteTodos = parseNoteTodos(noteDraft);
@@ -36,12 +35,24 @@
     editingDetailTitle = false;
   }
 
-  $: if (selectedTask?.id !== timingDraftTaskId) {
-    timingDraftTaskId = selectedTask?.id ?? null;
-    timingDraftStart = completedStartValue(selectedTask);
-    timingDraftEnd = completedEndValue(selectedTask);
-    timingError = '';
+  $: {
+    const nextTimingSource = timingSource(selectedTask);
+    if (selectedTask?.id !== timingDraftTaskId || nextTimingSource !== timingDraftSource) {
+      timingDraftTaskId = selectedTask?.id ?? null;
+      timingDraftSource = nextTimingSource;
+      timingDraftBlocks = timingBlocksForTask(selectedTask);
+      timingError = '';
+    }
   }
+
+  $: timingDraftTotal = timingDraftBlocks.reduce((total, block) => {
+    const start = new Date(block.startedAt);
+    const end = new Date(block.endedAt);
+    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start >= end) {
+      return total;
+    }
+    return total + Math.floor((end.getTime() - start.getTime()) / 1000);
+  }, 0);
 
   async function startDetailTitleEdit() {
     editingDetailTitle = true;
@@ -64,6 +75,31 @@
     return todo?.completedAt ? toDateTimeLocalValue(todo.completedAt) : '';
   }
 
+  function timingSource(todo) {
+    return JSON.stringify({
+      timeSegments: todo?.timeSegments ?? [],
+      firstStartedAt: todo?.firstStartedAt ?? null,
+      createdAt: todo?.createdAt ?? null,
+      completedAt: todo?.completedAt ?? null,
+    });
+  }
+
+  function timingBlocksForTask(todo) {
+    if (todo?.timeSegments?.length) {
+      return todo.timeSegments.map((segment) => ({
+        startedAt: toDateTimeLocalValue(segment.startedAt),
+        endedAt: toDateTimeLocalValue(segment.endedAt),
+      }));
+    }
+
+    return [
+      {
+        startedAt: completedStartValue(todo),
+        endedAt: completedEndValue(todo),
+      },
+    ];
+  }
+
   function completedDateValue(todo) {
     return todo?.completedAt ? toDateValue(todo.completedAt) : '';
   }
@@ -81,53 +117,75 @@
       return;
     }
 
-    const endTime = (timingDraftEnd || completedEndValue(selectedTask)).split('T')[1];
+    const latestBlockIndex = timingDraftBlocks.reduce((latestIndex, block, index, blocks) => {
+      if (!block.endedAt) {
+        return latestIndex;
+      }
+      return !blocks[latestIndex]?.endedAt || new Date(block.endedAt) > new Date(blocks[latestIndex].endedAt)
+        ? index
+        : latestIndex;
+    }, 0);
+    const latestBlock = timingDraftBlocks[latestBlockIndex];
+    const endTime = latestBlock?.endedAt?.split('T')[1];
     if (!endTime) {
       return;
     }
 
-    timingDraftEnd = `${value}T${endTime}`;
-    await saveTimingDraft();
+    await handleTimingChange(latestBlockIndex, 'endedAt', `${value}T${endTime}`);
   }
 
-  async function handleTimingChange(field, value) {
+  async function handleTimingChange(index, field, value) {
     if (!selectedTask?.id) {
       return;
     }
 
-    if (field === 'start') {
-      timingDraftStart = value;
-    } else {
-      timingDraftEnd = value;
-    }
+    timingDraftBlocks = timingDraftBlocks.map((block, blockIndex) =>
+      blockIndex === index ? { ...block, [field]: value } : block,
+    );
     timingError = '';
 
-    await saveTimingDraft();
+    await saveTimingDrafts();
   }
 
-  async function saveTimingDraft() {
-    const startedAt = timingDraftStart;
-    const completedAt = timingDraftEnd;
-
-    if (!startedAt || !completedAt) {
+  async function saveTimingDrafts() {
+    if (timingDraftBlocks.some((block) => !block.startedAt || !block.endedAt)) {
+      timingError = 'Choose both a start and end time in each block.';
       return;
     }
 
-    const start = new Date(startedAt);
-    const end = new Date(completedAt);
-    if (
-      Number.isNaN(start.getTime()) ||
-      Number.isNaN(end.getTime()) ||
-      start.getTime() >= end.getTime()
-    ) {
-      timingError = 'Start time must be before end time.';
-      return;
+    const segments = [];
+    for (const block of timingDraftBlocks) {
+      const start = new Date(block.startedAt);
+      const end = new Date(block.endedAt);
+      if (
+        Number.isNaN(start.getTime()) ||
+        Number.isNaN(end.getTime()) ||
+        start.getTime() >= end.getTime()
+      ) {
+        timingError = 'Start time must be before end time in each block.';
+        return;
+      }
+      segments.push({ startedAt: block.startedAt, endedAt: block.endedAt });
     }
 
-    const result = await onCompletedTimingChange?.(selectedTask.id, startedAt, completedAt);
+    const result = await onTimeSegmentsChange?.(selectedTask.id, segments);
     if (result?.ok === false) {
       timingError = result.error ?? 'The task timing could not be updated.';
     }
+  }
+
+  function addTimeBlock() {
+    timingDraftBlocks = [...timingDraftBlocks, { startedAt: '', endedAt: '' }];
+    timingError = '';
+  }
+
+  async function removeTimeBlock(index) {
+    if (timingDraftBlocks.length <= 1) {
+      return;
+    }
+    timingDraftBlocks = timingDraftBlocks.filter((_, blockIndex) => blockIndex !== index);
+    timingError = '';
+    await saveTimingDrafts();
   }
 
   async function handleNoteTextareaInput(event) {
@@ -324,9 +382,9 @@
         on:change={handleDueDateInput}
       />
     </label>
-    <div class="detail-timing-controls" aria-label="Task timing">
+    <div class="detail-timing-controls time-segment-history" aria-label="Time blocks">
       {#if selectedTask.completedAt}
-        <label>
+        <label class="detail-done-date-control">
           <span>Done date</span>
           <CalendarPicker
             triggerClass="detail-done-date-picker"
@@ -336,51 +394,68 @@
           />
         </label>
       {/if}
-      <label>
-        <span>Start time</span>
-        {#if !selectedTask.firstStartedAt}
-          <small class="detail-start-missing">Defaults to creation time</small>
-        {/if}
-        <CalendarPicker
-          mode="datetime"
-          triggerClass="detail-start-picker"
-          label="Change task start time"
-          value={timingDraftStart}
-          onChange={(nextValue) => handleTimingChange('start', nextValue)}
-        />
-      </label>
-      <label>
-        <span>End time</span>
-        <CalendarPicker
-          mode="datetime"
-          triggerClass="detail-end-picker"
-          label="Change task end time"
-          value={timingDraftEnd}
-          onChange={(nextValue) => handleTimingChange('end', nextValue)}
-        />
-      </label>
+      <div class="time-block-heading">
+        <div>
+          <h3>Time blocks</h3>
+          <small>Add separate work periods to accumulate time.</small>
+        </div>
+        <strong aria-live="polite">Total {formatDuration(timingDraftTotal)}</strong>
+      </div>
+      <ol class="time-block-list">
+        {#each timingDraftBlocks as block, index (index)}
+          <li class="time-block-item">
+            <div class="time-block-title">
+              <strong>Block {index + 1}</strong>
+              {#if timingDraftBlocks.length > 1}
+                <button
+                  type="button"
+                  class="time-block-remove"
+                  aria-label={`Remove time block ${index + 1}`}
+                  on:click={() => removeTimeBlock(index)}
+                >
+                  Remove
+                </button>
+              {/if}
+            </div>
+            <label>
+              <span>Start time</span>
+              {#if index === 0 && !selectedTask.firstStartedAt}
+                <small class="detail-start-missing">Defaults to creation time</small>
+              {/if}
+              <CalendarPicker
+                mode="datetime"
+                triggerClass={index === 0 ? 'detail-start-picker' : 'time-block-start-picker'}
+                label={`Change start time for block ${index + 1}`}
+                value={block.startedAt}
+                onChange={(nextValue) => handleTimingChange(index, 'startedAt', nextValue)}
+              />
+            </label>
+            <label>
+              <span>End time</span>
+              <CalendarPicker
+                mode="datetime"
+                triggerClass={index === 0 ? 'detail-end-picker' : 'time-block-end-picker'}
+                label={`Change end time for block ${index + 1}`}
+                value={block.endedAt}
+                onChange={(nextValue) => handleTimingChange(index, 'endedAt', nextValue)}
+              />
+            </label>
+            {#if block.startedAt && block.endedAt}
+              <small class="time-block-duration">
+                {formatDuration(
+                  Math.max(
+                    0,
+                    Math.floor((new Date(block.endedAt) - new Date(block.startedAt)) / 1000),
+                  ),
+                )}
+              </small>
+            {/if}
+          </li>
+        {/each}
+      </ol>
+      <button type="button" class="time-block-add" on:click={addTimeBlock}>Add time block</button>
       {#if timingError}
         <p class="detail-timing-error" role="alert" aria-live="polite">{timingError}</p>
-      {/if}
-    </div>
-    <div class="time-segment-history" aria-label="Time segments">
-      <h3>Time segments</h3>
-      {#if selectedTaskTimeSegments.length}
-        <ol>
-          {#each selectedTaskTimeSegments as segment, index (`${segment.startedAt}-${segment.endedAt}-${index}`)}
-            <li class="time-segment-item">
-              <span>Segment {index + 1}</span>
-              <div>
-                <time datetime={segment.startedAt}>{formatTaskTimestamp(segment.startedAt)}</time>
-                <small>to</small>
-                <time datetime={segment.endedAt}>{formatTaskTimestamp(segment.endedAt)}</time>
-              </div>
-              <strong>{formatDuration(segment.durationSeconds)}</strong>
-            </li>
-          {/each}
-        </ol>
-      {:else}
-        <p>No completed time segments yet.</p>
       {/if}
     </div>
     {#if selectedTask.isProgressive}

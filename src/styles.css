@@ -1977,7 +1977,7 @@ h2 {
 
 .detail-timing-controls {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   gap: 12px;
 }
 
@@ -2018,6 +2018,106 @@ h2 {
   font-weight: 500;
 }
 
+.detail-done-date-control {
+  max-width: 220px;
+}
+
+.time-block-heading,
+.time-block-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.time-block-heading > div {
+  display: grid;
+  gap: 3px;
+}
+
+.time-block-heading h3,
+.time-block-heading small,
+.time-block-list {
+  margin: 0;
+}
+
+.time-block-heading h3 {
+  color: var(--strong);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.time-block-heading small,
+.time-block-duration {
+  color: var(--subtle);
+  font-size: 11px;
+}
+
+.time-block-heading > strong {
+  color: var(--strong);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.time-block-list {
+  display: grid;
+  gap: 10px;
+  padding: 0;
+  list-style: none;
+}
+
+.time-block-item {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px 12px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--block-surface);
+}
+
+.time-block-title,
+.time-block-duration {
+  grid-column: 1 / -1;
+}
+
+.time-block-title strong {
+  color: var(--default);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.time-block-remove,
+.time-block-add {
+  border: 1px solid var(--border);
+  background: var(--field-surface);
+  color: var(--default);
+  font: inherit;
+  cursor: pointer;
+}
+
+.time-block-remove {
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-size: 11px;
+}
+
+.time-block-add {
+  justify-self: start;
+  min-height: 34px;
+  padding: 0 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.time-block-remove:hover,
+.time-block-add:hover {
+  border-color: var(--strong);
+  color: var(--strong);
+}
+
 .detail-due-date {
   display: grid;
   gap: 8px;
@@ -2043,8 +2143,7 @@ h2 {
   font-weight: 500;
 }
 
-.session-history,
-.time-segment-history {
+.session-history {
   display: grid;
   gap: 10px;
   padding-top: 2px;
@@ -2052,31 +2151,25 @@ h2 {
 
 .session-history h3,
 .session-history p,
-.session-history ol,
-.time-segment-history h3,
-.time-segment-history p,
-.time-segment-history ol {
+.session-history ol {
   margin: 0;
 }
 
-.session-history h3,
-.time-segment-history h3 {
+.session-history h3 {
   color: var(--subtle);
   font-size: 12px;
   font-weight: 500;
   text-transform: uppercase;
 }
 
-.session-history ol,
-.time-segment-history ol {
+.session-history ol {
   display: grid;
   gap: 8px;
   padding: 0;
   list-style: none;
 }
 
-.session-history li,
-.time-segment-history li {
+.session-history li {
   display: grid;
   gap: 10px;
   align-items: center;
@@ -2084,36 +2177,6 @@ h2 {
   border: 1px solid var(--border);
   border-radius: 10px;
   background: var(--block-surface);
-}
-
-.time-segment-history li {
-  grid-template-columns: auto minmax(0, 1fr) auto;
-  min-height: 52px;
-}
-
-.time-segment-history li > span,
-.time-segment-history strong {
-  color: var(--default);
-  font-size: 12px;
-  font-weight: 500;
-}
-
-.time-segment-history li > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 3px 6px;
-  min-width: 0;
-}
-
-.time-segment-history time {
-  color: var(--strong);
-  font-size: 12px;
-  font-variant-numeric: tabular-nums;
-}
-
-.time-segment-history small {
-  color: var(--subtle);
-  font-size: 11px;
 }
 
 .session-history li {
@@ -2322,6 +2385,10 @@ h2 {
   .detail-timing-controls {
     grid-template-columns: 1fr;
     align-items: stretch;
+  }
+
+  .time-block-item {
+    grid-template-columns: 1fr;
   }
 
   .detail-timeline {

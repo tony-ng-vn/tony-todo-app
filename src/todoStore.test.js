@@ -31,6 +31,7 @@ import {
   startTodoTimer,
   deleteTodo,
   updateTodoTiming,
+  updateTodoTimeSegments,
   updateCompletedTodoTiming,
   updateTodoCompletedAt,
   updateTodoProgress,
@@ -585,6 +586,68 @@ describe('todo day summary', () => {
         },
       ],
     });
+  });
+
+  it('accumulates edited time blocks into the tracked total', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Split work', new Date('2026-06-10T08:00:00.000Z'));
+    const todoId = state.todos[0].id;
+
+    state = updateTodoTimeSegments(state, todoId, [
+      {
+        startedAt: '2026-06-10T09:00:00.000Z',
+        endedAt: '2026-06-10T09:30:00.000Z',
+      },
+      {
+        startedAt: '2026-06-10T10:15:00.000Z',
+        endedAt: '2026-06-10T11:00:00.000Z',
+      },
+    ]);
+
+    expect(state.todos[0]).toMatchObject({
+      firstStartedAt: '2026-06-10T09:00:00.000Z',
+      completedAt: '2026-06-10T11:00:00.000Z',
+      trackedSeconds: 75 * 60,
+      timeSegments: [
+        {
+          startedAt: '2026-06-10T09:00:00.000Z',
+          endedAt: '2026-06-10T09:30:00.000Z',
+        },
+        {
+          startedAt: '2026-06-10T10:15:00.000Z',
+          endedAt: '2026-06-10T11:00:00.000Z',
+        },
+      ],
+    });
+
+    state = updateTodoTimeSegments(state, todoId, [
+      state.todos[0].timeSegments[0],
+      {
+        startedAt: '2026-06-10T10:15:00.000Z',
+        endedAt: '2026-06-10T11:15:00.000Z',
+      },
+    ]);
+
+    expect(state.todos[0]).toMatchObject({
+      completedAt: '2026-06-10T11:15:00.000Z',
+      trackedSeconds: 90 * 60,
+    });
+  });
+
+  it('rejects a time block whose end is not after its start', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Keep blocks valid', new Date('2026-06-10T08:00:00.000Z'));
+    const todoId = state.todos[0].id;
+    const original = state;
+
+    expect(
+      updateTodoTimeSegments(state, todoId, [
+        {
+          startedAt: '2026-06-10T10:00:00.000Z',
+          endedAt: '2026-06-10T09:00:00.000Z',
+        },
+      ]),
+    ).toBe(original);
   });
 
   it('deletes a todo and its progress sessions', () => {
