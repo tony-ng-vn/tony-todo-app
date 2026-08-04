@@ -490,6 +490,7 @@ async function exerciseManualTiming(page) {
   });
   await page.getByRole('button', { name: 'Add time block', exact: true }).click();
   await choosePastDateTime('.time-block-start-picker', 11, 0, 'AM');
+  const incompleteBlockError = await page.locator('.detail-timing-error').textContent();
   await choosePastDateTime('.time-block-end-picker', 11, 30, 'AM');
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
@@ -510,6 +511,7 @@ async function exerciseManualTiming(page) {
         : null,
     };
   });
+  result.incompleteBlockError = incompleteBlockError?.trim() ?? '';
   result.invalidError = invalidError?.trim() ?? '';
   await page.click('#detail-close');
   await page.locator('#summary-date').click();
@@ -977,6 +979,7 @@ function assertManualTiming(result) {
     timing.trackedSeconds === 90 * 60 &&
     timing.timeBlockCount === 2 &&
     timing.totalLabel === 'Total 1h 30m' &&
+    timing.incompleteBlockError === 'Choose both a start and end time in each block.' &&
     timing.completedDayKey !== todayKey
     ? []
     : [

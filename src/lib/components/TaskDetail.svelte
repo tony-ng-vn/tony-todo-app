@@ -125,8 +125,9 @@
         ? index
         : latestIndex;
     }, 0);
-    const endTime = timingDraftBlocks[latestBlockIndex]?.endedAt.split('T')[1];
-    if (!endTime || !timingDraftBlocks[latestBlockIndex]) {
+    const latestBlock = timingDraftBlocks[latestBlockIndex];
+    const endTime = latestBlock?.endedAt?.split('T')[1];
+    if (!endTime) {
       return;
     }
 
@@ -148,6 +149,7 @@
 
   async function saveTimingDrafts() {
     if (timingDraftBlocks.some((block) => !block.startedAt || !block.endedAt)) {
+      timingError = 'Choose both a start and end time in each block.';
       return;
     }
 
