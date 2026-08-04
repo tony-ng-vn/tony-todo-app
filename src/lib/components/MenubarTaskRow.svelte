@@ -1,5 +1,6 @@
 <script>
   import { tick } from 'svelte';
+  import CalendarPicker from './CalendarPicker.svelte';
   import { expandTodoCommand, parseNoteTodos, toggleNoteTodo } from '../../noteTodos.js';
   import { getTextareaKeyEdit } from '../../textareaEditing.js';
   import {
@@ -369,10 +370,12 @@
 
       <label>
         <span>Due date</span>
-        <input
-          type="date"
+        <CalendarPicker
+          triggerClass="menubar-calendar-trigger"
+          label={`Due date for ${todo.title}`}
+          allowClear={true}
           value={dueDateValue(todo.dueDate)}
-          on:change={(event) => onDueDateChange(todo.id, event.currentTarget.value)}
+          onChange={(nextDate) => onDueDateChange(todo.id, nextDate)}
         />
       </label>
 
@@ -401,26 +404,26 @@
               </div>
               <label>
                 <span>Start</span>
-                <input
-                  type="datetime-local"
+                <CalendarPicker
+                  mode="datetime"
+                  triggerClass="menubar-calendar-trigger"
                   value={block.startedAt}
-                  aria-label={`Start time for ${todo.title} block ${index + 1}`}
-                  aria-invalid={Boolean(timingError)}
-                  aria-describedby={timingError ? `menubar-timing-error-${todo.id}` : undefined}
-                  on:change={(event) =>
-                    handleTimingInput(index, 'startedAt', event.currentTarget.value)}
+                  label={`Start time for ${todo.title} block ${index + 1}`}
+                  invalid={Boolean(timingError)}
+                  describedBy={timingError ? `menubar-timing-error-${todo.id}` : undefined}
+                  onChange={(nextValue) => handleTimingInput(index, 'startedAt', nextValue)}
                 />
               </label>
               <label>
                 <span>End</span>
-                <input
-                  type="datetime-local"
+                <CalendarPicker
+                  mode="datetime"
+                  triggerClass="menubar-calendar-trigger"
                   value={block.endedAt}
-                  aria-label={`End time for ${todo.title} block ${index + 1}`}
-                  aria-invalid={Boolean(timingError)}
-                  aria-describedby={timingError ? `menubar-timing-error-${todo.id}` : undefined}
-                  on:change={(event) =>
-                    handleTimingInput(index, 'endedAt', event.currentTarget.value)}
+                  label={`End time for ${todo.title} block ${index + 1}`}
+                  invalid={Boolean(timingError)}
+                  describedBy={timingError ? `menubar-timing-error-${todo.id}` : undefined}
+                  onChange={(nextValue) => handleTimingInput(index, 'endedAt', nextValue)}
                 />
               </label>
             </li>
@@ -607,8 +610,6 @@
   }
 
   .menubar-task-details input[type='text'],
-  .menubar-task-details input[type='date'],
-  .menubar-task-details input[type='datetime-local'],
   .menubar-task-details textarea {
     width: 100%;
     min-width: 0;
@@ -622,9 +623,16 @@
   }
 
   .menubar-task-details input[type='text'],
-  .menubar-task-details input[type='date'],
-  .menubar-task-details input[type='datetime-local'] {
+  .menubar-task-details :global(.menubar-calendar-trigger) {
     min-height: 38px;
+  }
+
+  .menubar-task-details :global(.menubar-calendar-trigger) {
+    border-radius: 10px;
+    padding: 9px 10px;
+    background: var(--field-surface);
+    font-size: 13px;
+    line-height: 1.4;
   }
 
   .menubar-task-details textarea {
@@ -632,6 +640,7 @@
   }
 
   .menubar-task-details input:focus-visible,
+  .menubar-task-details :global(.menubar-calendar-trigger:focus-visible),
   .menubar-task-details textarea:focus-visible,
   .note-todo-item:focus-visible,
   .menubar-details-toggle:focus-visible,

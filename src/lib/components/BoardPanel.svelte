@@ -1,5 +1,6 @@
 <script>
   import { tick } from 'svelte';
+  import CalendarPicker from './CalendarPicker.svelte';
   import { linkifyText } from '../../linkify.js';
   import { formatDueDate, formatTaskTimestamp } from '../../todoStore.js';
   import { iconMoon, iconPlus, iconSun } from './icons.js';
@@ -89,14 +90,14 @@
 
     <div class="board-header-actions">
       <output class="sync-status" aria-live="polite">{syncMessage}</output>
-      <label class="board-day-field">
-        <span class="sr-only">Board day</span>
-        <input
-          type="date"
+      <div class="board-day-field">
+        <CalendarPicker
           value={selectedDay}
-          on:change={(event) => onSelectedDayChange?.(event.currentTarget.value)}
+          label="Board day"
+          triggerClass="board-day-picker"
+          onChange={(nextDate) => onSelectedDayChange?.(nextDate)}
         />
-      </label>
+      </div>
       <button
         type="button"
         class="theme-toggle"

@@ -1,5 +1,5 @@
 <script>
-  import { tick } from 'svelte';
+  import { onMount, tick } from 'svelte';
 
   export let id = undefined;
   export let value = '';
@@ -7,9 +7,14 @@
   export let label = 'Select date';
   export let triggerClass = '';
   export let onChange = () => {};
+  export let invalid = false;
+  export let describedBy = undefined;
+  export let allowClear = false;
 
   const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  const PICKER_OPEN_EVENT = 'done-log-calendar-picker-open';
   const VIEWPORT_MARGIN = 16;
+  const pickerToken = {};
   let triggerElement;
   let isOpen = false;
   let viewDate = startOfMonth(parseValue(value) ?? new Date());
@@ -24,11 +29,23 @@
   $: calendarDays = daysForMonth(viewDate);
   $: triggerText = mode === 'datetime' ? formatDateTimeLabel(value) : formatDateLabel(value);
 
+  onMount(() => {
+    function closeWhenAnotherPickerOpens(event) {
+      if (event.detail !== pickerToken) {
+        closeCalendar();
+      }
+    }
+
+    window.addEventListener(PICKER_OPEN_EVENT, closeWhenAnotherPickerOpens);
+    return () => window.removeEventListener(PICKER_OPEN_EVENT, closeWhenAnotherPickerOpens);
+  });
+
   async function openCalendar() {
     const parsedValue = parseValue(value) ?? new Date();
     draftDate = parsedValue;
     viewDate = startOfMonth(parsedValue);
     setDraftTime(parsedValue);
+    window.dispatchEvent(new CustomEvent(PICKER_OPEN_EVENT, { detail: pickerToken }));
     isOpen = true;
     await tick();
     positionPopover();
@@ -78,6 +95,11 @@
       onChange(formatDateValue(today));
       closeCalendar();
     }
+  }
+
+  function clearValue() {
+    onChange('');
+    closeCalendar();
   }
 
   function handleKeydown(event) {
@@ -237,6 +259,8 @@
     aria-haspopup="dialog"
     aria-expanded={isOpen}
     aria-label={label}
+    data-invalid={invalid || undefined}
+    aria-describedby={describedBy}
     on:click={handleTriggerClick}
   >
     {triggerText}
@@ -278,6 +302,9 @@
 
           <div class="calendar-footer">
             <button type="button" on:click={chooseToday}>Today</button>
+            {#if allowClear}
+              <button type="button" on:click={clearValue}>Clear</button>
+            {/if}
             <button type="button" on:click={closeCalendar}>Close</button>
           </div>
         </section>

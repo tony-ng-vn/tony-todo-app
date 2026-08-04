@@ -24,6 +24,8 @@ try {
     ...assertHasMotion(mobile, '.theme-toggle', 'Theme toggle'),
     ...assertTimerControlLabel(desktop),
     ...assertTaskRowSpacing(desktop),
+    ...assertCalendarConsistency(desktop),
+    ...assertNewTaskCalendarClear(desktop),
     ...assertOngoingSection(desktop),
     ...assertManualTiming(desktop),
     ...assertBoardCardLayout(boardCardLayout),
@@ -274,6 +276,10 @@ async function inspectBoardCardLayout(viewport) {
       timingGap: Number.parseFloat(timingStyle?.gap ?? '0'),
       timingLabelWidth: Math.round(label?.getBoundingClientRect().width ?? 0),
       timingTimeWidth: Math.round(time?.getBoundingClientRect().width ?? 0),
+      nativeCalendarInputCount: document.querySelectorAll(
+        '.board-panel input[type="date"], .board-panel input[type="datetime-local"]',
+      ).length,
+      hasBoardDayPicker: Boolean(document.querySelector('.board-day-picker')),
     };
   });
   await page.close();
@@ -380,6 +386,7 @@ async function inspectViewport(viewport, isMobile) {
   const summaryTimeEdit = isMobile ? null : await exerciseSummaryTimeEditing(page);
   const taskFlowChecks = isMobile ? null : await exerciseParallelAndReopen(page);
   const editChecks = isMobile ? null : await exerciseDetailEditing(page);
+  const newTaskCalendarClear = isMobile ? null : await exerciseNewTaskCalendarClear(page);
 
   const metrics = await page.evaluate(() => {
     function rectFor(selector) {
@@ -432,6 +439,11 @@ async function inspectViewport(viewport, isMobile) {
       exists: {
         '.flow-rail': Boolean(document.querySelector('.flow-rail')),
         '.theme-toggle': Boolean(document.querySelector('.theme-toggle')),
+      },
+      calendarPresentation: {
+        nativeInputCount: document.querySelectorAll('input[type="date"], input[type="datetime-local"]').length,
+        hasNewTaskPicker: Boolean(document.querySelector('#todo-due-date.calendar-trigger')),
+        hasSummaryPicker: Boolean(document.querySelector('#summary-date.calendar-trigger')),
       },
       summaryBuckets: Array.from(document.querySelectorAll('.summary-section h3')).map((element) => element.textContent.trim()),
       summaryDurations: Array.from(document.querySelectorAll('.summary-duration')).map((element) => element.textContent.trim()),
@@ -529,7 +541,22 @@ async function inspectViewport(viewport, isMobile) {
     pausedTimeline,
     summaryTimeEdit,
     taskFlowChecks,
+    newTaskCalendarClear,
     ...metrics,
+  };
+}
+
+async function exerciseNewTaskCalendarClear(page) {
+  await page.locator('#todo-due-date').click();
+  await page.locator('.calendar-footer button', { hasText: 'Today' }).click();
+  await page.locator('#todo-due-date').click();
+  const clearAvailable = Boolean(
+    await page.locator('.calendar-footer button', { hasText: 'Clear' }).count(),
+  );
+  await page.locator('.calendar-footer button', { hasText: 'Clear' }).click();
+  return {
+    clearAvailable,
+    triggerText: (await page.locator('#todo-due-date').textContent())?.trim() ?? '',
   };
 }
 
@@ -792,7 +819,9 @@ async function exerciseDetailEditing(page) {
     selectionStart: document.querySelector('#detail-note')?.selectionStart,
     activeElementId: document.activeElement?.id,
   }));
-  await page.keyboard.press('End');
+  await page.locator('#detail-note').evaluate((textarea) => {
+    textarea.setSelectionRange(textarea.value.length, textarea.value.length);
+  });
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
@@ -847,7 +876,10 @@ async function exerciseDetailEditing(page) {
   });
   const deleteButtonUpfront = await page.locator('.detail-delete-task').isVisible();
   const detailUsesCustomCalendar = await page.evaluate(() => ({
-    hasNativeDateTimeInput: Boolean(document.querySelector('#task-detail input[type="datetime-local"]')),
+    hasNativeCalendarInput: Boolean(
+      document.querySelector('#task-detail input[type="date"], #task-detail input[type="datetime-local"]'),
+    ),
+    hasDueDatePicker: Boolean(document.querySelector('.detail-due-picker')),
     hasStartPicker: Boolean(document.querySelector('.detail-start-picker')),
     hasEndPicker: Boolean(document.querySelector('.detail-end-picker')),
     hasDoneDatePicker: Boolean(document.querySelector('.detail-done-date-picker')),
@@ -1083,9 +1115,27 @@ function assertBoardCardLayout(result) {
     Number.parseFloat(result.progressBorderRadius) <= 12 &&
     result.timingGap >= 4 &&
     result.timingLabelWidth > 0 &&
-    result.timingTimeWidth > 0
+    result.timingTimeWidth > 0 &&
+    result.nativeCalendarInputCount === 0 &&
+    result.hasBoardDayPicker
     ? []
     : [`board card progress/timing layout is not restrained: ${JSON.stringify(result)}`];
+}
+
+function assertCalendarConsistency(result) {
+  const presentation = result.calendarPresentation;
+  return presentation.nativeInputCount === 0 &&
+    presentation.hasNewTaskPicker &&
+    presentation.hasSummaryPicker
+    ? []
+    : [`calendar controls are not using the shared picker: ${JSON.stringify(presentation)}`];
+}
+
+function assertNewTaskCalendarClear(result) {
+  return result.newTaskCalendarClear?.clearAvailable &&
+    result.newTaskCalendarClear.triggerText === 'Select date'
+    ? []
+    : [`new-task assigned date could not be cleared: ${JSON.stringify(result.newTaskCalendarClear)}`];
 }
 
 function assertPausedTimeline(result) {
@@ -1263,7 +1313,8 @@ function assertDetailEditing(result) {
   }
 
   if (
-    editChecks.detailUsesCustomCalendar?.hasNativeDateTimeInput ||
+    editChecks.detailUsesCustomCalendar?.hasNativeCalendarInput ||
+    !editChecks.detailUsesCustomCalendar?.hasDueDatePicker ||
     !editChecks.detailUsesCustomCalendar?.hasStartPicker ||
     !editChecks.detailUsesCustomCalendar?.hasEndPicker ||
     !editChecks.detailUsesCustomCalendar?.hasDoneDatePicker
