@@ -73,6 +73,7 @@
   let noteSaveStatuses = {};
   let liveTimer = null;
   let refreshInFlight = false;
+  let updateInFlight = false;
   const noteAutosave = createDebouncedSaveQueue(saveNoteToRemote);
 
   $: pendingTodos = getPendingTodos(state).map((todo) => ({
@@ -159,6 +160,24 @@
     } finally {
       refreshInFlight = false;
     }
+  }
+
+  async function handleManualUpdate() {
+    if (updateInFlight) {
+      return;
+    }
+
+    updateInFlight = true;
+    syncMessage = 'Updating Done Log';
+    try {
+      await noteAutosave.flushAll();
+    } catch {
+      // Pending notes remain in local storage and retry after the reload.
+    }
+
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.set('updated', Date.now().toString());
+    window.location.replace(nextUrl);
   }
 
   async function handleAuthSubmit({ email, password, mode }) {
@@ -550,6 +569,16 @@
         <h1 class="menubar-heading">Done Log</h1>
       </div>
       <div class="menubar-header-actions">
+        <button
+          type="button"
+          class="menubar-update"
+          disabled={updateInFlight}
+          aria-label="Update Done Log"
+          title="Reload the latest Done Log and sync data"
+          on:click={handleManualUpdate}
+        >
+          {updateInFlight ? 'Updating' : 'Update'}
+        </button>
         <a
           class="menubar-open-full"
           href="/"
@@ -782,6 +811,7 @@
   }
 
   .menubar-open-full,
+  .menubar-update,
   .menubar-sign-out {
     display: inline-flex;
     align-items: center;
@@ -794,6 +824,11 @@
     font-size: 11px;
     font-weight: 600;
     text-decoration: none;
+  }
+
+  .menubar-update:disabled {
+    cursor: wait;
+    opacity: 0.68;
   }
 
   .menubar-sync,
@@ -841,6 +876,7 @@
 
   .menubar-quick-add input:focus-visible,
   .menubar-quick-add button:focus-visible,
+  .menubar-update:focus-visible,
   .menubar-open-full:focus-visible,
   .menubar-sign-out:focus-visible {
     outline: 2px solid var(--focus-ring);

@@ -28,6 +28,14 @@ enum MenuBarConfiguration {
       ?? URL(string: "/", relativeTo: defaultURL)!.absoluteURL
   }
 
+  static func makeHomeRequest(for url: URL) -> URLRequest {
+    URLRequest(
+      url: url,
+      cachePolicy: .reloadRevalidatingCacheData,
+      timeoutInterval: 30
+    )
+  }
+
   @MainActor
   static func makeStatusIcon() -> NSImage? {
     guard
