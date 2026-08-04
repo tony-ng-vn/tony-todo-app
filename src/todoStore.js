@@ -354,6 +354,27 @@ export function partitionPendingTodos(todos) {
   );
 }
 
+export function partitionTaskFlowTodos(todos, currentDate = new Date()) {
+  const { ready, ongoing, paused } = partitionPendingTodos(todos);
+  const currentDayKey = formatDayKey(currentDate);
+  const pausedToday = [];
+  const pausedOther = [];
+
+  for (const todo of paused) {
+    if (getTodoAssignedDayKey(todo) === currentDayKey) {
+      pausedToday.push(todo);
+    } else {
+      pausedOther.push(todo);
+    }
+  }
+
+  return {
+    scheduled: [...ready, ...pausedToday].toSorted(compareTodosNewestFirst),
+    ongoing,
+    paused: pausedOther,
+  };
+}
+
 // Board filter presets keyed off a task's due date. 'all' shows everything;
 // the rest only match tasks that actually have a due date.
 export const BOARD_DUE_FILTERS = ['all', 'overdue', 'today', 'week'];

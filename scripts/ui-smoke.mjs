@@ -444,6 +444,15 @@ async function inspectViewport(viewport, isMobile) {
         count: section.querySelector('.section-count')?.textContent.trim(),
         ids: Array.from(section.querySelectorAll('.todo-item')).map((item) => item.dataset.todoId),
       })),
+      pausedTodayPresentation: (() => {
+        const row = document.querySelector('[data-todo-id="ui-smoke-paused-task"]');
+        return {
+          section: row?.closest('.task-list-section')?.querySelector('h2')?.textContent.trim(),
+          state: row?.getAttribute('data-task-state'),
+          badge: row?.querySelector('.task-state-badge')?.textContent.trim(),
+          animationName: row ? getComputedStyle(row.querySelector('.task-block-dot')).animationName : null,
+        };
+      })(),
       recapRhythm: Array.from(document.querySelectorAll('.summary-section')).map((section) => {
         const heading = section.querySelector('h3').getBoundingClientRect();
         const block = section.querySelector('ol > li').getBoundingClientRect();
@@ -1016,24 +1025,23 @@ function assertTaskRowSpacing(result) {
 function assertOngoingSection(result) {
   const ongoing = result.taskSections.find((section) => section.heading === 'Ongoing');
   const todayIndex = result.taskSections.findIndex((section) => section.heading === 'Today todos');
-  const pausedIndex = result.taskSections.findIndex((section) => section.heading === 'Paused');
   const today = result.taskSections[todayIndex];
-  const paused = result.taskSections[pausedIndex];
   const dated = result.taskSections.find((section) => section.ids.includes('ui-smoke-local-task'));
   return ongoing?.heading === 'Ongoing' &&
     ongoing?.ids.includes('ui-smoke-overflow-task-0') &&
     ongoing?.ids[0] === 'ui-smoke-overflow-task-1' &&
-    paused?.heading === 'Paused' &&
-    paused?.ids.includes('ui-smoke-paused-task') &&
     today?.heading === 'Today todos' &&
     today.ids.includes('ui-smoke-today-task') &&
+    today.ids.includes('ui-smoke-paused-task') &&
     dated?.heading === 'Jun 8, 2026' &&
     dated.ids.includes('ui-smoke-local-task') &&
     todayIndex >= 0 &&
-    pausedIndex > todayIndex &&
     !today?.ids.includes('ui-smoke-overflow-task-0') &&
-    !today?.ids.includes('ui-smoke-paused-task') &&
-    !dated?.ids.includes('ui-smoke-overflow-task-0')
+    !dated?.ids.includes('ui-smoke-overflow-task-0') &&
+    result.pausedTodayPresentation?.section === 'Today todos' &&
+    result.pausedTodayPresentation?.state === 'paused' &&
+    result.pausedTodayPresentation?.badge === 'Paused' &&
+    result.pausedTodayPresentation?.animationName === 'paused-breathe'
     ? []
     : [`running, paused, and dated tasks are not separated correctly: ${JSON.stringify(result.taskSections)}`];
 }

@@ -67,6 +67,7 @@
 
   $: isRunning = Boolean(todo.activeStartedAt);
   $: isCompleted = Boolean(todo.completedAt);
+  $: isPaused = Boolean(todo.firstStartedAt && !todo.activeStartedAt && !todo.completedAt);
   $: duration = formatDuration(getElapsedSeconds(todo));
   $: timingBlocksTotal = timingBlocksDraft.reduce((total, block) => {
     const start = new Date(block.startedAt);
@@ -230,6 +231,7 @@
 
 <article
   class:is-running={isRunning}
+  class:is-paused={isPaused}
   class:is-expanded={expanded}
   class="menubar-task"
   data-menubar-id={todo.id}
@@ -242,7 +244,10 @@
       aria-expanded={expanded}
       on:click={() => onToggleDetails(todo.id)}
     >
-      <span class="menubar-task-title">{todo.title}</span>
+      <span class="menubar-task-title-row">
+        <span class="menubar-task-title">{todo.title}</span>
+        {#if isPaused}<span class="menubar-paused-badge">Paused</span>{/if}
+      </span>
       <span class="menubar-task-meta">
         {isCompleted ? 'Finished' : isRunning ? 'Tracking' : 'Duration'} {duration}
         {#if todo.dueDate} - due {formatDueDate(todo.dueDate)}{/if}
@@ -448,6 +453,11 @@
     background: var(--block-running);
   }
 
+  .menubar-task.is-paused {
+    border-color: color-mix(in srgb, var(--board-paused) 32%, var(--block-border));
+    background: color-mix(in srgb, var(--board-paused-surface) 56%, var(--block-surface));
+  }
+
   .menubar-task-summary {
     display: grid;
     grid-template-columns: 6px minmax(0, 1fr) auto;
@@ -467,6 +477,11 @@
   .is-running .menubar-task-dot {
     background: var(--board-in-progress);
     box-shadow: 0 0 0 4px var(--board-in-progress-soft);
+  }
+
+  .is-paused .menubar-task-dot {
+    background: var(--board-paused);
+    animation: menubar-paused-breathe 2.8s ease-in-out infinite;
   }
 
   .menubar-details-toggle {
@@ -489,10 +504,30 @@
     white-space: nowrap;
   }
 
+  .menubar-task-title-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    min-width: 0;
+  }
+
   .menubar-task-title {
     color: var(--strong);
     font-size: 13px;
     font-weight: 600;
+  }
+
+  .menubar-paused-badge {
+    flex: 0 0 auto;
+    padding: 1px 5px;
+    border: 1px solid var(--board-paused-soft);
+    border-radius: 999px;
+    background: var(--board-paused-surface);
+    color: var(--board-paused);
+    font-size: 8px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
   }
 
   .menubar-task-meta,
@@ -738,6 +773,23 @@
     .menubar-task,
     .menubar-icon-button {
       transition: none;
+    }
+
+    .is-paused .menubar-task-dot {
+      animation: none;
+    }
+  }
+
+  @keyframes menubar-paused-breathe {
+    0%,
+    100% {
+      box-shadow: 0 0 0 0 var(--board-paused-soft);
+      transform: scale(0.9);
+    }
+
+    50% {
+      box-shadow: 0 0 0 4px transparent;
+      transform: scale(1);
     }
   }
 </style>

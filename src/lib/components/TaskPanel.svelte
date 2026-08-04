@@ -178,11 +178,19 @@
 
 {#snippet taskRow(todo)}
   {@const isRunning = Boolean(todo.activeStartedAt)}
+  {@const isPaused = Boolean(todo.firstStartedAt && !todo.activeStartedAt && !todo.completedAt)}
   {@const elapsedSeconds = getElapsedSeconds(todo)}
   {@const latestSession = todo.latestProgressSession}
   {@const timerAction = isRunning ? 'pause' : 'start'}
   {@const timerText = isRunning ? 'Stop' : 'Start'}
-  <li data-todo-id={todo.id} class:is-running={isRunning} class:is-new-block={newlyAddedTodoId === todo.id} class="todo-item">
+  <li
+    data-todo-id={todo.id}
+    data-task-state={isRunning ? 'running' : isPaused ? 'paused' : 'ready'}
+    class:is-running={isRunning}
+    class:is-paused={isPaused}
+    class:is-new-block={newlyAddedTodoId === todo.id}
+    class="todo-item"
+  >
     <span class="task-block-dot" aria-hidden="true"></span>
     <div class="task-content">
       {#if editingTaskId === todo.id}
@@ -206,6 +214,9 @@
         >
           {@html linkifyText(todo.title)}
         </span>
+      {/if}
+      {#if isPaused}
+        <span class="task-state-badge">Paused</span>
       {/if}
       <span class:is-live={isRunning} class="task-duration" data-timer-label={todo.id}>
         {#if todo.isProgressive}

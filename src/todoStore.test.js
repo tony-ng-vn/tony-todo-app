@@ -26,6 +26,7 @@ import {
   moveTodoToBoardColumn,
   pauseTodoTimer,
   partitionPendingTodos,
+  partitionTaskFlowTodos,
   reorderCompletedTodosForDay,
   reopenTodo,
   setTodoProgressive,
@@ -1065,6 +1066,40 @@ describe('todo day summary', () => {
 });
 
 describe('board view columns', () => {
+  it('places paused tasks assigned to today with scheduled tasks and keeps older pauses separate', () => {
+    const todos = getPendingTodos(
+      createInitialState([
+        {
+          id: 'today-ready',
+          title: 'Today ready',
+          createdAt: '2026-06-08T08:00:00.000Z',
+          dueDate: '2026-06-08T07:00:00.000Z',
+        },
+        {
+          id: 'today-paused',
+          title: 'Today paused',
+          createdAt: '2026-06-08T08:05:00.000Z',
+          dueDate: '2026-06-08T07:00:00.000Z',
+          firstStartedAt: '2026-06-08T09:00:00.000Z',
+          activeStartedAt: null,
+        },
+        {
+          id: 'older-paused',
+          title: 'Older paused',
+          createdAt: '2026-06-07T08:00:00.000Z',
+          dueDate: '2026-06-07T07:00:00.000Z',
+          firstStartedAt: '2026-06-07T09:00:00.000Z',
+          activeStartedAt: null,
+        },
+      ]),
+    );
+
+    const groups = partitionTaskFlowTodos(todos, new Date('2026-06-08T12:00:00.000Z'));
+
+    expect(groups.scheduled.map((todo) => todo.id)).toEqual(['today-paused', 'today-ready']);
+    expect(groups.paused.map((todo) => todo.id)).toEqual(['older-paused']);
+  });
+
   it('splits todos into not started, in progress, paused, and done columns', () => {
     let state = createInitialState();
     state = addTodo(state, 'Backlog task', new Date('2026-06-08T08:00:00'));
