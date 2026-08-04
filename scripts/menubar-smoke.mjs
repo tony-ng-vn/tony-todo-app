@@ -105,6 +105,19 @@ try {
         ready?.getBoundingClientRect().top < paused?.getBoundingClientRect().top,
       runningVisible: Boolean(document.querySelector('[data-menubar-id="menubar-running"]')),
       pausedVisible: Boolean(document.querySelector('[data-menubar-id="menubar-paused"]')),
+      pausedInToday: Boolean(
+        document
+          .querySelector('[data-menubar-id="menubar-paused"]')
+          ?.closest('[data-menubar-section="ready"]'),
+      ),
+      pausedInPausedSection: Boolean(
+        document
+          .querySelector('[data-menubar-id="menubar-paused"]')
+          ?.closest('[data-menubar-section="paused"]'),
+      ),
+      pausedBadge: document
+        .querySelector('[data-menubar-id="menubar-paused"] .menubar-paused-badge')
+        ?.textContent.trim(),
       runningStarted: document.querySelector(
         '[data-menubar-id="menubar-running"] .menubar-task-started',
       )?.textContent.trim(),
@@ -132,6 +145,12 @@ try {
       ).transitionDuration,
     };
   });
+
+  await page.emulateMedia({ reducedMotion: 'no-preference' });
+  const pausedAnimationName = await page
+    .locator('[data-menubar-id="menubar-paused"] .menubar-task-dot')
+    .evaluate((element) => getComputedStyle(element).animationName);
+  await page.emulateMedia({ reducedMotion: 'reduce' });
 
   await page.click('.menubar-update');
   await page.waitForURL((url) => url.searchParams.has('updated'));
@@ -419,6 +438,16 @@ try {
   if (initial.openCount !== '5 open') failures.push(`unexpected open count: ${JSON.stringify(initial)}`);
   if (!initial.sectionsInOrder || !initial.runningVisible || !initial.pausedVisible || !initial.openVisible) {
     failures.push(`task sections are incomplete or out of order: ${JSON.stringify(initial)}`);
+  }
+  if (
+    !initial.pausedInToday ||
+    initial.pausedInPausedSection ||
+    initial.pausedBadge !== 'Paused' ||
+    !pausedAnimationName.endsWith('menubar-paused-breathe')
+  ) {
+    failures.push(
+      `today's paused task is not clearly presented in Today: ${JSON.stringify({ initial, pausedAnimationName })}`,
+    );
   }
   if (
     !initial.readyDateGroups.length ||

@@ -13,7 +13,7 @@
     getProgressSessions,
     logProgressSession,
     pauseTodoTimer,
-    partitionPendingTodos,
+    partitionTaskFlowTodos,
     setTodoDueDate,
     setTodoProgressive,
     startTodoTimer,
@@ -80,10 +80,10 @@
     ...todo,
     latestProgressSession: getProgressSessions(state, todo.id)[0] ?? null,
   }));
-  $: pendingTodoGroups = partitionPendingTodos(pendingTodos);
+  $: pendingTodoGroups = partitionTaskFlowTodos(pendingTodos, new Date());
   $: ongoingTodos = pendingTodoGroups.ongoing;
   $: pausedTodos = pendingTodoGroups.paused;
-  $: openTodoSections = getOpenTodoSections(pendingTodoGroups.ready, new Date());
+  $: openTodoSections = getOpenTodoSections(pendingTodoGroups.scheduled, new Date());
   $: todayOpenSection = openTodoSections.find((section) => section.isToday) ?? null;
   $: datedOpenSections = openTodoSections.filter((section) => !section.isToday);
   $: openTodos = openTodoSections.flatMap((section) => section.items);
@@ -627,7 +627,7 @@
       <section data-menubar-section="ready" aria-labelledby="menubar-ready-heading">
         <div class="menubar-section-heading">
           <h2 id="menubar-ready-heading">Today</h2>
-          <span>{todayOpenSection?.items.length ?? 0} ready</span>
+          <span>{todayOpenSection?.items.length ?? 0} tasks</span>
         </div>
         <div class="menubar-date-groups">
           {#if todayOpenSection}

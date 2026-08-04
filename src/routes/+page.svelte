@@ -34,7 +34,7 @@
     moveTodoToBoardColumn,
     getPendingTodos,
     pauseTodoTimer,
-    partitionPendingTodos,
+    partitionTaskFlowTodos,
     reopenTodo,
     setTodoDueDate,
     setTodoProgressive,
@@ -143,10 +143,13 @@
 
   $: pendingTodos = getPendingTodos(state);
   $: pendingViewTodos = withLatestProgressSession(pendingTodos);
-  $: pendingTodoGroups = partitionPendingTodos(pendingViewTodos);
+  $: pendingTodoGroups = partitionTaskFlowTodos(
+    pendingViewTodos,
+    new Date(`${currentDayKey}T00:00:00`),
+  );
   $: ongoingTodos = pendingTodoGroups.ongoing;
   $: pausedTodos = pendingTodoGroups.paused;
-  $: openTodos = pendingTodoGroups.ready;
+  $: openTodos = pendingTodoGroups.scheduled;
   $: openTodoSections = getOpenTodoSections(openTodos, new Date(`${currentDayKey}T00:00:00`));
   $: openCount = openTodos.length;
   $: summary = getDaySummary(state, selectedDay);

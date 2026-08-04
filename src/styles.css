@@ -1241,6 +1241,11 @@ h2 {
   background: var(--block-running);
 }
 
+.todo-item.is-paused {
+  border-color: color-mix(in srgb, var(--board-paused) 32%, var(--block-border));
+  background: color-mix(in srgb, var(--board-paused-surface) 56%, var(--block-surface));
+}
+
 .task-block-dot {
   width: 10px;
   height: 10px;
@@ -1252,6 +1257,12 @@ h2 {
 .todo-item.is-running .task-block-dot {
   border-color: var(--strong);
   background: var(--strong);
+}
+
+.todo-item.is-paused .task-block-dot {
+  border-color: var(--board-paused);
+  background: var(--board-paused);
+  animation: paused-breathe 2.8s ease-in-out infinite;
 }
 
 .task-content,
@@ -1271,6 +1282,19 @@ h2 {
 
 .task-title {
   cursor: text;
+}
+
+.task-state-badge {
+  justify-self: start;
+  padding: 2px 7px;
+  border: 1px solid var(--board-paused-soft);
+  border-radius: 999px;
+  background: var(--board-paused-surface);
+  color: var(--board-paused);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
 }
 
 .task-duration,
@@ -2425,6 +2449,19 @@ h2 {
   100% {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes paused-breathe {
+  0%,
+  100% {
+    box-shadow: 0 0 0 0 var(--board-paused-soft);
+    transform: scale(0.92);
+  }
+
+  50% {
+    box-shadow: 0 0 0 5px transparent;
+    transform: scale(1);
   }
 }
 
