@@ -190,6 +190,20 @@ try {
       `[data-menubar-details="${createdTask.id}"] input[aria-label^="Start time for"]`,
     ),
   };
+  await page.fill('#menubar-quick-add', 'Captured from menu ba');
+  await page.locator('#menubar-quick-add').press('Enter');
+  await page.waitForFunction(() =>
+    document.querySelector('.menubar-sync')?.textContent.includes('Duplicate task'),
+  );
+  const duplicateTask = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    return {
+      matchingTasks: state.todos.filter((todo) => todo.title.startsWith('Captured from menu ba'))
+        .length,
+      draft: document.querySelector('#menubar-quick-add')?.value,
+      message: document.querySelector('.menubar-sync')?.textContent.trim(),
+    };
+  });
   await page.click('[data-menubar-id="menubar-open"] .menubar-start');
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
@@ -458,6 +472,13 @@ try {
     failures.push(
       `new task start time does not default to creation time: ${JSON.stringify(createdTimingDefault)}`,
     );
+  }
+  if (
+    duplicateTask.matchingTasks !== 1 ||
+    duplicateTask.draft !== 'Captured from menu ba' ||
+    duplicateTask.message !== 'Duplicate task: "Captured from menu bar" is already open'
+  ) {
+    failures.push(`menu bar duplicate matching failed: ${JSON.stringify(duplicateTask)}`);
   }
   if (!startedPresentation.visible || !startedPresentation.remainsInOngoing) {
     failures.push(
