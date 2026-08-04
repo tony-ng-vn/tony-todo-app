@@ -7,6 +7,7 @@
     addTodo,
     createInitialState,
     deleteTodo,
+    findDuplicateTodo,
     getOpenTodoSections,
     getCompletedTodoSections,
     getPendingTodos,
@@ -251,6 +252,12 @@
   }
 
   async function handleAdd() {
+    const duplicate = findDuplicateTodo(state, titleDraft);
+    if (duplicate) {
+      syncMessage = `Duplicate task: "${duplicate.title}" is already open`;
+      return;
+    }
+
     const existingIds = new Set(state.todos.map((todo) => todo.id));
     const createdAt = new Date();
     state = addTodo(state, titleDraft, createdAt);
@@ -308,6 +315,12 @@
 
   async function handleTitleCommit(todoId, title) {
     const before = findTodo(todoId);
+    const duplicate = findDuplicateTodo(state, title, { excludeTodoId: todoId });
+    if (duplicate) {
+      syncMessage = `Duplicate task: "${duplicate.title}" is already open`;
+      return;
+    }
+
     state = updateTodoTitle(state, todoId, title);
     const after = findTodo(todoId);
     saveLocalState(state);

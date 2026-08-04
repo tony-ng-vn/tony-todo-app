@@ -20,6 +20,7 @@
     createInitialState,
     deleteTodo,
     failTodo,
+    findDuplicateTodo,
     formatDayKey,
     formatDuration,
     getBoardColumns,
@@ -218,6 +219,12 @@
   }
 
   async function handleSubmit() {
+    const duplicate = findDuplicateTodo(state, titleDraft);
+    if (duplicate) {
+      syncMessage = `Duplicate task: "${duplicate.title}" is already open`;
+      return;
+    }
+
     const existingIds = new Set(state.todos.map((todo) => todo.id));
     state = addTodo(state, titleDraft, new Date(), {
       dueDate: dueDateInputToIso(dueDateDraft || selectedDay),
@@ -341,6 +348,12 @@
 
   async function commitTodoTitle(todoId, title) {
     const before = findTodo(todoId);
+    const duplicate = findDuplicateTodo(state, title, { excludeTodoId: todoId });
+    if (duplicate) {
+      syncMessage = `Duplicate task: "${duplicate.title}" is already open`;
+      return;
+    }
+
     state = updateTodoTitle(state, todoId, title);
     saveLocalState(state);
     syncMessage = 'Saving title';
@@ -510,6 +523,12 @@
   }
 
   async function handleCreateTaskInColumn(columnId, title) {
+    const duplicate = findDuplicateTodo(state, title);
+    if (duplicate) {
+      syncMessage = `Duplicate task: "${duplicate.title}" is already open`;
+      return false;
+    }
+
     const existingIds = new Set(state.todos.map((todo) => todo.id));
     state = addTodo(state, title, new Date(), { dueDate: dueDateInputToIso(selectedDay) });
 
@@ -522,7 +541,7 @@
 
     const createdTodo = state.todos.find((todo) => !existingIds.has(todo.id));
     if (!createdTodo) {
-      return;
+      return false;
     }
 
     newlyAddedTodoId = createdTodo.id;
@@ -539,10 +558,11 @@
         ? formatDayKey(new Date(createdTodo.completedAt))
         : formatDayKey(new Date());
       await syncRemoteChange('Saving', () => persistNewTodo(createdTodo));
-      return;
+      return true;
     }
 
     await syncRemoteChange('Saving', () => persistNewTodo(createdTodo));
+    return true;
   }
 
   function handleVisibilityChange() {

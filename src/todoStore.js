@@ -34,7 +34,7 @@ export function createInitialState(todos = []) {
 export function addTodo(state, title, createdAt = new Date(), { dueDate = null } = {}) {
   const cleanTitle = title.trim();
 
-  if (!cleanTitle) {
+  if (!cleanTitle || findDuplicateTodo(state, cleanTitle)) {
     return state;
   }
 
@@ -66,6 +66,23 @@ export function addTodo(state, title, createdAt = new Date(), { dueDate = null }
       },
     ],
   };
+}
+
+export function findDuplicateTodo(state, title, { excludeTodoId = null } = {}) {
+  const candidateTitle = normalizeTaskTitle(title);
+  if (!candidateTitle) {
+    return null;
+  }
+
+  return (
+    state.todos.find((todo) => {
+      if (todo.id === excludeTodoId || todo.completedAt || todo.isProgressSession) {
+        return false;
+      }
+
+      return taskTitlesMatch(candidateTitle, normalizeTaskTitle(todo.title));
+    }) ?? null
+  );
 }
 
 export function completeTodo(state, todoId, completedAt = new Date()) {
@@ -630,7 +647,7 @@ export function updateTodoNote(state, todoId, note) {
 
 export function updateTodoTitle(state, todoId, title) {
   const cleanTitle = title.trim();
-  if (!cleanTitle) {
+  if (!cleanTitle || findDuplicateTodo(state, cleanTitle, { excludeTodoId: todoId })) {
     return state;
   }
 
@@ -896,6 +913,87 @@ export function createTodoId(title, date) {
     .slice(0, 32);
 
   return `${date.getTime()}-${slug || 'todo'}`;
+}
+
+function normalizeTaskTitle(title) {
+  return String(title ?? '')
+    .normalize('NFKC')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
+    .trim()
+    .replace(/\s+/g, ' ');
+}
+
+function taskTitlesMatch(candidateTitle, existingTitle) {
+  if (!existingTitle) {
+    return false;
+  }
+
+  if (candidateTitle === existingTitle) {
+    return true;
+  }
+
+  const candidateTokens = candidateTitle.split(' ');
+  const existingTokens = existingTitle.split(' ');
+  if (
+    candidateTokens.length >= 3 &&
+    candidateTokens.length === existingTokens.length &&
+    candidateTokens.toSorted().join(' ') === existingTokens.toSorted().join(' ')
+  ) {
+    return true;
+  }
+
+  const longerLength = Math.max(candidateTitle.length, existingTitle.length);
+  if (longerLength < 12) {
+    return false;
+  }
+
+  const allowedDistance = longerLength >= 24 ? 2 : 1;
+  if (Math.abs(candidateTitle.length - existingTitle.length) > allowedDistance) {
+    return false;
+  }
+
+  return editDistanceAtMost(candidateTitle, existingTitle, allowedDistance);
+}
+
+function editDistanceAtMost(first, second, limit) {
+  let previous = Array.from({ length: second.length + 1 }, (_, index) => index);
+  let previousPrevious = null;
+
+  for (let firstIndex = 1; firstIndex <= first.length; firstIndex += 1) {
+    const current = [firstIndex];
+    let rowMinimum = current[0];
+
+    for (let secondIndex = 1; secondIndex <= second.length; secondIndex += 1) {
+      const substitutionCost = first[firstIndex - 1] === second[secondIndex - 1] ? 0 : 1;
+      current[secondIndex] = Math.min(
+        current[secondIndex - 1] + 1,
+        previous[secondIndex] + 1,
+        previous[secondIndex - 1] + substitutionCost,
+      );
+      if (
+        previousPrevious &&
+        first[firstIndex - 1] === second[secondIndex - 2] &&
+        first[firstIndex - 2] === second[secondIndex - 1]
+      ) {
+        current[secondIndex] = Math.min(
+          current[secondIndex],
+          previousPrevious[secondIndex - 2] + 1,
+        );
+      }
+      rowMinimum = Math.min(rowMinimum, current[secondIndex]);
+    }
+
+    if (rowMinimum > limit) {
+      return false;
+    }
+
+    previousPrevious = previous;
+    previous = current;
+  }
+
+  return previous[second.length] <= limit;
 }
 
 function normalizedTrackedSeconds(todo) {
