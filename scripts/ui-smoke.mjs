@@ -10,6 +10,7 @@ try {
   const desktop = await inspectViewport({ width: 1366, height: 900 }, false);
   const draftCue = await inspectDraftInsertionCue({ width: 1366, height: 900 });
   const boardCardLayout = await inspectBoardCardLayout({ width: 1366, height: 900 });
+  const duplicateTask = await inspectDuplicateTask({ width: 1366, height: 900 });
   const navigation = await inspectWorkspaceNavigation({ width: 1366, height: 900 });
   const failures = [
     ...assertNoOverflow(mobile),
@@ -26,6 +27,7 @@ try {
     ...assertOngoingSection(desktop),
     ...assertManualTiming(desktop),
     ...assertBoardCardLayout(boardCardLayout),
+    ...assertDuplicateTask(duplicateTask),
     ...assertPausedTimeline(desktop),
     ...assertFullScreenShell(desktop, '.workspace', 'workspace shell'),
     ...assertFixedDocumentScroll(desktop),
@@ -51,6 +53,72 @@ try {
   }
 } finally {
   await browser.close();
+}
+
+async function inspectDuplicateTask(viewport) {
+  const page = await browser.newPage({ viewport });
+  await page.addInitScript(() => {
+    localStorage.setItem('done-log-client-id', 'ui-smoke-duplicate-task');
+    localStorage.setItem(
+      'done-log-state',
+      JSON.stringify({
+        todos: [
+          {
+            id: 'existing-task',
+            title: 'Review launch checklist',
+            createdAt: new Date().toISOString(),
+            completedAt: null,
+          },
+        ],
+      }),
+    );
+  });
+  await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
+  await page.fill('#todo-title', 'Review launch checklst');
+  await page.click('.input-row button[type="submit"]');
+  await page.waitForFunction(() =>
+    document.querySelector('#sync-status')?.textContent.includes('Duplicate task'),
+  );
+
+  const result = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    return {
+      taskCount: state.todos.length,
+      draft: document.querySelector('#todo-title')?.value,
+      message: document.querySelector('#sync-status')?.textContent.trim(),
+    };
+  });
+  await page.getByRole('button', { name: 'Board', exact: true }).click();
+  await page.waitForSelector('.board-panel');
+  await page.click('[data-column="not_started"] .board-new-task');
+  await page.fill('[data-board-draft="not_started"]', 'Review launch cheklist');
+  await page.click('[data-column="not_started"] .board-draft-submit');
+  result.board = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    return {
+      taskCount: state.todos.length,
+      draft: document.querySelector('[data-board-draft="not_started"]')?.value,
+    };
+  });
+  await page.close();
+  return result;
+}
+
+function assertDuplicateTask(result) {
+  const failures = [];
+  if (result.taskCount !== 1) {
+    failures.push(`duplicate task creation changed the task count: ${JSON.stringify(result)}`);
+  }
+  if (result.draft !== 'Review launch checklst') {
+    failures.push(`duplicate task creation cleared the draft: ${JSON.stringify(result)}`);
+  }
+  if (result.message !== 'Duplicate task: "Review launch checklist" is already open') {
+    failures.push(`duplicate task creation did not identify the match: ${JSON.stringify(result)}`);
+  }
+  if (result.board.taskCount !== 1 || result.board.draft !== 'Review launch cheklist') {
+    failures.push(`board duplicate task creation was not blocked: ${JSON.stringify(result)}`);
+  }
+  return failures;
 }
 
 async function inspectWorkspaceNavigation(viewport) {

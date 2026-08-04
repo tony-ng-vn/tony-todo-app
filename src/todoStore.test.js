@@ -4,6 +4,7 @@ import {
   completeTodo,
   createInitialState,
   failTodo,
+  findDuplicateTodo,
   formatDueDate,
   matchesDueFilter,
   setTodoDueDate,
@@ -39,6 +40,89 @@ import {
   updateTodoTitle,
   updateTodoNote,
 } from './todoStore.js';
+
+describe('duplicate task matching', () => {
+  it('matches open tasks after normalizing case, punctuation, and whitespace', () => {
+    const state = createInitialState([
+      {
+        id: 'existing',
+        title: 'Send follow-up email',
+        createdAt: '2026-06-08T08:00:00.000Z',
+        completedAt: null,
+      },
+    ]);
+
+    expect(findDuplicateTodo(state, '  SEND follow up   email! ')).toMatchObject({ id: 'existing' });
+    expect(findDuplicateTodo(state, 'Email follow up send')).toMatchObject({ id: 'existing' });
+  });
+
+  it('matches a conservative one-character typo in a substantive title', () => {
+    const state = createInitialState([
+      {
+        id: 'existing',
+        title: 'Submit expense report',
+        createdAt: '2026-06-08T08:00:00.000Z',
+        completedAt: null,
+      },
+    ]);
+
+    expect(findDuplicateTodo(state, 'Submit expens report')).toMatchObject({ id: 'existing' });
+    expect(findDuplicateTodo(state, 'Submit expense reprot')).toMatchObject({ id: 'existing' });
+  });
+
+  it('does not match short or meaningfully different titles', () => {
+    const state = createInitialState([
+      {
+        id: 'call-alice',
+        title: 'Call Alice',
+        createdAt: '2026-06-08T08:00:00.000Z',
+        completedAt: null,
+      },
+    ]);
+
+    expect(findDuplicateTodo(state, 'Call Alicia')).toBeNull();
+    expect(findDuplicateTodo(state, 'Call Bob')).toBeNull();
+  });
+
+  it('allows a completed task title to be used again', () => {
+    let state = createInitialState([
+      {
+        id: 'completed',
+        title: 'Send weekly update',
+        createdAt: '2026-06-01T08:00:00.000Z',
+        completedAt: '2026-06-01T09:00:00.000Z',
+      },
+    ]);
+
+    expect(findDuplicateTodo(state, 'Send weekly update')).toBeNull();
+
+    state = addTodo(state, 'Send weekly update', new Date('2026-06-08T08:00:00.000Z'));
+    expect(state.todos).toHaveLength(2);
+  });
+
+  it('does not add a duplicate open task', () => {
+    const createdAt = new Date('2026-06-08T08:00:00.000Z');
+    let state = addTodo(createInitialState(), 'Review launch checklist', createdAt);
+    const originalState = state;
+
+    state = addTodo(state, 'Review launch checklst', new Date('2026-06-08T09:00:00.000Z'));
+
+    expect(state).toBe(originalState);
+    expect(state.todos).toHaveLength(1);
+  });
+
+  it('does not rename an open task to duplicate another one', () => {
+    const state = createInitialState([
+      { id: 'first', title: 'Prepare launch notes', completedAt: null },
+      { id: 'second', title: 'Email the team', completedAt: null },
+    ]);
+
+    const updated = updateTodoTitle(state, 'second', 'Prepare launch note');
+
+    expect(updated).toBe(state);
+    expect(updated.todos[1].title).toBe('Email the team');
+  });
+});
 
 describe('calendar month', () => {
   const now = new Date(2026, 6, 15, 9, 0, 0); // Wed Jul 15 2026, local

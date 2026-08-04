@@ -59,8 +59,10 @@
       return;
     }
 
-    await onCreateTaskInColumn?.(columnId, title);
-    cancelDraft();
+    const created = await onCreateTaskInColumn?.(columnId, title);
+    if (created !== false) {
+      cancelDraft();
+    }
   }
 
   function handleDraftKeydown(event, columnId) {
