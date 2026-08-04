@@ -1,4 +1,5 @@
 <script>
+  import { updated } from '$app/state';
   import { onDestroy, onMount, tick } from 'svelte';
   import '../../styles.css';
   import AuthGate from '../../lib/components/AuthGate.svelte';
@@ -58,6 +59,7 @@
     'timeSegments',
   ];
   const THEME_STORAGE_KEY = 'done-log-theme';
+  const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
   let state = createInitialState();
   let syncMessage = 'Connecting';
@@ -75,6 +77,9 @@
   let liveTimer = null;
   let refreshInFlight = false;
   let updateInFlight = false;
+  let updateCheckInFlight = false;
+  let updateAvailable = false;
+  let updateCheckTimer = null;
   const noteAutosave = createDebouncedSaveQueue(saveNoteToRemote);
 
   $: pendingTodos = getPendingTodos(state).map((todo) => ({
@@ -96,15 +101,18 @@
     state = loadLocalState();
     queuePendingNoteSaves();
     applyStoredTheme();
-    window.addEventListener('focus', refreshFromSource);
+    window.addEventListener('focus', handleWindowFocus);
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    updateCheckTimer = window.setInterval(checkForUpdate, UPDATE_CHECK_INTERVAL_MS);
+    void checkForUpdate();
     initializeAuth();
   });
 
   onDestroy(() => {
     window.clearInterval(liveTimer);
+    window.clearInterval(updateCheckTimer);
     void noteAutosave.flushAll().catch(() => {});
-    window.removeEventListener('focus', refreshFromSource);
+    window.removeEventListener('focus', handleWindowFocus);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
   });
 
@@ -139,9 +147,28 @@
     }
   }
 
+  function handleWindowFocus() {
+    refreshFromSource();
+    void checkForUpdate();
+  }
+
   function handleVisibilityChange() {
     if (document.visibilityState === 'visible') {
       refreshFromSource();
+      void checkForUpdate();
+    }
+  }
+
+  async function checkForUpdate() {
+    if (updateAvailable || updateCheckInFlight) {
+      return;
+    }
+
+    updateCheckInFlight = true;
+    try {
+      updateAvailable = await updated.check();
+    } finally {
+      updateCheckInFlight = false;
     }
   }
 
@@ -585,12 +612,16 @@
         <button
           type="button"
           class="menubar-update"
+          class:is-available={updateAvailable}
           disabled={updateInFlight}
-          aria-label="Update Done Log"
-          title="Reload the latest Done Log and sync data"
+          aria-live="polite"
+          aria-label={updateAvailable ? 'Update available for Done Log' : 'Check for Done Log updates'}
+          title={updateAvailable
+            ? 'A newer Done Log is ready to load'
+            : 'Check for and load the latest Done Log'}
           on:click={handleManualUpdate}
         >
-          {updateInFlight ? 'Updating' : 'Update'}
+          {updateInFlight ? 'Updating' : updateAvailable ? 'Update available' : 'Update'}
         </button>
         <a
           class="menubar-open-full"
@@ -842,6 +873,13 @@
   .menubar-update:disabled {
     cursor: wait;
     opacity: 0.68;
+  }
+
+  .menubar-update.is-available {
+    border-color: transparent;
+    background: var(--button-bg);
+    color: var(--button-fg);
+    box-shadow: var(--shadow-raised);
   }
 
   .menubar-sync,
