@@ -34,7 +34,7 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     webView.uiDelegate = self
     webView.allowsMagnification = false
     view = webView
-    webView.load(URLRequest(url: homeURL))
+    webView.load(MenuBarConfiguration.makeHomeRequest(for: homeURL))
   }
 
   func webView(

@@ -123,6 +123,7 @@ try {
           .querySelector('[data-menubar-date-group][data-menubar-is-today="false"]')
           ?.getBoundingClientRect().top,
       fullAppHref: document.querySelector('.menubar-open-full')?.getAttribute('href'),
+      updateButtonLabel: document.querySelector('.menubar-update')?.textContent.trim(),
       scrollWidth: document.documentElement.scrollWidth,
       clientWidth: document.documentElement.clientWidth,
       scrollbarWidth: shellStyle.scrollbarWidth,
@@ -131,6 +132,15 @@ try {
       ).transitionDuration,
     };
   });
+
+  await page.click('.menubar-update');
+  await page.waitForURL((url) => url.searchParams.has('updated'));
+  await page.waitForSelector('.menubar-shell');
+  const updateUrl = new URL(page.url());
+  const manualUpdate = {
+    keptLocalMode: updateUrl.searchParams.has('local'),
+    hasCacheBuster: updateUrl.searchParams.has('updated'),
+  };
 
   await page.locator('#menubar-quick-add').press('Enter');
   await page.waitForTimeout(50);
@@ -422,6 +432,13 @@ try {
     failures.push(`running task start time is missing: ${JSON.stringify(initial)}`);
   }
   if (initial.fullAppHref !== '/') failures.push(`full app link is wrong: ${JSON.stringify(initial)}`);
+  if (
+    initial.updateButtonLabel !== 'Update' ||
+    !manualUpdate.keptLocalMode ||
+    !manualUpdate.hasCacheBuster
+  ) {
+    failures.push(`manual update control did not reload Done Log safely: ${JSON.stringify({ initial, manualUpdate })}`);
+  }
   if (initial.scrollWidth > initial.clientWidth || initial.scrollbarWidth !== 'none') {
     failures.push(`compact shell overflows or shows a scrollbar: ${JSON.stringify(initial)}`);
   }

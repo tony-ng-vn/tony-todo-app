@@ -25,6 +25,17 @@ struct MenuBarConfigurationTests {
     )
   }
 
+  @Test("Revalidates the menu bar page on launch")
+  func revalidatesMenuBarPageOnLaunch() throws {
+    let url = try #require(
+      URL(string: "https://tony-todo-app.vercel.app/menubar")
+    )
+    let request = MenuBarConfiguration.makeHomeRequest(for: url)
+
+    #expect(request.url == url)
+    #expect(request.cachePolicy == .reloadRevalidatingCacheData)
+  }
+
   @Test("Opens the full app on the same origin as the menu bar route")
   func opensFullAppOnSameOrigin() throws {
     let menuBarURL = try #require(
