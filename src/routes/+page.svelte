@@ -29,7 +29,6 @@
     getMillisecondsUntilNextDay,
     getOpenTodoSections,
     getProgressSessions,
-    getTaskTimeSegments,
     logProgressSession,
     moveCompletedTodoToSummaryBucket,
     moveTodoToBoardColumn,
@@ -40,7 +39,7 @@
     setTodoDueDate,
     setTodoProgressive,
     startTodoTimer,
-    updateTodoTiming,
+    updateTodoTimeSegments,
     updateTodoCompletedAt,
     updateTodoNote,
     updateTodoProgress,
@@ -160,7 +159,6 @@
   $: selectedTask = state.todos.find((todo) => todo.id === selectedTaskId);
   $: selectedNoteSaveStatus = noteSaveStatuses[selectedTaskId] ?? 'saved';
   $: selectedTaskSessions = selectedTaskId ? getProgressSessions(state, selectedTaskId) : [];
-  $: selectedTaskTimeSegments = selectedTaskId ? getTaskTimeSegments(state, selectedTaskId) : [];
 
   $: if (selectedDay !== lastSelectedDayForDraft && dueDateDraft === lastSelectedDayForDraft) {
     dueDateDraft = selectedDay;
@@ -721,19 +719,20 @@
     return { ok: true };
   }
 
-  async function handleCompletedTimingChange(todoId, startedAt, completedAt) {
-    const start = new Date(startedAt);
-    const end = new Date(completedAt);
+  async function handleTimeSegmentsChange(todoId, segments) {
     if (
-      Number.isNaN(start.getTime()) ||
-      Number.isNaN(end.getTime()) ||
-      start.getTime() >= end.getTime()
+      !segments.length ||
+      segments.some(({ startedAt, endedAt }) => {
+        const start = new Date(startedAt);
+        const end = new Date(endedAt);
+        return Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start >= end;
+      })
     ) {
-      return { ok: false, error: 'Start time must be before end time.' };
+      return { ok: false, error: 'Start time must be before end time in each block.' };
     }
 
     const beforeTodos = state.todos;
-    const nextState = updateTodoTiming(state, todoId, startedAt, completedAt);
+    const nextState = updateTodoTimeSegments(state, todoId, segments);
     const changedTodos = getTodosWithChangedFields(beforeTodos, nextState.todos, [
       ...TIMER_SYNC_FIELDS,
       ...COMPLETION_SYNC_FIELDS,
@@ -1391,7 +1390,6 @@
   <TaskDetail
     {selectedTask}
     {selectedTaskSessions}
-    {selectedTaskTimeSegments}
     bind:noteDraft
     noteSaveStatus={selectedNoteSaveStatus}
     onClose={closeTask}
@@ -1399,7 +1397,7 @@
     onDetailTitleCommit={handleDetailTitleCommit}
     onProgressiveChange={handleProgressiveChange}
     onProgressInput={handleProgressInput}
-    onCompletedTimingChange={handleCompletedTimingChange}
+    onTimeSegmentsChange={handleTimeSegmentsChange}
     onDueDateChange={handleDueDateChange}
     onDeleteTask={handleDeleteTask}
     {formatDuration}

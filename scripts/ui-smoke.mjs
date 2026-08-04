@@ -488,6 +488,14 @@ async function exerciseManualTiming(page) {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     return Boolean(state.todos.find((item) => item.id === 'ui-smoke-manual-timing-task')?.completedAt);
   });
+  await page.getByRole('button', { name: 'Add time block', exact: true }).click();
+  await choosePastDateTime('.time-block-start-picker', 11, 0, 'AM');
+  await choosePastDateTime('.time-block-end-picker', 11, 30, 'AM');
+  await page.waitForFunction(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    const task = state.todos.find((item) => item.id === 'ui-smoke-manual-timing-task');
+    return task?.timeSegments?.length === 2 && task?.trackedSeconds === 90 * 60;
+  });
   const result = await page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     const task = state.todos.find((item) => item.id === 'ui-smoke-manual-timing-task');
@@ -495,6 +503,8 @@ async function exerciseManualTiming(page) {
     return {
       completed: Boolean(task?.completedAt),
       trackedSeconds: task?.trackedSeconds,
+      timeBlockCount: task?.timeSegments?.length,
+      totalLabel: document.querySelector('.time-block-heading > strong')?.textContent.trim(),
       completedDayKey: completedAt
         ? `${completedAt.getFullYear()}-${String(completedAt.getMonth() + 1).padStart(2, '0')}-${String(completedAt.getDate()).padStart(2, '0')}`
         : null,
@@ -512,10 +522,10 @@ async function inspectPausedTimeline(page) {
   await page.click('[data-todo-id="ui-smoke-paused-task"] .open-task-button');
   await page.waitForSelector('.time-segment-history');
   const result = await page.evaluate(() => ({
-    heading: document.querySelector('.time-segment-history h3')?.textContent.trim(),
-    segments: Array.from(document.querySelectorAll('.time-segment-item')).map((segment) =>
-      segment.textContent.replace(/\s+/g, ' ').trim(),
-    ),
+    heading: document.querySelector('.time-block-heading h3')?.textContent.trim(),
+    blockCount: document.querySelectorAll('.time-block-item').length,
+    total: document.querySelector('.time-block-heading > strong')?.textContent.trim(),
+    hasAddButton: Boolean(document.querySelector('.time-block-add')),
   }));
   await page.click('#detail-close');
   return result;
@@ -962,9 +972,11 @@ function assertManualTiming(result) {
   const timing = result.manualTiming;
   const now = new Date();
   const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
-  return timing?.invalidError === 'Start time must be before end time.' &&
+  return timing?.invalidError === 'Start time must be before end time in each block.' &&
     timing.completed === true &&
-    timing.trackedSeconds === 60 * 60 &&
+    timing.trackedSeconds === 90 * 60 &&
+    timing.timeBlockCount === 2 &&
+    timing.totalLabel === 'Total 1h 30m' &&
     timing.completedDayKey !== todayKey
     ? []
     : [
@@ -986,9 +998,10 @@ function assertBoardCardLayout(result) {
 }
 
 function assertPausedTimeline(result) {
-  return result.pausedTimeline?.heading === 'Time segments' &&
-    result.pausedTimeline.segments.length === 1 &&
-    result.pausedTimeline.segments[0].includes('10m')
+  return result.pausedTimeline?.heading === 'Time blocks' &&
+    result.pausedTimeline.blockCount === 1 &&
+    result.pausedTimeline.total === 'Total 10m' &&
+    result.pausedTimeline.hasAddButton
     ? []
     : [`paused task timeline is missing or incomplete: ${JSON.stringify(result.pausedTimeline)}`];
 }

@@ -17,7 +17,7 @@
     setTodoDueDate,
     setTodoProgressive,
     startTodoTimer,
-    updateTodoTiming,
+    updateTodoTimeSegments,
     updateTodoNote,
     updateTodoProgress,
     updateTodoTitle,
@@ -407,9 +407,9 @@
     await syncRemoteChange('Saving due date', () => persistTodoDueDate(after));
   }
 
-  async function handleTimingChange(todoId, startedAt, completedAt) {
+  async function handleTimingChange(todoId, segments) {
     const beforeTodos = state.todos;
-    state = updateTodoTiming(state, todoId, startedAt, completedAt);
+    state = updateTodoTimeSegments(state, todoId, segments);
     const changedTodos = getChangedTodos(beforeTodos, state.todos, TIMING_FIELDS);
 
     if (changedTodos.length === 0) {

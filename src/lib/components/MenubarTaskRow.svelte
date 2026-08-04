@@ -29,10 +29,8 @@
   let progressDraft = '';
   let sourceNote = '';
   let sourceProgress = '';
-  let timingStartDraft = '';
-  let timingEndDraft = '';
-  let sourceTimingStart = '';
-  let sourceTimingEnd = '';
+  let timingBlocksDraft = [];
+  let sourceTimingBlocks = '';
   let timingError = '';
 
   $: {
@@ -45,10 +43,8 @@
       sourceProgress = nextProgress;
       noteDraft = nextNote;
       progressDraft = nextProgress;
-      sourceTimingStart = dateTimeLocalValue(getDefaultTaskStartTimestamp(todo));
-      sourceTimingEnd = dateTimeLocalValue(todo.completedAt);
-      timingStartDraft = sourceTimingStart;
-      timingEndDraft = sourceTimingEnd;
+      sourceTimingBlocks = timingBlocksSource(todo);
+      timingBlocksDraft = timingBlocksForTodo(todo);
       timingError = '';
     } else {
       if (nextNote !== sourceNote) {
@@ -61,16 +57,10 @@
         progressDraft = nextProgress;
       }
 
-      const nextTimingStart = dateTimeLocalValue(getDefaultTaskStartTimestamp(todo));
-      const nextTimingEnd = dateTimeLocalValue(todo.completedAt);
-      if (nextTimingStart !== sourceTimingStart) {
-        sourceTimingStart = nextTimingStart;
-        timingStartDraft = nextTimingStart;
-      }
-
-      if (nextTimingEnd !== sourceTimingEnd) {
-        sourceTimingEnd = nextTimingEnd;
-        timingEndDraft = nextTimingEnd;
+      const nextTimingBlocks = timingBlocksSource(todo);
+      if (nextTimingBlocks !== sourceTimingBlocks) {
+        sourceTimingBlocks = nextTimingBlocks;
+        timingBlocksDraft = timingBlocksForTodo(todo);
       }
     }
   }
@@ -78,6 +68,13 @@
   $: isRunning = Boolean(todo.activeStartedAt);
   $: isCompleted = Boolean(todo.completedAt);
   $: duration = formatDuration(getElapsedSeconds(todo));
+  $: timingBlocksTotal = timingBlocksDraft.reduce((total, block) => {
+    const start = new Date(block.startedAt);
+    const end = new Date(block.endedAt);
+    return Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start >= end
+      ? total
+      : total + Math.floor((end.getTime() - start.getTime()) / 1000);
+  }, 0);
   $: noteTodos = parseNoteTodos(noteDraft);
 
   function dueDateValue(dueDate) {
@@ -114,35 +111,75 @@
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   }
 
-  function handleTimingInput(field, value) {
-    if (field === 'start') {
-      timingStartDraft = value;
-    } else {
-      timingEndDraft = value;
+  function timingBlocksSource(item) {
+    return JSON.stringify({
+      timeSegments: item.timeSegments ?? [],
+      firstStartedAt: item.firstStartedAt ?? null,
+      createdAt: item.createdAt ?? null,
+      completedAt: item.completedAt ?? null,
+    });
+  }
+
+  function timingBlocksForTodo(item) {
+    if (item.timeSegments?.length) {
+      return item.timeSegments.map((segment) => ({
+        startedAt: dateTimeLocalValue(segment.startedAt),
+        endedAt: dateTimeLocalValue(segment.endedAt),
+      }));
     }
+    return [
+      {
+        startedAt: dateTimeLocalValue(getDefaultTaskStartTimestamp(item)),
+        endedAt: dateTimeLocalValue(item.completedAt),
+      },
+    ];
+  }
+
+  function handleTimingInput(index, field, value) {
+    timingBlocksDraft = timingBlocksDraft.map((block, blockIndex) =>
+      blockIndex === index ? { ...block, [field]: value } : block,
+    );
 
     timingError = validateTiming();
     if (!timingError) {
-      onTimingChange(todo.id, timingStartDraft, timingEndDraft);
+      onTimingChange(todo.id, timingBlocksDraft);
     }
   }
 
   function validateTiming() {
-    if (!timingStartDraft || !timingEndDraft) {
-      return 'Choose both a start and end time.';
-    }
+    for (const block of timingBlocksDraft) {
+      if (!block.startedAt || !block.endedAt) {
+        return 'Choose both a start and end time in each block.';
+      }
 
-    const start = new Date(timingStartDraft);
-    const end = new Date(timingEndDraft);
-    if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
-      return 'Enter valid start and end times.';
-    }
+      const start = new Date(block.startedAt);
+      const end = new Date(block.endedAt);
+      if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+        return 'Enter valid start and end times.';
+      }
 
-    if (start.getTime() >= end.getTime()) {
-      return 'Start must be before end.';
+      if (start.getTime() >= end.getTime()) {
+        return 'Start must be before end in each block.';
+      }
     }
 
     return '';
+  }
+
+  function addTimeBlock() {
+    timingBlocksDraft = [...timingBlocksDraft, { startedAt: '', endedAt: '' }];
+    timingError = '';
+  }
+
+  function removeTimeBlock(index) {
+    if (timingBlocksDraft.length <= 1) {
+      return;
+    }
+    timingBlocksDraft = timingBlocksDraft.filter((_, blockIndex) => blockIndex !== index);
+    timingError = validateTiming();
+    if (!timingError) {
+      onTimingChange(todo.id, timingBlocksDraft);
+    }
   }
 
   function handleTitleKeydown(event) {
@@ -325,31 +362,57 @@
 
       <div class="menubar-timing-controls" aria-label="Task timing">
         <div class="menubar-timing-heading">
-          <strong>Start and end time</strong>
-          <small>{isCompleted ? 'Update the recorded timing.' : 'Saving timing finishes this task.'}</small>
+          <div>
+            <strong>Time blocks</strong>
+            <small>{isCompleted ? 'Update or add recorded work periods.' : 'Saving timing finishes this task.'}</small>
+          </div>
+          <strong aria-live="polite">Total {formatDuration(timingBlocksTotal)}</strong>
         </div>
-        <label>
-          <span>Start</span>
-          <input
-            type="datetime-local"
-            value={timingStartDraft}
-            aria-label={`Start time for ${todo.title}`}
-            aria-invalid={Boolean(timingError)}
-            aria-describedby={timingError ? `menubar-timing-error-${todo.id}` : undefined}
-            on:change={(event) => handleTimingInput('start', event.currentTarget.value)}
-          />
-        </label>
-        <label>
-          <span>End</span>
-          <input
-            type="datetime-local"
-            value={timingEndDraft}
-            aria-label={`End time for ${todo.title}`}
-            aria-invalid={Boolean(timingError)}
-            aria-describedby={timingError ? `menubar-timing-error-${todo.id}` : undefined}
-            on:change={(event) => handleTimingInput('end', event.currentTarget.value)}
-          />
-        </label>
+        <ol class="menubar-time-block-list">
+          {#each timingBlocksDraft as block, index (index)}
+            <li class="menubar-time-block">
+              <div class="menubar-time-block-title">
+                <strong>Block {index + 1}</strong>
+                {#if timingBlocksDraft.length > 1}
+                  <button
+                    type="button"
+                    aria-label={`Remove time block ${index + 1} for ${todo.title}`}
+                    on:click={() => removeTimeBlock(index)}
+                  >
+                    Remove
+                  </button>
+                {/if}
+              </div>
+              <label>
+                <span>Start</span>
+                <input
+                  type="datetime-local"
+                  value={block.startedAt}
+                  aria-label={`Start time for ${todo.title} block ${index + 1}`}
+                  aria-invalid={Boolean(timingError)}
+                  aria-describedby={timingError ? `menubar-timing-error-${todo.id}` : undefined}
+                  on:change={(event) =>
+                    handleTimingInput(index, 'startedAt', event.currentTarget.value)}
+                />
+              </label>
+              <label>
+                <span>End</span>
+                <input
+                  type="datetime-local"
+                  value={block.endedAt}
+                  aria-label={`End time for ${todo.title} block ${index + 1}`}
+                  aria-invalid={Boolean(timingError)}
+                  aria-describedby={timingError ? `menubar-timing-error-${todo.id}` : undefined}
+                  on:change={(event) =>
+                    handleTimingInput(index, 'endedAt', event.currentTarget.value)}
+                />
+              </label>
+            </li>
+          {/each}
+        </ol>
+        <button type="button" class="menubar-add-time-block" on:click={addTimeBlock}>
+          Add time block
+        </button>
         {#if timingError}
           <p class="menubar-timing-error" id={`menubar-timing-error-${todo.id}`} role="alert">
             {timingError}
@@ -534,7 +597,7 @@
 
   .menubar-timing-controls {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-columns: 1fr;
     gap: 8px;
     padding-top: 2px;
   }
@@ -545,6 +608,13 @@
   }
 
   .menubar-timing-heading {
+    display: flex;
+    align-items: start;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .menubar-timing-heading > div {
     display: grid;
     gap: 2px;
   }
@@ -557,6 +627,67 @@
   .menubar-timing-heading small {
     color: var(--subtle);
     font-size: 10px;
+  }
+
+  .menubar-timing-heading > strong:last-child {
+    color: var(--strong);
+    font-size: 11px;
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .menubar-time-block-list {
+    display: grid;
+    gap: 8px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .menubar-time-block {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    gap: 8px;
+    padding: 9px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--block-surface);
+  }
+
+  .menubar-time-block-title {
+    grid-column: 1 / -1;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+  }
+
+  .menubar-time-block-title strong {
+    color: var(--default);
+    font-size: 10px;
+  }
+
+  .menubar-time-block-title button,
+  .menubar-add-time-block {
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--field-surface);
+    color: var(--default);
+    font: inherit;
+    cursor: pointer;
+  }
+
+  .menubar-time-block-title button {
+    padding: 3px 7px;
+    font-size: 10px;
+  }
+
+  .menubar-add-time-block {
+    justify-self: start;
+    min-height: 30px;
+    padding: 0 10px;
+    font-size: 11px;
+    font-weight: 600;
   }
 
   .menubar-timing-error {

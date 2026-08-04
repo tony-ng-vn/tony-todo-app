@@ -311,6 +311,20 @@ try {
     const todo = state.todos.find((item) => item.id === 'menubar-open');
     return todo?.trackedSeconds === 3 * 60 * 60;
   });
+  await page.click('[data-menubar-details="menubar-open"] .menubar-add-time-block');
+  await page.fill(
+    '[data-menubar-details="menubar-open"] input[aria-label="Start time for Renamed in menu bar block 2"]',
+    '2026-07-30T03:00',
+  );
+  await page.fill(
+    '[data-menubar-details="menubar-open"] input[aria-label="End time for Renamed in menu bar block 2"]',
+    '2026-07-30T04:00',
+  );
+  await page.waitForFunction(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    const todo = state.todos.find((item) => item.id === 'menubar-open');
+    return todo?.timeSegments?.length === 2 && todo?.trackedSeconds === 4 * 60 * 60;
+  });
   await page.click('[data-menubar-id="menubar-open"] .menubar-details-toggle');
 
   await page.click('[data-menubar-id="menubar-paused"] .menubar-finish');
@@ -374,6 +388,8 @@ try {
       renamed: state.todos.find((todo) => todo.id === 'menubar-open')?.title,
       note: state.todos.find((todo) => todo.id === 'menubar-open')?.note,
       completed: Boolean(state.todos.find((todo) => todo.id === 'menubar-open')?.completedAt),
+      completedTrackedSeconds: state.todos.find((todo) => todo.id === 'menubar-open')?.trackedSeconds,
+      completedTimeBlocks: state.todos.find((todo) => todo.id === 'menubar-open')?.timeSegments?.length,
       pausedCompleted: Boolean(state.todos.find((todo) => todo.id === 'menubar-paused')?.completedAt),
       progress: state.todos.find((todo) => todo.id === 'menubar-progressive')?.progressLabel,
       dueDate: state.todos.find((todo) => todo.id === 'menubar-progressive')?.dueDate,
@@ -431,10 +447,16 @@ try {
       `started task disappeared from the ongoing section: ${JSON.stringify(startedPresentation)}`,
     );
   }
-  if (timingInputCount !== 2 || invalidTimingMessage?.trim() !== 'Start must be before end.') {
+  if (
+    timingInputCount !== 2 ||
+    invalidTimingMessage?.trim() !== 'Start must be before end in each block.'
+  ) {
     failures.push(
       `timing controls did not validate strictly: ${JSON.stringify({ timingInputCount, invalidTimingMessage })}`,
     );
+  }
+  if (final.completedTrackedSeconds !== 4 * 60 * 60 || final.completedTimeBlocks !== 2) {
+    failures.push(`time blocks did not accumulate in the menu bar: ${JSON.stringify(final)}`);
   }
   if (
     !final.added ||
