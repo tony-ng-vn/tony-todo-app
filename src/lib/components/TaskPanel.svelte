@@ -1,4 +1,5 @@
 <script>
+  import CalendarPicker from './CalendarPicker.svelte';
   import {
     formatDuration,
     formatDueDate,
@@ -89,15 +90,15 @@
         bind:value={titleDraft}
         on:input={onDraftInput}
       />
-      <input
-        id="todo-due-date"
-        name="dueDate"
-        type="date"
-        class="new-task-due"
-        aria-label="Assigned date"
-        title="Assigned date"
-        bind:value={dueDateDraft}
-      />
+      <div class="new-task-calendar">
+        <CalendarPicker
+          id="todo-due-date"
+          value={dueDateDraft}
+          label="Assigned date"
+          triggerClass="new-task-due"
+          onChange={(nextDate) => (dueDateDraft = nextDate)}
+        />
+      </div>
       <button type="submit">Add</button>
     </div>
   </form>

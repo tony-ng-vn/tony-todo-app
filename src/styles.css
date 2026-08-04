@@ -138,7 +138,7 @@
 .task-actions,
 .detail-window-actions,
 .open-task-button,
-.input-row button,
+.input-row > button,
 .theme-toggle,
 .sign-out-button {
   display: flex;
@@ -187,6 +187,10 @@
 
 .calendar-trigger:active {
   transform: translateY(1px) scale(0.99);
+}
+
+.calendar-trigger[data-invalid] {
+  border-color: var(--danger, #d85c52);
 }
 
 .calendar-popover {
@@ -349,6 +353,26 @@
   font-weight: 700;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+@media (max-width: 520px) {
+  .calendar-shell.has-time {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .calendar-time {
+    grid-template-columns: auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    padding-top: 14px;
+    padding-left: 0;
+    border-top: 1px solid #e5e7eb;
+    border-left: 0;
+  }
+
+  .calendar-apply {
+    min-height: 40px;
+    margin-top: 0;
+  }
 }
 
 .calendar-time-fields {
@@ -588,13 +612,11 @@ h2 {
   gap: 8px;
 }
 
-.board-day-field input {
+.board-day-picker {
   min-height: 34px;
-  border: 1px solid var(--border);
   border-radius: 999px;
   padding: 0 12px;
   background: var(--field-surface);
-  color: var(--strong);
   font: inherit;
 }
 
@@ -1062,7 +1084,7 @@ h2 {
   font-size: 16px;
 }
 
-.input-row button,
+.input-row > button,
 .todo-item button {
   justify-content: center;
   gap: 6px;
@@ -1079,7 +1101,7 @@ h2 {
     transform 180ms ease;
 }
 
-.input-row button {
+.input-row > button {
   padding: 0 20px;
 }
 
@@ -1348,10 +1370,13 @@ h2 {
   color: color-mix(in srgb, var(--strong) 78%, #9f3030);
 }
 
+.new-task-calendar {
+  flex: 0 0 auto;
+  min-width: 180px;
+}
+
 /* Narrow, non-growing date picker beside the task title input. */
 .new-task-due {
-  flex: 0 0 auto;
-  width: auto;
   height: 48px;
   padding: 0 12px;
   color: var(--subtle);
@@ -1460,13 +1485,13 @@ h2 {
   color: var(--strong);
 }
 
-.input-row button:hover {
+.input-row > button:hover {
   border-color: var(--subtle);
   background: var(--button-bg);
   color: var(--button-fg);
 }
 
-.input-row button:active,
+.input-row > button:active,
 .todo-item button:active,
 .open-task-button:active,
 .theme-toggle:active,
@@ -1479,7 +1504,7 @@ h2 {
 .task-title-input:focus-visible,
 .summary-time-button:focus-visible,
 .summary-time-input:focus-visible,
-.input-row button:focus-visible,
+.input-row > button:focus-visible,
 .todo-item button:focus-visible,
 .open-task-button:focus-visible,
 .theme-toggle:focus-visible,
@@ -2155,16 +2180,11 @@ h2 {
   text-transform: uppercase;
 }
 
-.detail-due-input {
+.detail-due-picker {
   width: 100%;
   min-height: 42px;
   padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: 11px;
   background: var(--field-surface);
-  color: var(--strong);
-  font-size: 14px;
-  font-weight: 500;
 }
 
 .session-history {
@@ -2360,11 +2380,12 @@ h2 {
   }
 
   .summary-top input,
-  .input-row button {
+  .input-row > button {
     width: 100%;
   }
 
   .input-row input,
+  .new-task-calendar,
   .summary-top input {
     flex: none;
     flex-basis: auto;

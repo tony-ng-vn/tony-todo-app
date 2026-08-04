@@ -109,8 +109,8 @@
     return todo?.dueDate ? toDateValue(todo.dueDate) : '';
   }
 
-  function handleDueDateInput(event) {
-    onDueDateChange?.(selectedTask.id, event.currentTarget.value);
+  function handleDueDateInput(value) {
+    onDueDateChange?.(selectedTask.id, value);
   }
 
   async function handleDoneDateChange(value) {
@@ -385,12 +385,12 @@
     {/if}
     <label class="detail-due-date">
       <span>Due date</span>
-      <input
-        type="date"
-        class="detail-due-input"
-        aria-label="Task due date"
+      <CalendarPicker
+        triggerClass="detail-due-picker"
+        label="Task due date"
+        allowClear={true}
         value={dueDateValue(selectedTask)}
-        on:change={handleDueDateInput}
+        onChange={handleDueDateInput}
       />
     </label>
     <div class="detail-timing-controls time-segment-history" aria-label="Time blocks">

@@ -6,6 +6,53 @@ const expectUpdateAvailable = process.env.EXPECT_UPDATE_AVAILABLE === '1';
 
 const browser = await chromium.launch({ headless: true });
 
+async function moveCalendarToMonth(page, target) {
+  const targetTitle = new Intl.DateTimeFormat([], { month: 'long', year: 'numeric' }).format(target);
+
+  for (let attempts = 0; attempts < 24; attempts += 1) {
+    const currentTitle = (await page.locator('.calendar-month-title').textContent())?.trim();
+    if (currentTitle === targetTitle) {
+      return;
+    }
+
+    const current = new Date(`${currentTitle} 1`);
+    const direction = current < target ? 'Next month' : 'Previous month';
+    await page.getByRole('button', { name: direction, exact: true }).click();
+  }
+
+  throw new Error(`Could not navigate calendar to ${targetTitle}`);
+}
+
+async function chooseCalendarDay(page, selector, value) {
+  const target = new Date(`${value}T12:00:00`);
+  await page.locator(selector).click();
+  await page.waitForSelector('.calendar-popover');
+  await moveCalendarToMonth(page, target);
+  await page
+    .locator('.calendar-day:not(.is-muted)')
+    .filter({ hasText: new RegExp(`^${target.getDate()}$`) })
+    .click();
+}
+
+async function chooseCalendarDateTime(page, selector, value) {
+  const target = new Date(value);
+  await page.locator(selector).click();
+  await page.waitForSelector('.calendar-popover');
+  await moveCalendarToMonth(page, target);
+  await page
+    .locator('.calendar-day:not(.is-muted)')
+    .filter({ hasText: new RegExp(`^${target.getDate()}$`) })
+    .click();
+
+  const hour = target.getHours() % 12 || 12;
+  await page.fill('.calendar-hour-input', String(hour));
+  await page.fill('.calendar-minute-input', String(target.getMinutes()).padStart(2, '0'));
+  await page
+    .locator('.calendar-period-button', { hasText: target.getHours() >= 12 ? 'PM' : 'AM' })
+    .click();
+  await page.click('.calendar-apply');
+}
+
 try {
   const page = await browser.newPage({ viewport: { width: 420, height: 640 } });
   await page.emulateMedia({ reducedMotion: 'reduce' });
@@ -210,16 +257,23 @@ try {
 
     return {
       id: todo.id,
-      expected: `${createdAt.getFullYear()}-${String(createdAt.getMonth() + 1).padStart(2, '0')}-${String(createdAt.getDate()).padStart(2, '0')}T${String(createdAt.getHours()).padStart(2, '0')}:${String(createdAt.getMinutes()).padStart(2, '0')}`,
+      expected: new Intl.DateTimeFormat([], {
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      }).format(createdAt),
       firstStartedAt: todo.firstStartedAt,
     };
   });
   await page.click(`[data-menubar-id="${createdTask.id}"] .menubar-details-toggle`);
   const createdTimingDefault = {
     ...createdTask,
-    value: await page.inputValue(
-      `[data-menubar-details="${createdTask.id}"] input[aria-label^="Start time for"]`,
-    ),
+    value: (
+      await page
+        .locator(`[data-menubar-details="${createdTask.id}"] button[aria-label^="Start time for"]`)
+        .textContent()
+    )?.trim(),
   };
   await page.fill('#menubar-quick-add', 'Captured from menu ba');
   await page.locator('#menubar-quick-add').press('Enter');
@@ -270,6 +324,32 @@ try {
 
   await page.click('[data-menubar-id="menubar-open"] .menubar-details-toggle');
   await page.waitForSelector('[data-menubar-details="menubar-open"]');
+  const calendarPresentation = await page.evaluate(() => {
+    const details = document.querySelector('[data-menubar-details="menubar-open"]');
+    return {
+      nativeInputCount: details.querySelectorAll('input[type="date"], input[type="datetime-local"]').length,
+      hasDuePicker: Boolean(details.querySelector('button[aria-label^="Due date for"]')),
+      timingPickerCount: details.querySelectorAll(
+        'button[aria-label^="Start time for"], button[aria-label^="End time for"]',
+      ).length,
+    };
+  });
+  await page.click(
+    '[data-menubar-details="menubar-open"] button[aria-label^="Start time for"]',
+  );
+  await page.waitForSelector('.calendar-popover');
+  calendarPresentation.compactLayout = await page.evaluate(() => {
+    const popover = document.querySelector('.calendar-popover')?.getBoundingClientRect();
+    const month = document.querySelector('.calendar-month')?.getBoundingClientRect();
+    const time = document.querySelector('.calendar-time')?.getBoundingClientRect();
+    return {
+      left: Math.round(popover?.left ?? -1),
+      right: Math.round(popover?.right ?? -1),
+      viewportWidth: window.innerWidth,
+      timeBelowMonth: (time?.top ?? 0) >= (month?.bottom ?? 1),
+    };
+  });
+  await page.keyboard.press('Escape');
   await page.fill('[data-menubar-details="menubar-open"] .menubar-title-input', 'Renamed in menu bar');
   await page.locator('[data-menubar-details="menubar-open"] .menubar-title-input').press('Enter');
   await page.fill('[data-menubar-details="menubar-open"] .menubar-note-input', 'Compact');
@@ -343,23 +423,23 @@ try {
     .locator('[data-menubar-details="menubar-open"] .note-todo-item')
     .getAttribute('aria-pressed');
 
-  await page.fill(
-    '[data-menubar-details="menubar-open"] input[aria-label^="Start time"]',
+  await chooseCalendarDateTime(
+    page,
+    '[data-menubar-details="menubar-open"] button[aria-label^="Start time"]',
     '2026-07-30T00:00',
   );
-  await page.fill(
-    '[data-menubar-details="menubar-open"] input[aria-label^="End time"]',
+  await chooseCalendarDateTime(
+    page,
+    '[data-menubar-details="menubar-open"] button[aria-label^="End time"]',
     '2026-07-29T00:00',
   );
   await page.waitForSelector('[data-menubar-details="menubar-open"] .menubar-timing-error');
   const invalidTimingMessage = await page
     .locator('[data-menubar-details="menubar-open"] .menubar-timing-error')
     .textContent();
-  const timingInputCount = await page
-    .locator('[data-menubar-details="menubar-open"] input[type="datetime-local"]')
-    .count();
-  await page.fill(
-    '[data-menubar-details="menubar-open"] input[aria-label^="End time"]',
+  await chooseCalendarDateTime(
+    page,
+    '[data-menubar-details="menubar-open"] button[aria-label^="End time"]',
     '2026-07-30T01:00',
   );
   await page.waitForFunction(() => {
@@ -375,12 +455,14 @@ try {
     ),
   );
   await page.waitForSelector('[data-menubar-details="menubar-open"]');
-  await page.fill(
-    '[data-menubar-details="menubar-open"] input[aria-label^="Start time"]',
+  await chooseCalendarDateTime(
+    page,
+    '[data-menubar-details="menubar-open"] button[aria-label^="Start time"]',
     '2026-07-29T23:00',
   );
-  await page.fill(
-    '[data-menubar-details="menubar-open"] input[aria-label^="End time"]',
+  await chooseCalendarDateTime(
+    page,
+    '[data-menubar-details="menubar-open"] button[aria-label^="End time"]',
     '2026-07-30T02:00',
   );
   await page.waitForFunction(() => {
@@ -389,12 +471,14 @@ try {
     return todo?.trackedSeconds === 3 * 60 * 60;
   });
   await page.click('[data-menubar-details="menubar-open"] .menubar-add-time-block');
-  await page.fill(
-    '[data-menubar-details="menubar-open"] input[aria-label="Start time for Renamed in menu bar block 2"]',
+  await chooseCalendarDateTime(
+    page,
+    '[data-menubar-details="menubar-open"] button[aria-label="Start time for Renamed in menu bar block 2"]',
     '2026-07-30T03:00',
   );
-  await page.fill(
-    '[data-menubar-details="menubar-open"] input[aria-label="End time for Renamed in menu bar block 2"]',
+  await chooseCalendarDateTime(
+    page,
+    '[data-menubar-details="menubar-open"] button[aria-label="End time for Renamed in menu bar block 2"]',
     '2026-07-30T04:00',
   );
   await page.waitForFunction(() => {
@@ -424,15 +508,32 @@ try {
     '3',
   );
   await page.locator('[data-menubar-details="menubar-progressive"] .menubar-progress-input').blur();
-  await page.fill(
-    '[data-menubar-details="menubar-progressive"] input[type="date"]',
+  await chooseCalendarDay(
+    page,
+    '[data-menubar-details="menubar-progressive"] button[aria-label^="Due date for"]',
     '2026-08-01',
   );
-  await page.locator('[data-menubar-details="menubar-progressive"] input[type="date"]').blur();
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     const todo = state.todos.find((item) => item.id === 'menubar-progressive');
     return todo?.progressLabel === 'Chapter\t3' && todo?.dueDate?.startsWith('2026-08-01');
+  });
+  await page.click(
+    '[data-menubar-details="menubar-progressive"] button[aria-label^="Due date for"]',
+  );
+  await page.getByRole('button', { name: 'Clear', exact: true }).click();
+  await page.waitForFunction(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    return state.todos.find((item) => item.id === 'menubar-progressive')?.dueDate === null;
+  });
+  await chooseCalendarDay(
+    page,
+    '[data-menubar-details="menubar-progressive"] button[aria-label^="Due date for"]',
+    '2026-08-01',
+  );
+  await page.waitForFunction(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    return state.todos.find((item) => item.id === 'menubar-progressive')?.dueDate?.startsWith('2026-08-01');
   });
 
   await page.click('[data-menubar-id="menubar-progressive"] .menubar-finish');
@@ -476,7 +577,7 @@ try {
       progressiveParentOpen: !state.todos.find((todo) => todo.id === 'menubar-progressive')
         ?.completedAt,
       deleted: !state.todos.some((todo) => todo.id === 'menubar-delete'),
-      nativeDateTimeInputs: document.querySelectorAll('input[type="datetime-local"]').length,
+      nativeCalendarInputs: document.querySelectorAll('input[type="date"], input[type="datetime-local"]').length,
     };
   });
 
@@ -551,11 +652,16 @@ try {
     );
   }
   if (
-    timingInputCount !== 2 ||
+    calendarPresentation.nativeInputCount !== 0 ||
+    !calendarPresentation.hasDuePicker ||
+    calendarPresentation.timingPickerCount !== 2 ||
+    calendarPresentation.compactLayout?.left < 0 ||
+    calendarPresentation.compactLayout?.right > calendarPresentation.compactLayout?.viewportWidth ||
+    !calendarPresentation.compactLayout?.timeBelowMonth ||
     invalidTimingMessage?.trim() !== 'Start must be before end in each block.'
   ) {
     failures.push(
-      `timing controls did not validate strictly: ${JSON.stringify({ timingInputCount, invalidTimingMessage })}`,
+      `calendar controls did not share the custom picker or validate strictly: ${JSON.stringify({ calendarPresentation, invalidTimingMessage })}`,
     );
   }
   if (final.completedTrackedSeconds !== 4 * 60 * 60 || final.completedTimeBlocks !== 2) {
@@ -575,7 +681,7 @@ try {
     noteAutosavePresentation.status !== 'Note saved automatically' ||
     !final.progressiveParentOpen ||
     !final.deleted ||
-    final.nativeDateTimeInputs !== 0
+    final.nativeCalendarInputs !== 0
   ) {
     failures.push(`compact task flow failed: ${JSON.stringify(final)}`);
   }
