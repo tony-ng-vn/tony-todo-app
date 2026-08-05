@@ -731,6 +731,36 @@ export function getDefaultTaskStartTimestamp(todo) {
   return null;
 }
 
+export function getEditableTaskTimeSegments(todo, activeEndedAt = new Date()) {
+  const recordedSegments = normalizeTimeSegments(todo?.timeSegments);
+
+  if (todo?.activeStartedAt) {
+    const startedAt = new Date(todo.activeStartedAt);
+    const endedAt = new Date(activeEndedAt);
+    if (!Number.isNaN(startedAt.getTime()) && !Number.isNaN(endedAt.getTime())) {
+      return [
+        ...recordedSegments,
+        {
+          startedAt: startedAt.toISOString(),
+          endedAt: new Date(Math.max(startedAt.getTime(), endedAt.getTime())).toISOString(),
+        },
+      ];
+    }
+  }
+
+  if (recordedSegments.length) {
+    return recordedSegments;
+  }
+
+  const completedAt = todo?.completedAt ? new Date(todo.completedAt) : null;
+  return [
+    {
+      startedAt: getDefaultTaskStartTimestamp(todo),
+      endedAt: completedAt && !Number.isNaN(completedAt.getTime()) ? completedAt.toISOString() : null,
+    },
+  ];
+}
+
 export function setTodoProgressive(state, todoId, isProgressive) {
   return {
     ...state,

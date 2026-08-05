@@ -20,6 +20,7 @@ import {
   formatDuration,
   getElapsedSeconds,
   getDefaultTaskStartTimestamp,
+  getEditableTaskTimeSegments,
   getOpenTodoSections,
   logProgressSession,
   moveCompletedTodoToSummaryBucket,
@@ -189,6 +190,52 @@ describe('todo day summary', () => {
     state = startTodoTimer(state, state.todos[0].id, new Date('2026-06-08T09:15:00.000Z'));
 
     expect(getDefaultTaskStartTimestamp(state.todos[0])).toBe('2026-06-08T09:15:00.000Z');
+  });
+
+  it('includes the active work period when editing a running task', () => {
+    const todo = {
+      id: 'running-task',
+      createdAt: '2026-06-08T08:00:00.000Z',
+      firstStartedAt: '2026-06-08T09:00:00.000Z',
+      activeStartedAt: '2026-06-08T10:00:00.000Z',
+      completedAt: null,
+      timeSegments: [
+        {
+          startedAt: '2026-06-08T09:00:00.000Z',
+          endedAt: '2026-06-08T09:30:00.000Z',
+        },
+      ],
+    };
+
+    expect(
+      getEditableTaskTimeSegments(todo, new Date('2026-06-08T10:45:00.000Z')),
+    ).toEqual([
+      {
+        startedAt: '2026-06-08T09:00:00.000Z',
+        endedAt: '2026-06-08T09:30:00.000Z',
+      },
+      {
+        startedAt: '2026-06-08T10:00:00.000Z',
+        endedAt: '2026-06-08T10:45:00.000Z',
+      },
+    ]);
+  });
+
+  it('does not invent an end time for a task that has not started', () => {
+    expect(
+      getEditableTaskTimeSegments({
+        createdAt: '2026-06-08T08:00:00.000Z',
+        firstStartedAt: null,
+        activeStartedAt: null,
+        completedAt: null,
+        timeSegments: [],
+      }),
+    ).toEqual([
+      {
+        startedAt: '2026-06-08T08:00:00.000Z',
+        endedAt: null,
+      },
+    ]);
   });
 
   it('keeps active todos ordered newest first by creation time', () => {
