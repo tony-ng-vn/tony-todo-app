@@ -7,7 +7,7 @@
     formatDueDate,
     formatDuration,
     formatTaskTimestamp,
-    getDefaultTaskStartTimestamp,
+    getEditableTaskTimeSegments,
     getElapsedSeconds,
   } from '../../todoStore.js';
   import { iconCheck, iconPage, iconPause, iconPlay, iconX } from './icons.js';
@@ -118,24 +118,17 @@
     return JSON.stringify({
       timeSegments: item.timeSegments ?? [],
       firstStartedAt: item.firstStartedAt ?? null,
+      activeStartedAt: item.activeStartedAt ?? null,
       createdAt: item.createdAt ?? null,
       completedAt: item.completedAt ?? null,
     });
   }
 
   function timingBlocksForTodo(item) {
-    if (item.timeSegments?.length) {
-      return item.timeSegments.map((segment) => ({
-        startedAt: dateTimeLocalValue(segment.startedAt),
-        endedAt: dateTimeLocalValue(segment.endedAt),
-      }));
-    }
-    return [
-      {
-        startedAt: dateTimeLocalValue(getDefaultTaskStartTimestamp(item)),
-        endedAt: dateTimeLocalValue(item.completedAt),
-      },
-    ];
+    return getEditableTaskTimeSegments(item).map((segment) => ({
+      startedAt: dateTimeLocalValue(segment.startedAt),
+      endedAt: dateTimeLocalValue(segment.endedAt),
+    }));
   }
 
   function handleTimingInput(index, field, value) {
@@ -147,6 +140,15 @@
     if (!timingError) {
       onTimingChange(todo.id, timingBlocksDraft);
     }
+  }
+
+  function handleToggleDetails() {
+    if (!expanded) {
+      sourceTimingBlocks = timingBlocksSource(todo);
+      timingBlocksDraft = timingBlocksForTodo(todo);
+      timingError = '';
+    }
+    onToggleDetails(todo.id);
   }
 
   function validateTiming() {
@@ -254,7 +256,7 @@
       type="button"
       class="menubar-details-toggle"
       aria-expanded={expanded}
-      on:click={() => onToggleDetails(todo.id)}
+      on:click={handleToggleDetails}
     >
       <span class="menubar-task-title-row">
         <span class="menubar-task-title">{todo.title}</span>

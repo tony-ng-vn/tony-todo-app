@@ -12,6 +12,7 @@ try {
   const boardCardLayout = await inspectBoardCardLayout({ width: 1366, height: 900 });
   const duplicateTask = await inspectDuplicateTask({ width: 1366, height: 900 });
   const navigation = await inspectWorkspaceNavigation({ width: 1366, height: 900 });
+  const runningTimingEdit = await inspectRunningTimingEdit({ width: 1366, height: 900 });
   const failures = [
     ...assertNoOverflow(mobile),
     ...assertNoOverflow(desktop),
@@ -47,6 +48,7 @@ try {
     ...assertStartsWith(desktop.taskTiming, 'Started ', 'running task start label'),
     ...assertDraftInsertionCue(draftCue),
     ...assertWorkspaceNavigation(navigation),
+    ...assertRunningTimingEdit(runningTimingEdit),
   ];
 
   if (failures.length) {
@@ -100,6 +102,56 @@ async function inspectDuplicateTask(viewport) {
     return {
       taskCount: state.todos.length,
       draft: document.querySelector('[data-board-draft="not_started"]')?.value,
+    };
+  });
+  await page.close();
+  return result;
+}
+
+async function inspectRunningTimingEdit(viewport) {
+  const page = await browser.newPage({ viewport });
+  await page.clock.setFixedTime(new Date('2026-08-04T23:30:00.000Z'));
+  await page.addInitScript(() => {
+    localStorage.setItem('done-log-client-id', 'ui-smoke-running-timing');
+    localStorage.setItem(
+      'done-log-state',
+      JSON.stringify({
+        todos: [
+          {
+            id: 'running-timing-task',
+            title: 'Forgotten start time',
+            createdAt: '2026-08-04T23:30:00.000Z',
+            completedAt: null,
+            firstStartedAt: '2026-08-04T23:30:00.000Z',
+            activeStartedAt: '2026-08-04T23:30:00.000Z',
+            trackedSeconds: 0,
+            timeSegments: [],
+          },
+        ],
+      }),
+    );
+  });
+  await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
+  await page.clock.setFixedTime(new Date('2026-08-04T23:31:00.000Z'));
+  await page.click('[data-todo-id="running-timing-task"] .open-task-button');
+  await page.waitForSelector('.detail-start-picker');
+  await page.locator('.detail-start-picker').click();
+  await page.fill('.calendar-hour-input', '12');
+  await page.fill('.calendar-minute-input', '30');
+  await page.locator('.calendar-period-button', { hasText: 'PM' }).click();
+  await page.click('.calendar-apply');
+  await page.waitForTimeout(100);
+  const result = await page.evaluate(() => {
+    const task = JSON.parse(localStorage.getItem('done-log-state')).todos.find(
+      (item) => item.id === 'running-timing-task',
+    );
+    return {
+      completed: Boolean(task?.completedAt),
+      activeStartedAt: task?.activeStartedAt,
+      trackedSeconds: task?.trackedSeconds,
+      error: document.querySelector('.detail-timing-error')?.textContent.trim() ?? '',
+      startText: document.querySelector('.detail-start-picker')?.textContent.trim(),
+      endText: document.querySelector('.detail-end-picker')?.textContent.trim(),
     };
   });
   await page.close();
@@ -1145,6 +1197,15 @@ function assertPausedTimeline(result) {
     result.pausedTimeline.hasAddButton
     ? []
     : [`paused task timeline is missing or incomplete: ${JSON.stringify(result.pausedTimeline)}`];
+}
+
+function assertRunningTimingEdit(result) {
+  return result.completed === true &&
+    result.activeStartedAt === null &&
+    result.trackedSeconds === 4 * 60 * 60 + 60 &&
+    result.error === ''
+    ? []
+    : [`running timing edit did not finish the task with the visible end time: ${JSON.stringify(result)}`];
 }
 
 function assertExists(result, selector, label) {

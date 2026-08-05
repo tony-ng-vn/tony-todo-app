@@ -54,6 +54,7 @@ async function chooseCalendarDateTime(page, selector, value) {
 }
 
 try {
+  const runningTimingEdit = await inspectRunningTimingEdit();
   const page = await browser.newPage({ viewport: { width: 420, height: 640 } });
   await page.emulateMedia({ reducedMotion: 'reduce' });
   if (expectUpdateAvailable) {
@@ -664,6 +665,16 @@ try {
       `calendar controls did not share the custom picker or validate strictly: ${JSON.stringify({ calendarPresentation, invalidTimingMessage })}`,
     );
   }
+  if (
+    !runningTimingEdit.completed ||
+    runningTimingEdit.activeStartedAt !== null ||
+    runningTimingEdit.trackedSeconds !== 4 * 60 * 60 + 60 ||
+    runningTimingEdit.error !== ''
+  ) {
+    failures.push(
+      `running timing edit did not finish the task with the visible end time: ${JSON.stringify(runningTimingEdit)}`,
+    );
+  }
   if (final.completedTrackedSeconds !== 4 * 60 * 60 || final.completedTimeBlocks !== 2) {
     failures.push(`time blocks did not accumulate in the menu bar: ${JSON.stringify(final)}`);
   }
@@ -711,4 +722,60 @@ try {
   }
 } finally {
   await browser.close();
+}
+
+async function inspectRunningTimingEdit() {
+  const page = await browser.newPage({ viewport: { width: 772, height: 532 } });
+  await page.clock.setFixedTime(new Date('2026-08-04T23:30:00.000Z'));
+  await page.addInitScript(() => {
+    localStorage.setItem('done-log-client-id', 'menubar-running-timing');
+    localStorage.setItem(
+      'done-log-state',
+      JSON.stringify({
+        todos: [
+          {
+            id: 'menubar-running-timing',
+            title: 'Forgotten start time',
+            createdAt: '2026-08-04T23:30:00.000Z',
+            completedAt: null,
+            firstStartedAt: '2026-08-04T23:30:00.000Z',
+            activeStartedAt: '2026-08-04T23:30:00.000Z',
+            trackedSeconds: 0,
+            timeSegments: [],
+          },
+        ],
+      }),
+    );
+  });
+  await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
+  await page.clock.setFixedTime(new Date('2026-08-04T23:31:00.000Z'));
+  await page.click('[data-menubar-id="menubar-running-timing"] .menubar-details-toggle');
+  await page.waitForSelector('[data-menubar-details="menubar-running-timing"]');
+  await chooseCalendarDateTime(
+    page,
+    '[data-menubar-details="menubar-running-timing"] button[aria-label^="Start time"]',
+    '2026-08-04T12:30:00-07:00',
+  );
+  await page.waitForTimeout(100);
+  const result = await page.evaluate(() => {
+    const task = JSON.parse(localStorage.getItem('done-log-state')).todos.find(
+      (item) => item.id === 'menubar-running-timing',
+    );
+    return {
+      completed: Boolean(task?.completedAt),
+      activeStartedAt: task?.activeStartedAt,
+      trackedSeconds: task?.trackedSeconds,
+      error: document.querySelector(
+        '[data-menubar-details="menubar-running-timing"] .menubar-timing-error',
+      )?.textContent.trim() ?? '',
+      startText: document.querySelector(
+        '[data-menubar-details="menubar-running-timing"] button[aria-label^="Start time"]',
+      )?.textContent.trim(),
+      endText: document.querySelector(
+        '[data-menubar-details="menubar-running-timing"] button[aria-label^="End time"]',
+      )?.textContent.trim(),
+    };
+  });
+  await page.close();
+  return result;
 }

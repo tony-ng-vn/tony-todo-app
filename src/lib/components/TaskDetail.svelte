@@ -4,7 +4,10 @@
   import { linkifyText } from '../../linkify.js';
   import { expandTodoCommand, parseNoteTodos, toggleNoteTodo } from '../../noteTodos.js';
   import { getTextareaKeyEdit } from '../../textareaEditing.js';
-  import { formatTaskTimestamp, getDefaultTaskStartTimestamp } from '../../todoStore.js';
+  import {
+    formatTaskTimestamp,
+    getEditableTaskTimeSegments,
+  } from '../../todoStore.js';
 
   export let selectedTask = null;
   export let noteDraft = '';
@@ -67,38 +70,21 @@
     onDetailTitleCommit(todoId, title);
   }
 
-  function completedStartValue(todo) {
-    const timestamp = getDefaultTaskStartTimestamp(todo);
-    return timestamp ? toDateTimeLocalValue(timestamp) : '';
-  }
-
-  function completedEndValue(todo) {
-    return todo?.completedAt ? toDateTimeLocalValue(todo.completedAt) : '';
-  }
-
   function timingSource(todo) {
     return JSON.stringify({
       timeSegments: todo?.timeSegments ?? [],
       firstStartedAt: todo?.firstStartedAt ?? null,
+      activeStartedAt: todo?.activeStartedAt ?? null,
       createdAt: todo?.createdAt ?? null,
       completedAt: todo?.completedAt ?? null,
     });
   }
 
   function timingBlocksForTask(todo) {
-    if (todo?.timeSegments?.length) {
-      return todo.timeSegments.map((segment) => ({
-        startedAt: toDateTimeLocalValue(segment.startedAt),
-        endedAt: toDateTimeLocalValue(segment.endedAt),
-      }));
-    }
-
-    return [
-      {
-        startedAt: completedStartValue(todo),
-        endedAt: completedEndValue(todo),
-      },
-    ];
+    return getEditableTaskTimeSegments(todo).map((segment) => ({
+      startedAt: toDateTimeLocalValue(segment.startedAt),
+      endedAt: toDateTimeLocalValue(segment.endedAt),
+    }));
   }
 
   function completedDateValue(todo) {
@@ -239,6 +225,10 @@
   }
 
   function toDateTimeLocalValue(dateLike) {
+    if (!dateLike) {
+      return '';
+    }
+
     const date = new Date(dateLike);
     if (Number.isNaN(date.getTime())) {
       return '';
@@ -248,6 +238,10 @@
   }
 
   function toDateValue(dateLike) {
+    if (!dateLike) {
+      return '';
+    }
+
     const date = new Date(dateLike);
     if (Number.isNaN(date.getTime())) {
       return '';
