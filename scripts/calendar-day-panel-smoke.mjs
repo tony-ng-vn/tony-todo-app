@@ -6,10 +6,15 @@ targetUrl.searchParams.set('local', '1');
 const browser = await chromium.launch({ headless: true });
 
 try {
-  const page = await browser.newPage({
+  const context = await browser.newContext({
+    locale: 'en-US',
     viewport: { width: 1366, height: 900 },
     timezoneId: 'America/Los_Angeles',
   });
+  const page = await context.newPage();
+  const fixedNow = new Date('2026-08-05T19:00:00.000Z');
+  await page.clock.install({ time: fixedNow });
+  await page.clock.pauseAt(fixedNow);
   const browserErrors = [];
   page.on('console', (message) => {
     if (message.type() === 'error') {
@@ -77,6 +82,13 @@ try {
   await dayButton('2026-08-05').dblclick();
   await waitForInkDot('2026-08-05');
   await page.waitForSelector('.calendar-day-panel');
+  await page.getByRole('button', { name: 'Close daily timeline' }).waitFor();
+  const closeButtonHasFocus = await page
+    .getByRole('button', { name: 'Close daily timeline' })
+    .evaluate((node) => node === document.activeElement);
+  if (!closeButtonHasFocus) {
+    throw new Error('opening the daily timeline did not move focus to its close button');
+  }
 
   const todayState = await page.evaluate(() => {
     const selectedCell = document.querySelector('[data-calendar-date="2026-08-05"]');
@@ -123,11 +135,17 @@ try {
   if ((await dayButton('2026-08-05').getAttribute('aria-pressed')) !== 'true') {
     throw new Error('closing the daily timeline did not preserve the selected date');
   }
+  if (!(await dayButton('2026-08-05').evaluate((node) => node === document.activeElement))) {
+    throw new Error('closing the daily timeline did not restore focus to its date button');
+  }
 
   await dayButton('2026-08-05').dblclick();
   await page.waitForSelector('.calendar-day-panel');
-  await page.getByRole('button', { name: 'Close daily timeline' }).click();
+  await page.keyboard.press('Escape');
   await page.waitForSelector('.calendar-day-panel', { state: 'hidden' });
+  if (!(await dayButton('2026-08-05').evaluate((node) => node === document.activeElement))) {
+    throw new Error('Escape did not restore focus to the selected date button');
+  }
 
   await dayButton('2026-08-06').dblclick();
   await waitForInkDot('2026-08-06');

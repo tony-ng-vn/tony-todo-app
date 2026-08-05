@@ -1,4 +1,5 @@
 <script>
+  import { tick } from 'svelte';
   import { linkifyText } from '../../linkify.js';
   import { formatDuration, getElapsedSeconds } from '../../todoStore.js';
   import WorkspaceTabs from './WorkspaceTabs.svelte';
@@ -18,6 +19,8 @@
   const MAX_VISIBLE = 3;
   let selectedDateKey = null;
   let isDayPanelOpen = false;
+  let dayPanelCloseButton;
+  let dayPanelTrigger;
 
   $: selectedCell = selectedDateKey
     ? weeks.flat().find((cell) => cell.dateKey === selectedDateKey) ?? null
@@ -37,19 +40,28 @@
     focusedSeconds,
   )} focused`;
 
-  function openDay(cell) {
+  async function openDay(cell, trigger) {
+    dayPanelTrigger = trigger;
     selectedDateKey = cell.dateKey;
     isDayPanelOpen = true;
+    await tick();
+    dayPanelCloseButton?.focus();
   }
 
-  function closeDayPanel() {
+  async function closeDayPanel(restoreFocus = true) {
+    const trigger = dayPanelTrigger;
     isDayPanelOpen = false;
+    await tick();
+    if (restoreFocus) {
+      trigger?.focus();
+    }
+    dayPanelTrigger = null;
   }
 
   function handleDayKeydown(event, cell) {
     if (event.key === 'Enter' || event.key === ' ') {
       event.preventDefault();
-      openDay(cell);
+      openDay(cell, event.currentTarget);
     }
   }
 
@@ -60,7 +72,7 @@
   }
 
   function navigateCalendar(callback) {
-    closeDayPanel();
+    closeDayPanel(false);
     selectedDateKey = null;
     callback?.();
   }
@@ -157,7 +169,7 @@
               class="calendar-day-number"
               aria-label={`${formatDayLabel(cell.dateKey)}. Double-click to view completed tasks`}
               aria-pressed={cell.dateKey === selectedDateKey}
-              on:dblclick={() => openDay(cell)}
+              on:dblclick={(event) => openDay(cell, event.currentTarget)}
               on:keydown={(event) => handleDayKeydown(event, cell)}
             >{cell.day}</button>
             <ul class="calendar-cell-tasks">
@@ -195,7 +207,8 @@
           type="button"
           class="calendar-day-panel-close"
           aria-label="Close daily timeline"
-          on:click={closeDayPanel}
+          bind:this={dayPanelCloseButton}
+          on:click={() => closeDayPanel()}
         >x</button>
       </header>
 
