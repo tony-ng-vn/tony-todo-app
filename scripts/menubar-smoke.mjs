@@ -669,7 +669,9 @@ try {
     !runningTimingEdit.completed ||
     runningTimingEdit.activeStartedAt !== null ||
     runningTimingEdit.trackedSeconds !== 4 * 60 * 60 + 60 ||
-    runningTimingEdit.error !== ''
+    runningTimingEdit.error !== '' ||
+    runningTimingEdit.startText !== 'Aug 4, 12:30 PM' ||
+    runningTimingEdit.endText !== 'Aug 4, 4:31 PM'
   ) {
     failures.push(
       `running timing edit did not finish the task with the visible end time: ${JSON.stringify(runningTimingEdit)}`,
@@ -725,7 +727,10 @@ try {
 }
 
 async function inspectRunningTimingEdit() {
-  const page = await browser.newPage({ viewport: { width: 772, height: 532 } });
+  const page = await browser.newPage({
+    viewport: { width: 772, height: 532 },
+    timezoneId: 'America/Los_Angeles',
+  });
   await page.clock.setFixedTime(new Date('2026-08-04T23:30:00.000Z'));
   await page.addInitScript(() => {
     localStorage.setItem('done-log-client-id', 'menubar-running-timing');

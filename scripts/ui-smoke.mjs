@@ -109,7 +109,7 @@ async function inspectDuplicateTask(viewport) {
 }
 
 async function inspectRunningTimingEdit(viewport) {
-  const page = await browser.newPage({ viewport });
+  const page = await browser.newPage({ viewport, timezoneId: 'America/Los_Angeles' });
   await page.clock.setFixedTime(new Date('2026-08-04T23:30:00.000Z'));
   await page.addInitScript(() => {
     localStorage.setItem('done-log-client-id', 'ui-smoke-running-timing');
@@ -1203,7 +1203,9 @@ function assertRunningTimingEdit(result) {
   return result.completed === true &&
     result.activeStartedAt === null &&
     result.trackedSeconds === 4 * 60 * 60 + 60 &&
-    result.error === ''
+    result.error === '' &&
+    result.startText === 'Aug 4, 12:30 PM' &&
+    result.endText === 'Aug 4, 4:31 PM'
     ? []
     : [`running timing edit did not finish the task with the visible end time: ${JSON.stringify(result)}`];
 }
