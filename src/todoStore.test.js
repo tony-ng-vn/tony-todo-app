@@ -8,6 +8,7 @@ import {
   formatDueDate,
   matchesDueFilter,
   setTodoDueDate,
+  shiftDayKey,
   getBoardColumns,
   getBoardColumnId,
   getCalendarMonth,
@@ -41,6 +42,18 @@ import {
   updateTodoTitle,
   updateTodoNote,
 } from './todoStore.js';
+
+describe('day navigation', () => {
+  it('moves one local calendar day in either direction', () => {
+    expect(shiftDayKey('2026-08-11', -1)).toBe('2026-08-10');
+    expect(shiftDayKey('2026-08-11', 1)).toBe('2026-08-12');
+  });
+
+  it('crosses month and year boundaries', () => {
+    expect(shiftDayKey('2026-03-01', -1)).toBe('2026-02-28');
+    expect(shiftDayKey('2026-12-31', 1)).toBe('2027-01-01');
+  });
+});
 
 describe('duplicate task matching', () => {
   it('matches open tasks after normalizing case, punctuation, and whitespace', () => {
