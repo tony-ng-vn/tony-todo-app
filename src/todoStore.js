@@ -233,7 +233,7 @@ export function updateTodoTimeSegments(state, todoId, segments) {
 
   timeSegments.sort((first, second) => new Date(first.startedAt) - new Date(second.startedAt));
   const firstStartedAt = timeSegments[0].startedAt;
-  const completedAt = timeSegments.reduce(
+  const latestEndedAt = timeSegments.reduce(
     (latest, segment) =>
       new Date(segment.endedAt) > new Date(latest) ? segment.endedAt : latest,
     timeSegments[0].endedAt,
@@ -241,18 +241,23 @@ export function updateTodoTimeSegments(state, todoId, segments) {
 
   return {
     ...state,
-    todos: state.todos.map((todo) =>
-      todo.id === todoId
-        ? {
-            ...todo,
-            firstStartedAt,
-            activeStartedAt: null,
-            completedAt,
-            trackedSeconds: totalTimeSegmentSeconds(timeSegments),
-            timeSegments,
-          }
-        : todo,
-    ),
+    todos: state.todos.map((todo) => {
+      if (todo.id !== todoId) {
+        return todo;
+      }
+
+      const wasCompleted = Boolean(todo.completedAt);
+      const wasRunning = Boolean(todo.activeStartedAt);
+
+      return {
+        ...todo,
+        firstStartedAt,
+        activeStartedAt: wasRunning ? latestEndedAt : null,
+        completedAt: wasCompleted ? latestEndedAt : null,
+        trackedSeconds: totalTimeSegmentSeconds(timeSegments),
+        timeSegments,
+      };
+    }),
   };
 }
 

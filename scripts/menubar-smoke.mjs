@@ -666,15 +666,15 @@ try {
     );
   }
   if (
-    !runningTimingEdit.completed ||
-    runningTimingEdit.activeStartedAt !== null ||
+    runningTimingEdit.completed ||
+    runningTimingEdit.activeStartedAt !== '2026-08-04T23:31:00.000Z' ||
     runningTimingEdit.trackedSeconds !== 4 * 60 * 60 + 60 ||
     runningTimingEdit.error !== '' ||
     runningTimingEdit.startText !== 'Aug 4, 12:30 PM' ||
     runningTimingEdit.endText !== 'Aug 4, 4:31 PM'
   ) {
     failures.push(
-      `running timing edit did not finish the task with the visible end time: ${JSON.stringify(runningTimingEdit)}`,
+      `running timing edit did not preserve the active task: ${JSON.stringify(runningTimingEdit)}`,
     );
   }
   if (final.completedTrackedSeconds !== 4 * 60 * 60 || final.completedTimeBlocks !== 2) {

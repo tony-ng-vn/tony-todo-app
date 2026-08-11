@@ -737,6 +737,7 @@ describe('todo day summary', () => {
     let state = createInitialState();
     state = addTodo(state, 'Split work', new Date('2026-06-10T08:00:00.000Z'));
     const todoId = state.todos[0].id;
+    state = completeTodo(state, todoId, new Date('2026-06-10T11:00:00.000Z'));
 
     state = updateTodoTimeSegments(state, todoId, [
       {
@@ -776,6 +777,55 @@ describe('todo day summary', () => {
     expect(state.todos[0]).toMatchObject({
       completedAt: '2026-06-10T11:15:00.000Z',
       trackedSeconds: 90 * 60,
+    });
+  });
+
+  it('keeps a paused task open when its time blocks are edited', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Adjust paused work', new Date('2026-06-10T08:00:00.000Z'));
+    const todoId = state.todos[0].id;
+    state = startTodoTimer(state, todoId, new Date('2026-06-10T09:00:00.000Z'));
+    state = pauseTodoTimer(state, todoId, new Date('2026-06-10T09:30:00.000Z'));
+
+    state = updateTodoTimeSegments(state, todoId, [
+      {
+        startedAt: '2026-06-10T08:45:00.000Z',
+        endedAt: '2026-06-10T09:45:00.000Z',
+      },
+    ]);
+
+    expect(state.todos[0]).toMatchObject({
+      firstStartedAt: '2026-06-10T08:45:00.000Z',
+      activeStartedAt: null,
+      completedAt: null,
+      trackedSeconds: 60 * 60,
+      timeSegments: [
+        {
+          startedAt: '2026-06-10T08:45:00.000Z',
+          endedAt: '2026-06-10T09:45:00.000Z',
+        },
+      ],
+    });
+  });
+
+  it('keeps a running task active when its time blocks are edited', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Adjust active work', new Date('2026-06-10T08:00:00.000Z'));
+    const todoId = state.todos[0].id;
+    state = startTodoTimer(state, todoId, new Date('2026-06-10T10:00:00.000Z'));
+
+    state = updateTodoTimeSegments(state, todoId, [
+      {
+        startedAt: '2026-06-10T09:30:00.000Z',
+        endedAt: '2026-06-10T10:45:00.000Z',
+      },
+    ]);
+
+    expect(state.todos[0]).toMatchObject({
+      firstStartedAt: '2026-06-10T09:30:00.000Z',
+      activeStartedAt: '2026-06-10T10:45:00.000Z',
+      completedAt: null,
+      trackedSeconds: 75 * 60,
     });
   });
 
