@@ -2,8 +2,8 @@
   import { tick } from 'svelte';
   import CalendarPicker from './CalendarPicker.svelte';
   import { linkifyText } from '../../linkify.js';
-  import { formatTaskTimestamp } from '../../todoStore.js';
-  import { iconPage } from './icons.js';
+  import { formatTaskTimestamp, shiftDayKey } from '../../todoStore.js';
+  import { iconChevronLeft, iconChevronRight, iconPage } from './icons.js';
 
   export let summary = [];
   export let selectedDay;
@@ -67,6 +67,10 @@
     const date = new Date(completedAt);
     return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
   }
+
+  function changeSelectedDay(offset) {
+    selectedDay = shiftDayKey(selectedDay, offset);
+  }
 </script>
 
 <aside class="summary-panel" aria-labelledby="summary-heading">
@@ -75,7 +79,29 @@
       <p class="eyebrow">Daily ledger</p>
       <h2 id="summary-heading">Today recap</h2>
     </div>
-    <CalendarPicker id="summary-date" value={selectedDay} label="Select recap date" onChange={(nextDate) => (selectedDay = nextDate)} />
+    <div class="summary-date-navigation" aria-label="Recap day navigation">
+      <button
+        id="summary-previous-day"
+        type="button"
+        class="summary-day-button"
+        aria-label="View previous day"
+        title="Previous day"
+        on:click={() => changeSelectedDay(-1)}
+      >
+        {@html iconChevronLeft()}
+      </button>
+      <CalendarPicker id="summary-date" value={selectedDay} label="Select recap date" onChange={(nextDate) => (selectedDay = nextDate)} />
+      <button
+        id="summary-next-day"
+        type="button"
+        class="summary-day-button"
+        aria-label="View next day"
+        title="Next day"
+        on:click={() => changeSelectedDay(1)}
+      >
+        {@html iconChevronRight()}
+      </button>
+    </div>
   </div>
   <div class="summary-list" id="summary-list">
     {#if summary.length}

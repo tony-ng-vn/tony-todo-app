@@ -75,3 +75,19 @@ export function iconPlus() {
     </svg>
   `;
 }
+
+export function iconChevronLeft() {
+  return `
+    <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M10 3.5 5.5 8l4.5 4.5" />
+    </svg>
+  `;
+}
+
+export function iconChevronRight() {
+  return `
+    <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="m6 3.5 4.5 4.5L6 12.5" />
+    </svg>
+  `;
+}

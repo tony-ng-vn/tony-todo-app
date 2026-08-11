@@ -13,11 +13,14 @@ try {
   const duplicateTask = await inspectDuplicateTask({ width: 1366, height: 900 });
   const navigation = await inspectWorkspaceNavigation({ width: 1366, height: 900 });
   const runningTimingEdit = await inspectRunningTimingEdit({ width: 1366, height: 900 });
+  const recapDayNavigation = await inspectRecapDayNavigation({ width: 1366, height: 900 });
   const failures = [
     ...assertNoOverflow(mobile),
     ...assertNoOverflow(desktop),
     ...assertMinimumTarget(mobile, '#todo-title', 44, 'mobile task input'),
     ...assertMinimumTarget(mobile, '#summary-date', 44, 'mobile date picker'),
+    ...assertMinimumTarget(mobile, '#summary-previous-day', 44, 'mobile previous-day button'),
+    ...assertMinimumTarget(mobile, '#summary-next-day', 44, 'mobile next-day button'),
     ...assertMinimumTarget(mobile, '.theme-toggle', 34, 'mobile theme toggle'),
     ...assertMinimumContrast(mobile, '.todo-item button', 4.5, 'Done button'),
     ...assertHasMotion(mobile, '.input-row button', 'Add button'),
@@ -49,6 +52,7 @@ try {
     ...assertDraftInsertionCue(draftCue),
     ...assertWorkspaceNavigation(navigation),
     ...assertRunningTimingEdit(runningTimingEdit),
+    ...assertRecapDayNavigation(recapDayNavigation),
   ];
 
   if (failures.length) {
@@ -57,6 +61,22 @@ try {
   }
 } finally {
   await browser.close();
+}
+
+async function inspectRecapDayNavigation(viewport) {
+  const page = await browser.newPage({ viewport });
+  await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
+
+  const initialDate = await page.locator('#summary-date').textContent();
+  await page.locator('#summary-previous-day').click();
+  const previousDate = await page.locator('#summary-date').textContent();
+  await page.locator('#summary-next-day').click();
+  const returnedDate = await page.locator('#summary-date').textContent();
+  await page.locator('#summary-next-day').click();
+  const nextDate = await page.locator('#summary-date').textContent();
+  await page.close();
+
+  return { initialDate, previousDate, returnedDate, nextDate };
 }
 
 async function inspectDuplicateTask(viewport) {
@@ -536,6 +556,8 @@ async function inspectViewport(viewport, isMobile) {
       rects: {
         '#todo-title': rectFor('#todo-title'),
         '#summary-date': rectFor('#summary-date'),
+        '#summary-previous-day': rectFor('#summary-previous-day'),
+        '#summary-next-day': rectFor('#summary-next-day'),
         '.theme-toggle': rectFor('.theme-toggle'),
         '.workspace': rectFor('.workspace'),
       },
@@ -1208,6 +1230,14 @@ function assertRunningTimingEdit(result) {
     result.endText === 'Aug 4, 4:31 PM'
     ? []
     : [`running timing edit did not finish the task with the visible end time: ${JSON.stringify(result)}`];
+}
+
+function assertRecapDayNavigation(result) {
+  return result.initialDate !== result.previousDate &&
+    result.initialDate === result.returnedDate &&
+    result.initialDate !== result.nextDate
+    ? []
+    : [`recap day controls did not move one day backward and forward: ${JSON.stringify(result)}`];
 }
 
 function assertExists(result, selector, label) {

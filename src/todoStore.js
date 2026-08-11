@@ -911,6 +911,13 @@ export function formatDayKey(date) {
   return `${year}-${month}-${day}`;
 }
 
+export function shiftDayKey(dayKey, offset) {
+  const [year, month, day] = dayKey.split('-').map(Number);
+  const shiftedDate = new Date(year, month - 1, day);
+  shiftedDate.setDate(shiftedDate.getDate() + offset);
+  return formatDayKey(shiftedDate);
+}
+
 export function getMillisecondsUntilNextDay(now = new Date()) {
   const nextDay = new Date(now);
   nextDay.setHours(24, 0, 0, 0);
