@@ -1,6 +1,6 @@
 <script>
   import { tick } from 'svelte';
-  import { shortenLinksText } from '../../linkify.js';
+  import { getStandaloneWebUrl, shortenLinksText } from '../../linkify.js';
   import { expandTodoCommand, parseNoteTodos, toggleNoteTodo } from '../../noteTodos.js';
   import { getTextareaKeyEdit } from '../../textareaEditing.js';
   import {
@@ -12,6 +12,7 @@
   } from '../../todoStore.js';
   import CalendarPicker from './CalendarPicker.svelte';
   import { iconCheck, iconPage, iconPause, iconPlay, iconX } from './icons.js';
+  import MenubarLinkTitle from './MenubarLinkTitle.svelte';
 
   export let todo;
   export let expanded = false;
@@ -71,6 +72,7 @@
   $: isRunning = Boolean(todo.activeStartedAt);
   $: isCompleted = Boolean(todo.completedAt);
   $: isPaused = Boolean(todo.firstStartedAt && !todo.activeStartedAt && !todo.completedAt);
+  $: taskUrl = getStandaloneWebUrl(todo.title);
   $: duration = formatDuration(getElapsedSeconds(todo));
   $: timingBlocksTotal = timingBlocksDraft.reduce((total, block) => {
     const start = new Date(block.startedAt);
@@ -244,6 +246,21 @@
   }
 </script>
 
+{#snippet taskMetadata()}
+  <span class="menubar-task-meta">
+    {isCompleted ? 'Finished' : isRunning ? 'Tracking' : 'Duration'} {duration}
+    {#if todo.dueDate} - due {formatDueDate(todo.dueDate)}{/if}
+  </span>
+  {#if todo.firstStartedAt}
+    <span class="menubar-task-started">
+      Started{' '}<time datetime={todo.firstStartedAt}>{formatTaskTimestamp(todo.firstStartedAt)}</time>
+    </span>
+  {/if}
+  {#if todo.progressLabel}
+    <span class="menubar-task-progress">{todo.progressLabel}</span>
+  {/if}
+{/snippet}
+
 <article
   class:is-running={isRunning}
   class:is-paused={isPaused}
@@ -253,51 +270,64 @@
 >
   <div class="menubar-task-summary">
     <span class="menubar-task-dot" aria-hidden="true"></span>
-    <button
-      type="button"
-      class="menubar-details-toggle"
-      aria-expanded={expanded}
-      on:click={handleToggleDetails}
-    >
-      <span class="menubar-task-title-row">
-        <span class="menubar-task-title">{shortenLinksText(todo.title)}</span>
-        {#if isPaused}<span class="menubar-paused-badge">Paused</span>{/if}
-      </span>
-      <span class="menubar-task-meta">
-        {isCompleted ? 'Finished' : isRunning ? 'Tracking' : 'Duration'} {duration}
-        {#if todo.dueDate} - due {formatDueDate(todo.dueDate)}{/if}
-      </span>
-      {#if todo.firstStartedAt}
-        <span class="menubar-task-started">
-          Started{' '}<time datetime={todo.firstStartedAt}>{formatTaskTimestamp(todo.firstStartedAt)}</time>
+    {#if taskUrl}
+      <div class="menubar-details-toggle">
+        <span class="menubar-task-title-row">
+          <MenubarLinkTitle url={taskUrl} fallbackTitle={shortenLinksText(todo.title)} />
+          {#if isPaused}<span class="menubar-paused-badge">Paused</span>{/if}
         </span>
-      {/if}
-      {#if todo.progressLabel}
-        <span class="menubar-task-progress">{todo.progressLabel}</span>
-      {/if}
-    </button>
-    {#if !isCompleted}
+        {@render taskMetadata()}
+      </div>
+    {:else}
+      <button
+        type="button"
+        class="menubar-details-toggle"
+        aria-expanded={expanded}
+        on:click={handleToggleDetails}
+      >
+        <span class="menubar-task-title-row">
+          <span class="menubar-task-title">{shortenLinksText(todo.title)}</span>
+          {#if isPaused}<span class="menubar-paused-badge">Paused</span>{/if}
+        </span>
+        {@render taskMetadata()}
+      </button>
+    {/if}
+    {#if taskUrl || !isCompleted}
       <div class="menubar-task-actions">
-        <button
-          type="button"
-          class:menubar-pause={isRunning}
-          class:menubar-start={!isRunning}
-          class="menubar-icon-button"
-          aria-label={`${isRunning ? 'Pause' : 'Start'} ${todo.title}`}
-          title={isRunning ? 'Pause' : 'Start'}
-          on:click={() => onTimerAction(isRunning ? 'pause' : 'start', todo.id)}
-        >
-          {@html isRunning ? iconPause() : iconPlay()}
-        </button>
-        <button
-          type="button"
-          class="menubar-icon-button menubar-finish"
-          aria-label={`${todo.isProgressive ? 'Log progress for' : 'Finish'} ${todo.title}`}
-          title={todo.isProgressive ? 'Log progress' : 'Finish'}
-          on:click={() => onComplete(todo.id)}
-        >
-          {@html iconCheck()}
-        </button>
+        {#if taskUrl}
+          <button
+            type="button"
+            class="menubar-icon-button"
+            aria-label={`Open ${todo.title} task details`}
+            title="Task details"
+            aria-expanded={expanded}
+            on:click={handleToggleDetails}
+          >
+            {@html iconPage()}
+          </button>
+        {/if}
+        {#if !isCompleted}
+          <button
+            type="button"
+            class:menubar-pause={isRunning}
+            class:menubar-start={!isRunning}
+            class="menubar-icon-button"
+            aria-label={`${isRunning ? 'Pause' : 'Start'} ${todo.title}`}
+            title={isRunning ? 'Pause' : 'Start'}
+            on:click={() => onTimerAction(isRunning ? 'pause' : 'start', todo.id)}
+          >
+            {@html isRunning ? iconPause() : iconPlay()}
+          </button>
+          <button
+            type="button"
+            class="menubar-icon-button menubar-finish"
+            aria-label={`${todo.isProgressive ? 'Log progress for' : 'Finish'} ${todo.title}`}
+            title={todo.isProgressive ? 'Log progress' : 'Finish'}
+            on:click={() => onComplete(todo.id)}
+          >
+            {@html iconCheck()}
+          </button>
+        {/if}
       </div>
     {/if}
   </div>

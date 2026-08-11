@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linkifyText, shortenLinksText } from './linkify.js';
+import { getStandaloneWebUrl, linkifyText, shortenLinksText } from './linkify.js';
 
 describe('linkifyText', () => {
   it('escapes plain text before rendering', () => {
@@ -34,5 +34,24 @@ describe('shortenLinksText', () => {
     expect(
       shortenLinksText('Review https://docs.example.com/a/very/long/path and https://x.com/example'),
     ).toBe('Review docs.example.com and X');
+  });
+
+  it('preserves punctuation after a shortened link', () => {
+    expect(shortenLinksText('Review https://docs.example.com/path, then reply.')).toBe(
+      'Review docs.example.com, then reply.',
+    );
+  });
+});
+
+describe('getStandaloneWebUrl', () => {
+  it('returns a trimmed http link when it is the entire task title', () => {
+    expect(getStandaloneWebUrl('  https://youtu.be/abc123?t=4  ')).toBe(
+      'https://youtu.be/abc123?t=4',
+    );
+  });
+
+  it('does not treat surrounding task text or unsafe schemes as a standalone web link', () => {
+    expect(getStandaloneWebUrl('Watch https://youtu.be/abc123')).toBeNull();
+    expect(getStandaloneWebUrl('javascript:alert(1)')).toBeNull();
   });
 });
