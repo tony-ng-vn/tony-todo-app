@@ -25,3 +25,9 @@ Design rules:
 - Keep this app in the glass design system: translucent surfaces, blurred backdrops, soft inset highlights, and restrained borders.
 - Never ship visible scrollbars. Scrollable regions should remain scrollable but hide native scrollbar rails/thumbs.
 <!-- INSFORGE:END -->
+
+## CI verification
+
+- Before pushing or opening a PR from macOS, run `npm run verify` so local verification matches the required web and native CI checks.
+- When macOS is unavailable, run `npm run verify:web` and rely on the required `Native menu bar` GitHub check for the native build.
+- Keep the canonical verification commands in `package.json`; when a CI command changes, update the matching npm script in the same commit.
