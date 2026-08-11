@@ -29,6 +29,10 @@ export function linkifyText(value) {
   return rendered + escapeHtml(text.slice(lastIndex));
 }
 
+export function shortenLinksText(value) {
+  return String(value).replace(URL_PATTERN, (url) => labelForUrl(url));
+}
+
 export function labelForUrl(url) {
   try {
     const parsedUrl = new URL(url);

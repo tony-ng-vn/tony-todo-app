@@ -1,6 +1,6 @@
 <script>
   import { tick } from 'svelte';
-  import CalendarPicker from './CalendarPicker.svelte';
+  import { shortenLinksText } from '../../linkify.js';
   import { expandTodoCommand, parseNoteTodos, toggleNoteTodo } from '../../noteTodos.js';
   import { getTextareaKeyEdit } from '../../textareaEditing.js';
   import {
@@ -10,6 +10,7 @@
     getEditableTaskTimeSegments,
     getElapsedSeconds,
   } from '../../todoStore.js';
+  import CalendarPicker from './CalendarPicker.svelte';
   import { iconCheck, iconPage, iconPause, iconPlay, iconX } from './icons.js';
 
   export let todo;
@@ -259,7 +260,7 @@
       on:click={handleToggleDetails}
     >
       <span class="menubar-task-title-row">
-        <span class="menubar-task-title">{todo.title}</span>
+        <span class="menubar-task-title">{shortenLinksText(todo.title)}</span>
         {#if isPaused}<span class="menubar-paused-badge">Paused</span>{/if}
       </span>
       <span class="menubar-task-meta">

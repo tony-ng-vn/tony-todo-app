@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { linkifyText } from './linkify.js';
+import { linkifyText, shortenLinksText } from './linkify.js';
 
 describe('linkifyText', () => {
   it('escapes plain text before rendering', () => {
@@ -26,5 +26,13 @@ describe('linkifyText', () => {
     expect(linkifyText('Read https://docs.example.com/path')).toBe(
       'Read <a href="https://docs.example.com/path" target="_blank" rel="noreferrer noopener">docs.example.com</a>',
     );
+  });
+});
+
+describe('shortenLinksText', () => {
+  it('shortens links without changing the surrounding task text', () => {
+    expect(
+      shortenLinksText('Review https://docs.example.com/a/very/long/path and https://x.com/example'),
+    ).toBe('Review docs.example.com and X');
   });
 });
