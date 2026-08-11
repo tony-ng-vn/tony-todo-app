@@ -22,6 +22,7 @@ const prePushHook = readFileSync(
   new URL('../.githooks/pre-push', import.meta.url),
   'utf8',
 );
+const gitignore = readFileSync(new URL('../.gitignore', import.meta.url), 'utf8');
 
 describe('CI workflow', () => {
   it('gates pull requests and main pushes with the deploy-critical checks', () => {
@@ -59,18 +60,25 @@ describe('CI workflow', () => {
     expect(packageJson.scripts['check:node-toolchain']).toBe(
       'node scripts/check-node-toolchain.mjs',
     );
-    expect(packageJson.scripts['verify:web:checks']).toBe(
-      'npm test && npm run build && npm run audit:dependencies',
+    expect(packageJson.scripts.verify).toBe(
+      'node scripts/ci-verify.mjs --scope all',
     );
     expect(packageJson.scripts['verify:web']).toBe(
-      'npm run check:node-toolchain && npm ci && npm run verify:web:checks',
+      'node scripts/ci-verify.mjs --scope web',
     );
     expect(packageJson.scripts['verify:native']).toBe(
-      'npm run check:swift-toolchain && npm run test:native-menubar && npm run build:native-menubar && npm run menubar:bundle',
+      'node scripts/ci-verify.mjs --scope native',
     );
-    expect(packageJson.scripts.verify).toBe(
-      'npm run verify:web && npm run verify:native',
+    expect(packageJson.scripts['ci:replay']).toBe(
+      'node scripts/ci-replay.mjs',
     );
+    expect(packageJson.scripts['ci:repair']).toBe(
+      'node scripts/ci-repair.mjs',
+    );
+    expect(packageJson.scripts['ci:promote']).toBe(
+      'node scripts/ci-promote-lesson.mjs',
+    );
+    expect(gitignore).toContain('.ci-learning');
     expect(packageJson.scripts.prepare).toBe(
       'node scripts/install-git-hooks.mjs',
     );
@@ -115,6 +123,16 @@ describe('CI workflow', () => {
     expect(actionReferences.length).toBeGreaterThan(0);
     for (const reference of actionReferences) {
       expect(reference).toMatch(/@[a-f0-9]{40}$/);
+    }
+  });
+
+  it('preserves redacted failure packets from both CI environments', () => {
+    for (const job of [workflow.jobs.verify, workflow.jobs['native-menubar']]) {
+      const upload = job.steps.find((step) => step.name.startsWith('Preserve '));
+      expect(upload.if).toBe('failure()');
+      expect(upload.uses).toMatch(/^actions\/upload-artifact@[0-9a-f]{40}$/);
+      expect(upload.with.path).toBe('.ci-learning/latest-failure.json');
+      expect(upload.with['retention-days']).toBe(30);
     }
   });
 });

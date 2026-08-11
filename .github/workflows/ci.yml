@@ -34,6 +34,15 @@ jobs:
       - name: Run canonical web verification
         run: npm run verify:web
 
+      - name: Preserve web failure packet
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ci-learning-web-${{ github.run_id }}
+          path: .ci-learning/latest-failure.json
+          if-no-files-found: warn
+          retention-days: 30
+
   native-menubar:
     name: Native menu bar
     runs-on: macos-15
@@ -45,3 +54,12 @@ jobs:
 
       - name: Run canonical native verification
         run: npm run verify:native
+
+      - name: Preserve native failure packet
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ci-learning-native-${{ github.run_id }}
+          path: .ci-learning/latest-failure.json
+          if-no-files-found: warn
+          retention-days: 30

@@ -1,0 +1,33 @@
+{
+  "schemaVersion": 1,
+  "id": "npm-clean-install-lockfile",
+  "title": "Keep package.json and package-lock.json synchronized",
+  "appliesTo": {
+    "phases": ["web.clean-install"],
+    "projectKinds": ["node"]
+  },
+  "match": [
+    {
+      "kind": "regex",
+      "value": "npm ci can only install|package.json and package-lock.json are not in sync|Missing: .+ from lock file"
+    }
+  ],
+  "failureExamples": [
+    "npm error npm ci can only install packages when your package.json and package-lock.json are in sync. Missing: example@1.0.0 from lock file"
+  ],
+  "harness": {
+    "command": "npx vitest run src/ciWorkflow.test.js"
+  },
+  "guidance": [
+    {
+      "when": "A dependency was intentionally added, removed, or upgraded.",
+      "solution": "Use the required Node and npm toolchain to regenerate the lockfile, then review the dependency diff and rerun npm ci.",
+      "tradeoffs": "Manual lockfile edits are fragile and can conceal transitive changes."
+    },
+    {
+      "when": "package.json changed accidentally or during conflict resolution.",
+      "solution": "Restore only the unintended manifest change and keep the existing lockfile.",
+      "tradeoffs": "Regenerating the lockfile in this case creates unrelated dependency churn."
+    }
+  ]
+}
