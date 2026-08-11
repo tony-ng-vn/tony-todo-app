@@ -58,6 +58,9 @@ describe('CI workflow', () => {
     expect(packageJson.scripts['audit:dependencies']).toBe(
       'npm audit --audit-level=high',
     );
+    expect(packageJson.scripts['check:swift-toolchain']).toBe(
+      'node scripts/check-swift-toolchain.mjs',
+    );
     expect(packageJson.scripts['verify:web']).toBe(
       'npm test && npm run build && npm run audit:dependencies',
     );
@@ -71,7 +74,7 @@ describe('CI workflow', () => {
 
   it('checks dependency health before feature work discovers advisories', () => {
     expect(dependencyWorkflow.on.schedule).toEqual([
-      { cron: '0 15 * * 1-5' },
+      { cron: '17 15 * * 1-5' },
     ]);
     expect(dependencyWorkflow.on).toHaveProperty('workflow_dispatch');
     expect(dependencyWorkflow.jobs.audit.steps.at(-1).run).toBe(

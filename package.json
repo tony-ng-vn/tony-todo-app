@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "audit:dependencies": "npm audit --audit-level=high",
-    "check:swift-toolchain": "bash scripts/check-swift-toolchain.sh",
+    "check:swift-toolchain": "node scripts/check-swift-toolchain.mjs",
     "test": "vitest run",
     "test:native-menubar": "swift test --package-path native",
     "test:ui": "node scripts/ui-smoke.mjs",
