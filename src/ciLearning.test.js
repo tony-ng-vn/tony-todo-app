@@ -8,6 +8,7 @@ import {
   lessonMatches,
   matchLessons,
   normalizeFailureOutput,
+  parseNulDelimitedList,
   redactSensitiveText,
   selectStages,
 } from '../scripts/ci-learning-core.mjs';
@@ -23,14 +24,25 @@ describe('CI learning core', () => {
     );
   });
 
-  it('produces identical fingerprints for scripts/native paths across machines', () => {
-    const macOutput = `FAIL /Users/alice/repo/scripts/ci-verify.mjs:19:4\nDuration 128ms`;
-    const linuxOutput = `FAIL /home/runner/repo/scripts/ci-verify.mjs:44:8\nDuration 941ms`;
+  it('produces identical fingerprints for scripts/native paths with differing intermediate dirs', () => {
+    // realistic machine-specific intermediates: a local checkout path vs a GitHub Actions runner path
+    const macOutput = `FAIL /Users/alice/Desktop/tony-todo-app/scripts/x.mjs:19:4\nDuration 128ms`;
+    const linuxOutput = `FAIL /home/runner/work/tony-todo-app/tony-todo-app/scripts/x.mjs:44:8\nDuration 941ms`;
 
     expect(normalizeFailureOutput(macOutput)).toBe(normalizeFailureOutput(linuxOutput));
     expect(fingerprintFailure('web.tests', macOutput)).toBe(
       fingerprintFailure('web.tests', linuxOutput),
     );
+  });
+
+  it('collapses machine roots before src, scripts, or native alike', () => {
+    const src = normalizeFailureOutput('/Users/alice/repo/src/example.test.js');
+    const scripts = normalizeFailureOutput('/home/runner/work/repo/repo/scripts/ci-verify.mjs');
+    const native = normalizeFailureOutput('/Users/bob/dev/repo/native/Sources/Example.swift');
+
+    expect(src).toContain('<root>/src/');
+    expect(scripts).toContain('<root>/scripts/');
+    expect(native).toContain('<root>/native/');
   });
 
   it('normalizes a Windows-style backslashed home path the same as a posix one', () => {
@@ -53,6 +65,20 @@ describe('CI learning core', () => {
     expect(serialized).not.toContain('/Users/alice');
     expect(record.outputTail).not.toContain('/Users/alice');
     expect(record.outputTail).toContain('19');
+  });
+
+  it('scrubs a Windows-style backslashed username out of outputTail without converting separators', () => {
+    const record = buildFailureRecord({
+      phase: 'native.tests',
+      command: 'swift test',
+      exitCode: 1,
+      output: 'FAIL C:\\Users\\carol\\project\\native\\x.swift:19:4\nDuration 128ms',
+      context: { platform: 'win32' },
+    });
+
+    expect(record.outputTail).not.toContain('carol');
+    // native separators stay untouched outside the scrubbed username segment
+    expect(record.outputTail).toContain('\\project\\native\\x.swift');
   });
 
   it('redacts common credentials before evidence is cached or sent to an agent', () => {
@@ -214,6 +240,24 @@ describe('CI learning core', () => {
     expect(lesson.harness.command).toBe('npm run build');
     expect(lesson.guidance[0].solution).toContain('Restored the public export');
     expect(lesson.evidence.attempts).toBe(2);
+  });
+});
+
+describe('parseNulDelimitedList', () => {
+  it('splits on NUL and drops the trailing empty entry, without trimming filenames', () => {
+    const output = 'src/example.js\0notes/plan.md\0';
+
+    expect(parseNulDelimitedList(output)).toEqual(['src/example.js', 'notes/plan.md']);
+  });
+
+  it('preserves a filename containing a newline or significant whitespace', () => {
+    const output = 'weird file\nname.txt\0trailing-space .txt\0';
+
+    expect(parseNulDelimitedList(output)).toEqual(['weird file\nname.txt', 'trailing-space .txt']);
+  });
+
+  it('returns an empty array for empty output', () => {
+    expect(parseNulDelimitedList('')).toEqual([]);
   });
 });
 

@@ -22,11 +22,13 @@ export function redactSensitiveText(value) {
 }
 
 // keeps machine-specific paths from fragmenting fingerprints or leaking usernames into artifacts
-// the optional drive prefix absorbs a Windows-style "C:" that precedes a slash-converted home path
+// the optional drive prefix absorbs a Windows-style "C:" before the home segment; [\\/] accepts
+// either separator directly so a username is gone even where backslashes are never converted
+// (buildFailureRecord's outputTail intentionally keeps native separators everywhere else)
 function scrubMachinePaths(value) {
   return String(value)
-    .replace(/(?:[A-Za-z]:)?\/Users\/[^/\s]+/g, '<home>')
-    .replace(/(?:[A-Za-z]:)?\/home\/[^/\s]+/g, '<home>')
+    .replace(/(?:[A-Za-z]:)?[\\/]Users[\\/][^\\/\s]+/g, '<home>')
+    .replace(/(?:[A-Za-z]:)?[\\/]home[\\/][^\\/\s]+/g, '<home>')
     // match /private/tmp before the shorter /tmp alternative so macOS's symlinked tmp collapses too
     .replace(/(?:\/private)?\/tmp\b/g, '<tmp>');
 }
@@ -34,8 +36,10 @@ function scrubMachinePaths(value) {
 export function normalizeFailureOutput(value) {
   // backslash-to-slash must run before the path scrub so a Windows "C:\Users\name" path matches it too
   return scrubMachinePaths(redactSensitiveText(value).replace(/\\/g, '/'))
-    // collapse whatever remains of the machine root down to a single stable marker for src paths
-    .replace(/(?:<home>|<tmp>)(?:\/[^\s:]+)*\/src\//g, '<root>/src/')
+    // collapse whatever remains of the machine root down to one stable marker, regardless of how
+    // many machine-specific intermediate directories (checkout path, CI runner workspace, ...) sit
+    // in between, for every repo area a verification stage can report from
+    .replace(/(?:<home>|<tmp>)(?:\/[^\s:]+)*\/(src|scripts|native)\//g, '<root>/$1/')
     .replace(/:\d+:\d+\b/g, ':<line>:<column>')
     .replace(/\b(?:Duration\s+)?\d+(?:\.\d+)?m?s\b/gi, '<duration>')
     .replace(/[ \t]+$/gm, '')
@@ -144,6 +148,12 @@ export function selectStages(plan, scope, mode, platform) {
       : plan.scopes[scope];
 
   return mode === 'push' ? stages.filter((stage) => stage.pushGate !== false) : stages;
+}
+
+// git's -z output is NUL-delimited so filenames with newlines, quotes, or trailing
+// whitespace survive intact; do not trim the raw output before splitting
+export function parseNulDelimitedList(output) {
+  return String(output).split('\0').filter(Boolean);
 }
 
 export function loadLessons(lessonsDirectory) {
