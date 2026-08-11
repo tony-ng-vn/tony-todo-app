@@ -10,6 +10,11 @@ describe('Node toolchain contract', () => {
     expect(parseInstalledNodeMajor('v24.14.0')).toBe(24);
   });
 
+  it('accepts a full or v-prefixed required version, not just a bare major', () => {
+    expect(parseRequiredNodeMajor('24.14.0')).toBe(24);
+    expect(parseRequiredNodeMajor('v24.14.0')).toBe(24);
+  });
+
   it('rejects malformed versions', () => {
     expect(parseRequiredNodeMajor('latest')).toBeNull();
     expect(parseInstalledNodeMajor('Node unknown')).toBeNull();

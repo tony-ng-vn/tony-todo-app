@@ -5,9 +5,11 @@ import {
   buildLessonFromCandidate,
   buildRepairPrompt,
   fingerprintFailure,
+  lessonMatches,
   matchLessons,
   normalizeFailureOutput,
   redactSensitiveText,
+  selectStages,
 } from '../scripts/ci-learning-core.mjs';
 
 describe('CI learning core', () => {
@@ -19,6 +21,31 @@ describe('CI learning core', () => {
     expect(fingerprintFailure('web.tests', first)).toBe(
       fingerprintFailure('web.tests', second),
     );
+  });
+
+  it('produces identical fingerprints for scripts/native paths across machines', () => {
+    const macOutput = `FAIL /Users/alice/repo/scripts/ci-verify.mjs:19:4\nDuration 128ms`;
+    const linuxOutput = `FAIL /home/runner/repo/scripts/ci-verify.mjs:44:8\nDuration 941ms`;
+
+    expect(normalizeFailureOutput(macOutput)).toBe(normalizeFailureOutput(linuxOutput));
+    expect(fingerprintFailure('web.tests', macOutput)).toBe(
+      fingerprintFailure('web.tests', linuxOutput),
+    );
+  });
+
+  it('scrubs home and temp directories out of buildFailureRecord entirely', () => {
+    const record = buildFailureRecord({
+      phase: 'native.tests',
+      command: 'swift test',
+      exitCode: 1,
+      output: 'FAIL /Users/alice/repo/native/Sources/Example.swift:19:4\nDuration 128ms',
+      context: { platform: 'darwin' },
+    });
+
+    const serialized = JSON.stringify(record);
+    expect(serialized).not.toContain('/Users/alice');
+    expect(record.outputTail).not.toContain('/Users/alice');
+    expect(record.outputTail).toContain('19');
   });
 
   it('redacts common credentials before evidence is cached or sent to an agent', () => {
@@ -33,6 +60,23 @@ describe('CI learning core', () => {
     expect(redacted).not.toContain('secret-token-value');
     expect(redacted).not.toContain('ghp_abcdefghijklmnopqrstuvwxyz123456');
     expect(redacted).not.toContain('plain-secret');
+    expect(redacted).toContain('[REDACTED]');
+  });
+
+  it('redacts KEY-suffixed env assignments, JWTs, and bare Bearer tokens', () => {
+    const jwt =
+      'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U';
+    const output = [
+      `VITE_INSFORGE_ANON_KEY=${jwt}`,
+      `standalone token in a log line: ${jwt}`,
+      'curl -H "Bearer some-loose-token" https://example.com',
+    ].join('\n');
+
+    const redacted = redactSensitiveText(output);
+
+    expect(redacted).not.toContain(jwt);
+    expect(redacted).not.toContain('some-loose-token');
+    expect(redacted).toContain('VITE_INSFORGE_ANON_KEY=[REDACTED]');
     expect(redacted).toContain('[REDACTED]');
   });
 
@@ -88,6 +132,23 @@ describe('CI learning core', () => {
     ).toEqual(['exact-build-failure']);
   });
 
+  it('never matches a lesson whose match list is missing or empty', () => {
+    const record = buildFailureRecord({
+      phase: 'web.build',
+      command: 'npm run build',
+      exitCode: 1,
+      output: 'anything at all',
+      context: { projectKinds: ['node'] },
+    });
+
+    expect(
+      lessonMatches(record, { id: 'empty-match', appliesTo: { phases: ['web.build'] }, match: [] }),
+    ).toBe(false);
+    expect(
+      lessonMatches(record, { id: 'missing-match', appliesTo: { phases: ['web.build'] } }),
+    ).toBe(false);
+  });
+
   it('builds a bounded repair prompt with evidence, lessons, and safety rules', () => {
     const prompt = buildRepairPrompt({
       attempt: 2,
@@ -137,5 +198,74 @@ describe('CI learning core', () => {
     expect(lesson.harness.command).toBe('npm run build');
     expect(lesson.guidance[0].solution).toContain('Restored the public export');
     expect(lesson.evidence.attempts).toBe(2);
+  });
+});
+
+describe('selectStages', () => {
+  const plan = {
+    scopes: {
+      web: [
+        { phase: 'web.node-toolchain', command: 'node scripts/check-node-toolchain.mjs' },
+        { phase: 'web.clean-install', command: 'npm ci', pushGate: false },
+        { phase: 'web.tests', command: 'npm test' },
+        { phase: 'web.build', command: 'npm run build' },
+        { phase: 'web.dependency-audit', command: 'npm run audit:dependencies', pushGate: false },
+      ],
+      native: [
+        { phase: 'native.swift-toolchain', command: 'npm run check:swift-toolchain' },
+        { phase: 'native.tests', command: 'npm run test:native-menubar' },
+        { phase: 'native.release-build', command: 'npm run build:native-menubar', pushGate: false },
+        { phase: 'native.app-bundle', command: 'npm run menubar:bundle', pushGate: false },
+      ],
+    },
+  };
+
+  it('runs every stage for a scope in full mode', () => {
+    expect(selectStages(plan, 'web', 'full', 'darwin').map((stage) => stage.phase)).toEqual([
+      'web.node-toolchain',
+      'web.clean-install',
+      'web.tests',
+      'web.build',
+      'web.dependency-audit',
+    ]);
+  });
+
+  it('drops exactly the pushGate:false stages in push mode', () => {
+    expect(selectStages(plan, 'all', 'push', 'darwin').map((stage) => stage.phase)).toEqual([
+      'web.node-toolchain',
+      'web.tests',
+      'web.build',
+      'native.swift-toolchain',
+      'native.tests',
+    ]);
+  });
+
+  it('filters by scope the same way in both modes', () => {
+    expect(selectStages(plan, 'native', 'full', 'darwin').map((stage) => stage.phase)).toEqual([
+      'native.swift-toolchain',
+      'native.tests',
+      'native.release-build',
+      'native.app-bundle',
+    ]);
+    expect(selectStages(plan, 'native', 'push', 'darwin').map((stage) => stage.phase)).toEqual([
+      'native.swift-toolchain',
+      'native.tests',
+    ]);
+  });
+
+  it('splits scope "all" between darwin and non-darwin platforms', () => {
+    expect(selectStages(plan, 'all', 'full', 'linux').map((stage) => stage.phase)).toEqual([
+      'web.node-toolchain',
+      'web.clean-install',
+      'web.tests',
+      'web.build',
+      'web.dependency-audit',
+    ]);
+    expect(selectStages(plan, 'all', 'full', 'darwin').length).toBe(9);
+  });
+
+  it('throws on an unknown scope or mode', () => {
+    expect(() => selectStages(plan, 'bogus', 'full', 'darwin')).toThrow();
+    expect(() => selectStages(plan, 'web', 'bogus', 'darwin')).toThrow();
   });
 });

@@ -3,7 +3,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
 export function parseRequiredNodeMajor(versionSource) {
-  const match = String(versionSource).trim().match(/^(\d+)$/);
+  // accept a bare major ("24"), a full semver ("24.14.0"), or a v-prefixed one
+  const match = String(versionSource).trim().match(/^v?(\d+)(?:\.\d+){0,2}$/);
   return match ? Number.parseInt(match[1], 10) : null;
 }
 
