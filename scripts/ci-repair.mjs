@@ -120,6 +120,11 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
   }
 
   const diffStat = run('git', ['diff', '--stat']).stdout.trim();
+  // git diff --stat misses files the agent created; list them without touching the index (no git add)
+  const untrackedFiles = run('git', ['ls-files', '--others', '--exclude-standard'])
+    .stdout.trim()
+    .split('\n')
+    .filter(Boolean);
   const candidate = {
     schemaVersion: 1,
     createdAt: new Date().toISOString(),
@@ -128,6 +133,7 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     failure: originalFailure,
     repairSummary: agentSummary,
     diffStat,
+    untrackedFiles,
     status: 'candidate',
     note: 'Review this candidate before promoting it into .ci/lessons.',
   };
