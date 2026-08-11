@@ -45,6 +45,7 @@ function runStage(stage) {
     });
 
     let output = '';
+    let settled = false;
     child.stdout.on('data', (chunk) => {
       process.stdout.write(chunk);
       output = appendCapped(output, chunk.toString('utf8'));
@@ -54,7 +55,22 @@ function runStage(stage) {
       output = appendCapped(output, chunk.toString('utf8'));
     });
     child.on('close', (code, signal) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
       resolveStage({ status: code, signal, output });
+    });
+    // if the process never launches (e.g. missing shell/binary), 'close' never fires; without
+    // this handler the promise would hang forever instead of failing the stage
+    child.on('error', (error) => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      const message = `[ci-learning] failed to launch stage command: ${error.message}\n`;
+      process.stderr.write(message);
+      resolveStage({ status: 1, signal: null, output: appendCapped(output, message) });
     });
   });
 }

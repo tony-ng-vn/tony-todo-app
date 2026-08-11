@@ -22,17 +22,18 @@ export function redactSensitiveText(value) {
 }
 
 // keeps machine-specific paths from fragmenting fingerprints or leaking usernames into artifacts
+// the optional drive prefix absorbs a Windows-style "C:" that precedes a slash-converted home path
 function scrubMachinePaths(value) {
   return String(value)
-    .replace(/\/Users\/[^/\s]+/g, '<home>')
-    .replace(/\/home\/[^/\s]+/g, '<home>')
+    .replace(/(?:[A-Za-z]:)?\/Users\/[^/\s]+/g, '<home>')
+    .replace(/(?:[A-Za-z]:)?\/home\/[^/\s]+/g, '<home>')
     // match /private/tmp before the shorter /tmp alternative so macOS's symlinked tmp collapses too
     .replace(/(?:\/private)?\/tmp\b/g, '<tmp>');
 }
 
 export function normalizeFailureOutput(value) {
-  return scrubMachinePaths(redactSensitiveText(value))
-    .replace(/\\/g, '/')
+  // backslash-to-slash must run before the path scrub so a Windows "C:\Users\name" path matches it too
+  return scrubMachinePaths(redactSensitiveText(value).replace(/\\/g, '/'))
     // collapse whatever remains of the machine root down to a single stable marker for src paths
     .replace(/(?:<home>|<tmp>)(?:\/[^\s:]+)*\/src\//g, '<root>/src/')
     .replace(/:\d+:\d+\b/g, ':<line>:<column>')

@@ -33,6 +33,13 @@ describe('CI learning core', () => {
     );
   });
 
+  it('normalizes a Windows-style backslashed home path the same as a posix one', () => {
+    const windowsOutput = `FAIL C:\\Users\\alice\\project\\scripts\\x.mjs:19:4\nDuration 128ms`;
+    const posixOutput = `FAIL /Users/bob/project/scripts/x.mjs:44:8\nDuration 941ms`;
+
+    expect(normalizeFailureOutput(windowsOutput)).toBe(normalizeFailureOutput(posixOutput));
+  });
+
   it('scrubs home and temp directories out of buildFailureRecord entirely', () => {
     const record = buildFailureRecord({
       phase: 'native.tests',
