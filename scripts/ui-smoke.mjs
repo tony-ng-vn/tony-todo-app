@@ -67,13 +67,13 @@ async function inspectRecapDayNavigation(viewport) {
   const page = await browser.newPage({ viewport });
   await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
 
-  const initialDate = await page.locator('#summary-date').textContent();
+  const initialDate = await page.locator('#summary-date').getAttribute('data-value');
   await page.locator('#summary-previous-day').click();
-  const previousDate = await page.locator('#summary-date').textContent();
+  const previousDate = await page.locator('#summary-date').getAttribute('data-value');
   await page.locator('#summary-next-day').click();
-  const returnedDate = await page.locator('#summary-date').textContent();
+  const returnedDate = await page.locator('#summary-date').getAttribute('data-value');
   await page.locator('#summary-next-day').click();
-  const nextDate = await page.locator('#summary-date').textContent();
+  const nextDate = await page.locator('#summary-date').getAttribute('data-value');
   await page.close();
 
   return { initialDate, previousDate, returnedDate, nextDate };
@@ -1233,11 +1233,18 @@ function assertRunningTimingEdit(result) {
 }
 
 function assertRecapDayNavigation(result) {
-  return result.initialDate !== result.previousDate &&
+  return shiftDayKey(result.initialDate, -1) === result.previousDate &&
     result.initialDate === result.returnedDate &&
-    result.initialDate !== result.nextDate
+    shiftDayKey(result.initialDate, 1) === result.nextDate
     ? []
     : [`recap day controls did not move one day backward and forward: ${JSON.stringify(result)}`];
+}
+
+function shiftDayKey(dayKey, offset) {
+  const [year, month, day] = dayKey.split('-').map(Number);
+  const shiftedDate = new Date(year, month - 1, day);
+  shiftedDate.setDate(shiftedDate.getDate() + offset);
+  return `${shiftedDate.getFullYear()}-${String(shiftedDate.getMonth() + 1).padStart(2, '0')}-${String(shiftedDate.getDate()).padStart(2, '0')}`;
 }
 
 function assertExists(result, selector, label) {
