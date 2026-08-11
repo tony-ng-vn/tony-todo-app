@@ -162,6 +162,43 @@
   min-width: 0;
 }
 
+.summary-date-navigation {
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
+  align-items: center;
+  gap: 8px;
+}
+
+.summary-day-button {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-strong);
+  color: var(--strong);
+  transition:
+    background-color 180ms ease,
+    border-color 180ms ease,
+    box-shadow 180ms ease,
+    transform 180ms ease;
+}
+
+.summary-day-button:hover {
+  border-color: var(--subtle);
+  background: var(--block-hover);
+}
+
+.summary-day-button:active {
+  transform: translateY(1px) scale(0.97);
+}
+
+.summary-day-button .nucleo-icon {
+  width: 18px;
+  height: 18px;
+}
+
 .calendar-trigger {
   width: 100%;
   min-height: 44px;
@@ -2393,6 +2430,10 @@ h2 {
 
   .calendar-picker,
   .calendar-trigger {
+    width: 100%;
+  }
+
+  .summary-date-navigation {
     width: 100%;
   }
 

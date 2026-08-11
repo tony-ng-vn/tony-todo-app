@@ -259,6 +259,7 @@
     aria-haspopup="dialog"
     aria-expanded={isOpen}
     aria-label={label}
+    data-value={value || undefined}
     data-invalid={invalid || undefined}
     aria-describedby={describedBy}
     on:click={handleTriggerClick}
