@@ -133,6 +133,26 @@ describe('CI workflow', () => {
     ).toBe(true);
   });
 
+  it('groups low-risk npm devDependency bumps and cools down every ecosystem', () => {
+    const npmUpdate = dependabot.updates.find(
+      (update) => update['package-ecosystem'] === 'npm',
+    );
+    const actionsUpdate = dependabot.updates.find(
+      (update) => update['package-ecosystem'] === 'github-actions',
+    );
+
+    expect(npmUpdate.groups['dev-tooling']).toEqual({
+      'applies-to': 'version-updates',
+      'dependency-type': 'development',
+      'update-types': ['minor', 'patch'],
+    });
+    expect(actionsUpdate.groups).toBeUndefined();
+
+    for (const update of [npmUpdate, actionsUpdate]) {
+      expect(update.cooldown['default-days']).toBeGreaterThanOrEqual(5);
+    }
+  });
+
   it('limits permissions and pins actions to immutable revisions', () => {
     expect(workflow.permissions.contents).toBe('read');
     expect(dependencyWorkflow.permissions.contents).toBe('read');
