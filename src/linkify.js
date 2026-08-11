@@ -29,6 +29,28 @@ export function linkifyText(value) {
   return rendered + escapeHtml(text.slice(lastIndex));
 }
 
+export function shortenLinksText(value) {
+  return String(value).replace(URL_PATTERN, (match) => {
+    const punctuation = match.match(/[.,!?;:]+$/)?.[0] ?? '';
+    const url = match.slice(0, match.length - punctuation.length);
+    return `${labelForUrl(url)}${punctuation}`;
+  });
+}
+
+export function getStandaloneWebUrl(value) {
+  const text = String(value).trim();
+  if (!text || /\s/.test(text)) {
+    return null;
+  }
+
+  try {
+    const parsedUrl = new URL(text);
+    return parsedUrl.protocol === 'http:' || parsedUrl.protocol === 'https:' ? text : null;
+  } catch {
+    return null;
+  }
+}
+
 export function labelForUrl(url) {
   try {
     const parsedUrl = new URL(url);
