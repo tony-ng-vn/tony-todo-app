@@ -25,3 +25,15 @@ Design rules:
 - Keep this app in the glass design system: translucent surfaces, blurred backdrops, soft inset highlights, and restrained borders.
 - Never ship visible scrollbars. Scrollable regions should remain scrollable but hide native scrollbar rails/thumbs.
 <!-- INSFORGE:END -->
+
+## CI verification
+
+- Run `npm run setup:hooks` once after cloning. `npm install` and `npm ci` also install the repository pre-push hook automatically.
+- On macOS, every push runs `npm run verify` so local verification uses the required Node version, performs a clean install, and matches the required web and native CI checks.
+- On other platforms, every push runs `npm run verify:web` and relies on the required `Native menu bar` GitHub check for the native build.
+- Use `SKIP_VERIFY=1 git push` only for an emergency push when local verification cannot run, and report why in the PR.
+- Keep the canonical verification commands in `package.json`; when a CI command changes, update the matching npm script in the same commit.
+- CI failures are cached as redacted packets in `.ci-learning/` and matched against the versioned lessons in `.ci/lessons/`.
+- Run `npm run ci:replay` when a CI lesson changes.
+- Run `npm run ci:repair` only on a feature branch when an AI repair loop is wanted. It must remain bounded and must not commit, push, merge, or weaken checks.
+- Treat generated lesson candidates as evidence. Review their context, solution, and tradeoffs before promoting and committing them.

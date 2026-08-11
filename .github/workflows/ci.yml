@@ -31,17 +31,17 @@ jobs:
           node-version-file: .node-version
           cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Run canonical web verification
+        run: npm run verify:web
 
-      - name: Run tests
-        run: npm test
-
-      - name: Build production bundle
-        run: npm run build
-
-      - name: Audit high-severity dependencies
-        run: npm audit --audit-level=high
+      - name: Preserve web failure packet
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ci-learning-web-${{ github.run_id }}
+          path: .ci-learning/latest-failure.json
+          if-no-files-found: warn
+          retention-days: 30
 
   native-menubar:
     name: Native menu bar
@@ -52,11 +52,14 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Test Swift menu bar host
-        run: swift test --package-path native
+      - name: Run canonical native verification
+        run: npm run verify:native
 
-      - name: Build release binary
-        run: swift build --package-path native -c release
-
-      - name: Build signed app bundle
-        run: npm run menubar:bundle
+      - name: Preserve native failure packet
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: ci-learning-native-${{ github.run_id }}
+          path: .ci-learning/latest-failure.json
+          if-no-files-found: warn
+          retention-days: 30

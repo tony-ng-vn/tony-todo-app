@@ -1,0 +1,46 @@
+{
+  "schemaVersion": 1,
+  "projectKinds": ["node", "svelte", "swift"],
+  "scopes": {
+    "web": [
+      {
+        "phase": "web.node-toolchain",
+        "command": "node scripts/check-node-toolchain.mjs"
+      },
+      {
+        "phase": "web.clean-install",
+        "command": "npm ci"
+      },
+      {
+        "phase": "web.tests",
+        "command": "npm test"
+      },
+      {
+        "phase": "web.build",
+        "command": "npm run build"
+      },
+      {
+        "phase": "web.dependency-audit",
+        "command": "npm run audit:dependencies"
+      }
+    ],
+    "native": [
+      {
+        "phase": "native.swift-toolchain",
+        "command": "npm run check:swift-toolchain"
+      },
+      {
+        "phase": "native.tests",
+        "command": "npm run test:native-menubar"
+      },
+      {
+        "phase": "native.release-build",
+        "command": "npm run build:native-menubar"
+      },
+      {
+        "phase": "native.app-bundle",
+        "command": "npm run menubar:bundle"
+      }
+    ]
+  }
+}

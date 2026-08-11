@@ -1,0 +1,13 @@
+#!/bin/sh
+set -eu
+
+if [ "${SKIP_VERIFY:-}" = "1" ]; then
+  echo "Skipping pre-push verification because SKIP_VERIFY=1."
+  exit 0
+fi
+
+if [ "$(uname -s)" = "Darwin" ]; then
+  npm run verify
+else
+  npm run verify:web
+fi

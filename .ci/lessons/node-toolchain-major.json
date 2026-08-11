@@ -1,0 +1,28 @@
+{
+  "schemaVersion": 1,
+  "id": "node-toolchain-major",
+  "title": "Use the repository Node major before installing or testing",
+  "appliesTo": {
+    "phases": ["web.node-toolchain"],
+    "projectKinds": ["node"]
+  },
+  "match": [
+    {
+      "kind": "regex",
+      "value": "Node \\d+\\.x is required, but v\\d+"
+    }
+  ],
+  "failureExamples": [
+    "Node 24.x is required, but v26.6.0 is active. Switch Node versions before verifying or pushing."
+  ],
+  "harness": {
+    "command": "npx vitest run src/nodeToolchain.test.js"
+  },
+  "guidance": [
+    {
+      "when": "A local version manager or agent shell is using a different Node major.",
+      "solution": "Activate the major in .node-version, then rerun the failed phase.",
+      "tradeoffs": "Changing package constraints hides environment drift, so prefer aligning the runtime unless the project intentionally upgrades Node."
+    }
+  ]
+}
