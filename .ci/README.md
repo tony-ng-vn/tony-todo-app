@@ -19,6 +19,11 @@ The pre-push hook runs detection and verification automatically.
 It never invokes the repair agent automatically.
 This keeps normal pushes deterministic and prevents an AI process from silently rewriting a developer's work.
 
+Local pushes run in `--mode push`, a declared subset of `verification.json` marked with `"pushGate": false` for the stages left out.
+That subset covers the toolchain checks, the test suite, and the production build.
+Clean install, the dependency audit, the native release build, and the native app bundle stay out of the local push gate and remain covered by the required GitHub checks, which always run the full plan.
+`ci-verify.mjs` prints the skipped phases so the narrower local gate is never silent.
+
 ## Repair safety
 
 The repair command refuses to run on `main` or `master`, does not commit or push, and allows at most five attempts.
@@ -26,8 +31,14 @@ The default adapter uses the locally authenticated Codex CLI with workspace-only
 Set `CI_REPAIR_AGENT_COMMAND` to a different command that accepts its prompt on standard input when another AI coding agent is preferred.
 
 Failure packets and agent output stay in the ignored `.ci-learning/` directory.
-Common bearer tokens, GitHub tokens, and secret-like environment assignments are redacted before caching or prompting.
+Common bearer tokens, GitHub tokens, JWTs, and secret-like environment assignments are redacted before caching or prompting.
 CI uploads only the redacted latest failure packet and retains it for 30 days.
+
+### Known considerations
+
+The repair prompt embeds redacted, unnormalized failure output, including whatever a failing tool or dependency printed.
+Hostile or compromised tool output could try to steer the agent through that text.
+The containment is the surrounding bounds, not the prompt itself: the repair loop is opt-in, it only runs on a feature branch, it never commits or pushes on its own, and every attempt is re-checked by the same canonical verification a human would run, so a steered agent still has to pass the real gate before its diff is treated as a candidate.
 
 ## Choosing among solutions
 

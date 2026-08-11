@@ -9,7 +9,8 @@
       },
       {
         "phase": "web.clean-install",
-        "command": "npm ci"
+        "command": "npm ci",
+        "pushGate": false
       },
       {
         "phase": "web.tests",
@@ -21,7 +22,8 @@
       },
       {
         "phase": "web.dependency-audit",
-        "command": "npm run audit:dependencies"
+        "command": "npm run audit:dependencies",
+        "pushGate": false
       }
     ],
     "native": [
@@ -35,11 +37,13 @@
       },
       {
         "phase": "native.release-build",
-        "command": "npm run build:native-menubar"
+        "command": "npm run build:native-menubar",
+        "pushGate": false
       },
       {
         "phase": "native.app-bundle",
-        "command": "npm run menubar:bundle"
+        "command": "npm run menubar:bundle",
+        "pushGate": false
       }
     ]
   }

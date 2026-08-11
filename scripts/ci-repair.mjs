@@ -3,7 +3,13 @@ import { dirname, resolve } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 
-import { buildRepairPrompt, loadLessons, matchLessons, redactSensitiveText } from './ci-learning-core.mjs';
+import {
+  buildRepairPrompt,
+  loadLessons,
+  matchLessons,
+  parseNulDelimitedList,
+  redactSensitiveText,
+} from './ci-learning-core.mjs';
 
 const repositoryRoot = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const cacheDirectory = resolve(repositoryRoot, '.ci-learning');
@@ -120,6 +126,11 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
   }
 
   const diffStat = run('git', ['diff', '--stat']).stdout.trim();
+  // git diff --stat misses files the agent created; list them without touching the index (no git add).
+  // -z is NUL-delimited so filenames with newlines or significant whitespace survive intact.
+  const untrackedFiles = parseNulDelimitedList(
+    run('git', ['ls-files', '--others', '--exclude-standard', '-z']).stdout,
+  );
   const candidate = {
     schemaVersion: 1,
     createdAt: new Date().toISOString(),
@@ -128,6 +139,7 @@ for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     failure: originalFailure,
     repairSummary: agentSummary,
     diffStat,
+    untrackedFiles,
     status: 'candidate',
     note: 'Review this candidate before promoting it into .ci/lessons.',
   };

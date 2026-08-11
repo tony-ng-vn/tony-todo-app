@@ -8,17 +8,38 @@ export function redactSensitiveText(value) {
   return String(value)
     .replace(ANSI_PATTERN, '')
     .replace(/(authorization\s*:\s*bearer\s+)[^\s]+/gi, '$1[REDACTED]')
+    // bare "Bearer <token>" without an "Authorization:" prefix; require a credential-shaped
+    // token on the same line so ordinary prose like "no bearer token was provided" survives
+    .replace(/\b(bearer)[^\S\n]+[A-Za-z0-9._~+/=-]{12,}/gi, '$1 [REDACTED]')
     .replace(/\b(gh[oprsu]_[A-Za-z0-9_]{20,})\b/g, '[REDACTED]')
     .replace(
-      /\b((?:[A-Z][A-Z0-9_]*_)?(?:TOKEN|SECRET|PASSWORD|PASSWD|API_KEY))\s*=\s*([^\s]+)/g,
+      // KEY (not just API_KEY) so repo secrets like VITE_INSFORGE_ANON_KEY are covered
+      /\b((?:[A-Z][A-Z0-9_]*_)?(?:TOKEN|SECRET|PASSWORD|PASSWD|KEY))\s*=\s*([^\s]+)/g,
       '$1=[REDACTED]',
-    );
+    )
+    // JWTs (InsForge anon keys are JWTs), anywhere in output, not just in an assignment
+    .replace(/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}(?:\.[A-Za-z0-9_-]+)?\b/g, '[REDACTED]');
+}
+
+// keeps machine-specific paths from fragmenting fingerprints or leaking usernames into artifacts
+// the optional drive prefix absorbs a Windows-style "C:" before the home segment; [\\/] accepts
+// either separator directly so a username is gone even where backslashes are never converted
+// (buildFailureRecord's outputTail intentionally keeps native separators everywhere else)
+function scrubMachinePaths(value) {
+  return String(value)
+    .replace(/(?:[A-Za-z]:)?[\\/]Users[\\/][^\\/\s]+/g, '<home>')
+    .replace(/(?:[A-Za-z]:)?[\\/]home[\\/][^\\/\s]+/g, '<home>')
+    // match /private/tmp before the shorter /tmp alternative so macOS's symlinked tmp collapses too
+    .replace(/(?:\/private)?\/tmp\b/g, '<tmp>');
 }
 
 export function normalizeFailureOutput(value) {
-  return redactSensitiveText(value)
-    .replace(/\\/g, '/')
-    .replace(/(?:\/Users\/[^/]+|\/tmp)(?:\/[^\s:]+)*\/src\//g, '<root>/src/')
+  // backslash-to-slash must run before the path scrub so a Windows "C:\Users\name" path matches it too
+  return scrubMachinePaths(redactSensitiveText(value).replace(/\\/g, '/'))
+    // collapse whatever remains of the machine root down to one stable marker, regardless of how
+    // many machine-specific intermediate directories (checkout path, CI runner workspace, ...) sit
+    // in between, for every repo area a verification stage can report from
+    .replace(/(?:<home>|<tmp>)(?:\/[^\s:]+)*\/(src|scripts|native)\//g, '<root>/$1/')
     .replace(/:\d+:\d+\b/g, ':<line>:<column>')
     .replace(/\b(?:Duration\s+)?\d+(?:\.\d+)?m?s\b/gi, '<duration>')
     .replace(/[ \t]+$/gm, '')
@@ -42,7 +63,8 @@ export function buildFailureRecord({
   now = new Date(),
 }) {
   const redactedOutput = redactSensitiveText(output);
-  const outputLines = redactedOutput.split('\n');
+  // scrub machine paths but keep line numbers and durations readable, unlike normalizedOutput
+  const outputLines = scrubMachinePaths(redactedOutput).split('\n');
 
   return {
     schemaVersion: 1,
@@ -80,7 +102,13 @@ export function lessonMatches(record, lesson) {
     return false;
   }
 
-  return (lesson.match ?? []).every((matcher) =>
+  const matchers = lesson.match ?? [];
+  // an empty matcher list is not "matches everything" (vacuous .every truth); it means unmatchable
+  if (matchers.length === 0) {
+    return false;
+  }
+
+  return matchers.every((matcher) =>
     matcher.kind === 'fingerprint'
       ? record.fingerprint === matcher.value
       : matcherMatches(record.normalizedOutput ?? record.outputTail ?? '', matcher),
@@ -92,12 +120,40 @@ export function matchLessons(record, lessons) {
     .filter((lesson) => lessonMatches(record, lesson))
     .map((lesson) => ({
       lesson,
+      // projectKinds is capped to a presence bit so listing many kinds cannot outrank a targeted match
       score:
         (lesson.appliesTo?.phases?.length ? 2 : 0) +
-        (lesson.appliesTo?.projectKinds?.length ?? 0) +
+        (lesson.appliesTo?.projectKinds?.length ? 1 : 0) +
         (lesson.match?.length ?? 0),
     }))
     .sort((left, right) => right.score - left.score || left.lesson.id.localeCompare(right.lesson.id));
+}
+
+const VALID_MODES = new Set(['full', 'push']);
+
+// pure so it is testable without running the stage loop's side effects (spawning, cache writes)
+export function selectStages(plan, scope, mode, platform) {
+  if (!VALID_MODES.has(mode)) {
+    throw new Error(`Unknown CI verification mode: ${mode}`);
+  }
+  if (scope !== 'web' && scope !== 'native' && scope !== 'all') {
+    throw new Error(`Unknown CI verification scope: ${scope}`);
+  }
+
+  const stages =
+    scope === 'all'
+      ? platform === 'darwin'
+        ? [...plan.scopes.web, ...plan.scopes.native]
+        : plan.scopes.web
+      : plan.scopes[scope];
+
+  return mode === 'push' ? stages.filter((stage) => stage.pushGate !== false) : stages;
+}
+
+// git's -z output is NUL-delimited so filenames with newlines, quotes, or trailing
+// whitespace survive intact; do not trim the raw output before splitting
+export function parseNulDelimitedList(output) {
+  return String(output).split('\0').filter(Boolean);
 }
 
 export function loadLessons(lessonsDirectory) {

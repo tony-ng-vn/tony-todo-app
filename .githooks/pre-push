@@ -7,7 +7,7 @@ if [ "${SKIP_VERIFY:-}" = "1" ]; then
 fi
 
 if [ "$(uname -s)" = "Darwin" ]; then
-  npm run verify
+  npm run verify:push
 else
-  npm run verify:web
+  npm run verify:push:web
 fi
