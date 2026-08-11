@@ -27,6 +27,8 @@
     "verify:web": "node scripts/ci-verify.mjs --scope web",
     "verify:native": "node scripts/ci-verify.mjs --scope native",
     "verify": "node scripts/ci-verify.mjs --scope all",
+    "verify:push": "node scripts/ci-verify.mjs --scope all --mode push",
+    "verify:push:web": "node scripts/ci-verify.mjs --scope web --mode push",
     "understanding:build": "node scripts/understanding-workbook.mjs",
     "understanding:serve": "node scripts/understanding-workbook.mjs && node scripts/understanding-serve.mjs"
   },

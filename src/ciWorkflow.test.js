@@ -23,6 +23,9 @@ const prePushHook = readFileSync(
   'utf8',
 );
 const gitignore = readFileSync(new URL('../.gitignore', import.meta.url), 'utf8');
+const verificationPlan = JSON.parse(
+  readFileSync(new URL('../.ci/verification.json', import.meta.url), 'utf8'),
+);
 
 describe('CI workflow', () => {
   it('gates pull requests and main pushes with the deploy-critical checks', () => {
@@ -85,9 +88,30 @@ describe('CI workflow', () => {
     expect(packageJson.scripts['setup:hooks']).toBe(
       'node scripts/install-git-hooks.mjs',
     );
-    expect(prePushHook).toContain('npm run verify');
-    expect(prePushHook).toContain('npm run verify:web');
+    expect(packageJson.scripts['verify:push']).toBe(
+      'node scripts/ci-verify.mjs --scope all --mode push',
+    );
+    expect(packageJson.scripts['verify:push:web']).toBe(
+      'node scripts/ci-verify.mjs --scope web --mode push',
+    );
+    expect(prePushHook).toContain('npm run verify:push');
+    expect(prePushHook).toContain('npm run verify:push:web');
     expect(prePushHook).toContain('SKIP_VERIFY');
+  });
+
+  it('marks exactly the heavy local stages as excluded from the push gate', () => {
+    const pushGateFalseStages = [...verificationPlan.scopes.web, ...verificationPlan.scopes.native]
+      .filter((stage) => stage.pushGate === false)
+      .map((stage) => stage.phase);
+
+    expect(pushGateFalseStages.sort()).toEqual(
+      [
+        'web.clean-install',
+        'web.dependency-audit',
+        'native.release-build',
+        'native.app-bundle',
+      ].sort(),
+    );
   });
 
   it('checks dependency health before feature work discovers advisories', () => {
