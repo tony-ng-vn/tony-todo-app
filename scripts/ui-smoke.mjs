@@ -664,7 +664,8 @@ async function exerciseManualTiming(page) {
   await choosePastDateTime('.detail-start-picker', 9, 0, 'AM', false);
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
-    return Boolean(state.todos.find((item) => item.id === 'ui-smoke-manual-timing-task')?.completedAt);
+    const task = state.todos.find((item) => item.id === 'ui-smoke-manual-timing-task');
+    return Boolean(task?.firstStartedAt) && !task?.completedAt;
   });
   await page.getByRole('button', { name: 'Add time block', exact: true }).click();
   await choosePastDateTime('.time-block-start-picker', 11, 0, 'AM');
@@ -1166,18 +1167,16 @@ function assertOngoingSection(result) {
 
 function assertManualTiming(result) {
   const timing = result.manualTiming;
-  const now = new Date();
-  const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
   return timing?.invalidError === 'Start time must be before end time in each block.' &&
-    timing.completed === true &&
+    timing.completed === false &&
     timing.trackedSeconds === 90 * 60 &&
     timing.timeBlockCount === 2 &&
     timing.totalLabel === 'Total 1h 30m' &&
     timing.incompleteBlockError === 'Choose both a start and end time in each block.' &&
-    timing.completedDayKey !== todayKey
+    timing.completedDayKey === null
     ? []
     : [
-        `manual timing controls did not validate and complete a past-date task: ${JSON.stringify(timing)}`,
+        `manual timing controls did not validate and keep the task open: ${JSON.stringify(timing)}`,
       ];
 }
 
@@ -1222,14 +1221,14 @@ function assertPausedTimeline(result) {
 }
 
 function assertRunningTimingEdit(result) {
-  return result.completed === true &&
-    result.activeStartedAt === null &&
+  return result.completed === false &&
+    result.activeStartedAt === '2026-08-04T23:31:00.000Z' &&
     result.trackedSeconds === 4 * 60 * 60 + 60 &&
     result.error === '' &&
     result.startText === 'Aug 4, 12:30 PM' &&
     result.endText === 'Aug 4, 4:31 PM'
     ? []
-    : [`running timing edit did not finish the task with the visible end time: ${JSON.stringify(result)}`];
+    : [`running timing edit did not preserve the active task: ${JSON.stringify(result)}`];
 }
 
 function assertRecapDayNavigation(result) {
