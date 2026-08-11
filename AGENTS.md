@@ -32,7 +32,7 @@ Design rules:
 - On macOS, every push runs `npm run verify:push` so local verification uses the required Node version and matches the required web and native test and build CI checks.
 - On other platforms, every push runs `npm run verify:push:web` and relies on the required `Native menu bar` GitHub check for the native build.
 - The local push gate is intentionally lighter than CI: it checks the toolchain, runs the test suite, and runs the production build.
-- Clean install, the dependency audit, the native release build, and the native app bundle are not part of the local push gate. They stay covered by the required GitHub checks, which always run the full `npm run verify` / `npm run verify:web` plan.
+- Clean install, the dependency audit, the native release build, and the native app bundle are not part of the local push gate. They stay covered by the required GitHub checks, which always run the full plan via `npm run verify:web` and `npm run verify:native`.
 - `.ci/verification.json` marks a stage `"pushGate": false` to exclude it from local pushes; CI ignores that flag and always runs every stage.
 - Use `SKIP_VERIFY=1 git push` only for an emergency push when local verification cannot run, and report why in the PR.
 - Keep the canonical verification commands in `package.json`; when a CI command changes, update the matching npm script in the same commit.
