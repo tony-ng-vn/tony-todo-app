@@ -29,7 +29,7 @@ Design rules:
 ## CI verification
 
 - Run `npm run setup:hooks` once after cloning. `npm install` and `npm ci` also install the repository pre-push hook automatically.
-- On macOS, every push runs `npm run verify:push` so local verification uses the required Node version and matches the required web and native test and build CI checks.
+- On macOS, every push runs `npm run verify:push`: it runs the toolchain checks, the web and native test suites, and the production build, while the required native build checks remain in GitHub CI.
 - On other platforms, every push runs `npm run verify:push:web` and relies on the required `Native menu bar` GitHub check for the native build.
 - The local push gate is intentionally lighter than CI: it checks the toolchain, runs the test suite, and runs the production build.
 - Clean install, the dependency audit, the native release build, and the native app bundle are not part of the local push gate. They stay covered by the required GitHub checks, which always run the full plan via `npm run verify:web` and `npm run verify:native`.

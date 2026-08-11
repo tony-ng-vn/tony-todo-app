@@ -36,7 +36,7 @@ CI uploads only the redacted latest failure packet and retains it for 30 days.
 
 ### Known considerations
 
-The repair prompt embeds raw failure output, including whatever a failing tool or dependency printed.
+The repair prompt embeds redacted, unnormalized failure output, including whatever a failing tool or dependency printed.
 Hostile or compromised tool output could try to steer the agent through that text.
 The containment is the surrounding bounds, not the prompt itself: the repair loop is opt-in, it only runs on a feature branch, it never commits or pushes on its own, and every attempt is re-checked by the same canonical verification a human would run, so a steered agent still has to pass the real gate before its diff is treated as a candidate.
 
