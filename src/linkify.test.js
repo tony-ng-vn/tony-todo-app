@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { getStandaloneWebUrl, linkifyText, shortenLinksText } from './linkify.js';
+import {
+  getStandaloneWebUrl,
+  isYouTubeUrl,
+  linkifyText,
+  shortenLinksText,
+} from './linkify.js';
 
 describe('linkifyText', () => {
   it('escapes plain text before rendering', () => {
@@ -53,5 +58,15 @@ describe('getStandaloneWebUrl', () => {
   it('does not treat surrounding task text or unsafe schemes as a standalone web link', () => {
     expect(getStandaloneWebUrl('Watch https://youtu.be/abc123')).toBeNull();
     expect(getStandaloneWebUrl('javascript:alert(1)')).toBeNull();
+  });
+});
+
+describe('isYouTubeUrl', () => {
+  it('recognizes supported YouTube links without matching unrelated hosts', () => {
+    expect(isYouTubeUrl('https://www.youtube.com/watch?v=abc123')).toBe(true);
+    expect(isYouTubeUrl('https://music.youtube.com/watch?v=abc123')).toBe(true);
+    expect(isYouTubeUrl('https://youtu.be/abc123')).toBe(true);
+    expect(isYouTubeUrl('https://notyoutube.com/watch?v=abc123')).toBe(false);
+    expect(isYouTubeUrl('not a URL')).toBe(false);
   });
 });

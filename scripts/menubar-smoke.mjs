@@ -66,6 +66,12 @@ try {
       }),
     );
   }
+  await page.route('**/api/link-title?*', (route) =>
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({ title: 'I cancelled all my cloud storage subscriptions' }),
+    }),
+  );
   await page.addInitScript(() => {
     const now = Date.now();
     const today = new Date(now);
@@ -92,6 +98,17 @@ try {
             id: 'menubar-open',
             title: 'Open task',
             createdAt: new Date(now - 30 * 60 * 1000).toISOString(),
+            completedAt: null,
+            note: '',
+            firstStartedAt: null,
+            activeStartedAt: null,
+            trackedSeconds: 0,
+            dueDate: today.toISOString(),
+          },
+          {
+            id: 'menubar-youtube',
+            title: 'https://www.youtube.com/watch?v=QKNXjsYyMWw',
+            createdAt: new Date(now - 28 * 60 * 1000).toISOString(),
             completedAt: null,
             note: '',
             firstStartedAt: null,
@@ -180,6 +197,16 @@ try {
         '[data-menubar-id="menubar-running"] .menubar-task-started',
       )?.textContent.trim(),
       openVisible: Boolean(document.querySelector('[data-menubar-id="menubar-open"]')),
+      youtubeLink: (() => {
+        const row = document.querySelector('[data-menubar-id="menubar-youtube"]');
+        const link = row?.querySelector('[data-menubar-link-title]');
+        return {
+          title: link?.textContent.trim(),
+          href: link?.getAttribute('href'),
+          hasIcon: Boolean(link?.querySelector('[data-youtube-icon]')),
+          showsRawUrl: row?.textContent.includes('https://www.youtube.com/watch?v=QKNXjsYyMWw'),
+        };
+      })(),
       readyDateGroups: [...document.querySelectorAll('[data-menubar-date-group]')].map((group) => ({
         id: group.getAttribute('data-menubar-date-group'),
         isToday: group.getAttribute('data-menubar-is-today'),
@@ -585,7 +612,7 @@ try {
   const failures = [];
   if (initial.title !== 'Done Log') failures.push(`unexpected heading: ${JSON.stringify(initial)}`);
   if (initial.sync !== 'Local only') failures.push(`unexpected sync state: ${JSON.stringify(initial)}`);
-  if (initial.openCount !== '5 open') failures.push(`unexpected open count: ${JSON.stringify(initial)}`);
+  if (initial.openCount !== '6 open') failures.push(`unexpected open count: ${JSON.stringify(initial)}`);
   if (!initial.sectionsInOrder || !initial.runningVisible || !initial.pausedVisible || !initial.openVisible) {
     failures.push(`task sections are incomplete or out of order: ${JSON.stringify(initial)}`);
   }
@@ -610,6 +637,14 @@ try {
   if (!initial.runningStarted?.startsWith('Started ')) {
     failures.push(`running task start time is missing: ${JSON.stringify(initial)}`);
   }
+  if (
+    initial.youtubeLink.title !== 'I cancelled all my cloud storage subscriptions' ||
+    initial.youtubeLink.href !== 'https://www.youtube.com/watch?v=QKNXjsYyMWw' ||
+    !initial.youtubeLink.hasIcon ||
+    initial.youtubeLink.showsRawUrl
+  ) {
+    failures.push(`YouTube task is not shown as an icon and title: ${JSON.stringify(initial)}`);
+  }
   if (initial.fullAppHref !== '/') failures.push(`full app link is wrong: ${JSON.stringify(initial)}`);
   if (
     initial.updateButtonLabel !== (expectUpdateAvailable ? 'Update available' : 'Update') ||
@@ -626,7 +661,7 @@ try {
   if (Number.parseFloat(initial.taskTransitionDuration) > 0.001) {
     failures.push(`reduced motion is not respected: ${JSON.stringify(initial)}`);
   }
-  if (countAfterEmptyAdd !== 5) {
+  if (countAfterEmptyAdd !== 6) {
     failures.push(`empty quick add created a task: ${countAfterEmptyAdd}`);
   }
   if (!parallelTimers.includes('menubar-running') || !parallelTimers.includes('menubar-open')) {

@@ -1,18 +1,8 @@
-import { labelForUrl } from '../../linkify.js';
-
-const YOUTUBE_HOSTS = new Set([
-  'youtube.com',
-  'www.youtube.com',
-  'm.youtube.com',
-  'music.youtube.com',
-  'youtu.be',
-]);
+import { isYouTubeUrl, labelForUrl } from '../../linkify.js';
 
 export async function resolveLinkTitle(rawUrl, { fetchImpl = globalThis.fetch } = {}) {
   const url = parseWebUrl(rawUrl);
-  const fallbackTitle = YOUTUBE_HOSTS.has(url.hostname.toLowerCase())
-    ? 'YouTube'
-    : labelForUrl(url.href);
+  const fallbackTitle = isYouTubeUrl(url) ? 'YouTube' : labelForUrl(url.href);
   const metadataUrl = youtubeMetadataUrl(url);
   if (!metadataUrl) {
     return { title: fallbackTitle };
@@ -48,7 +38,7 @@ function parseWebUrl(rawUrl) {
 }
 
 function youtubeMetadataUrl(url) {
-  if (!YOUTUBE_HOSTS.has(url.hostname.toLowerCase())) {
+  if (!isYouTubeUrl(url)) {
     return null;
   }
 
