@@ -24,6 +24,7 @@
     "ci:replay": "node scripts/ci-replay.mjs",
     "ci:repair": "node scripts/ci-repair.mjs",
     "ci:promote": "node scripts/ci-promote-lesson.mjs",
+    "ci:selftest-packet": "node scripts/ci-selftest-packet.mjs",
     "verify:web": "node scripts/ci-verify.mjs --scope web",
     "verify:native": "node scripts/ci-verify.mjs --scope native",
     "verify": "node scripts/ci-verify.mjs --scope all",

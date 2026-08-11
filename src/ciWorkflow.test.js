@@ -119,7 +119,10 @@ describe('CI workflow', () => {
       { cron: '17 15 * * *' },
     ]);
     expect(dependencyWorkflow.on).toHaveProperty('workflow_dispatch');
-    expect(dependencyWorkflow.jobs.audit.steps.at(-1).run).toBe(
+    const auditStepsByName = Object.fromEntries(
+      dependencyWorkflow.jobs.audit.steps.map((step) => [step.name, step]),
+    );
+    expect(auditStepsByName['Audit high-severity dependencies'].run).toBe(
       'npm run audit:dependencies',
     );
 
@@ -151,6 +154,37 @@ describe('CI workflow', () => {
     for (const update of [npmUpdate, actionsUpdate]) {
       expect(update.cooldown['default-days']).toBeGreaterThanOrEqual(5);
     }
+  });
+
+  it('self-tests the failure packet path daily since ci.yml only uploads on failure', () => {
+    const auditStepsByName = Object.fromEntries(
+      dependencyWorkflow.jobs.audit.steps.map((step) => [step.name, step]),
+    );
+
+    expect(auditStepsByName['Build failure packet self-test'].run).toBe(
+      'npm run ci:selftest-packet',
+    );
+
+    const upload = auditStepsByName['Upload failure packet self-test'];
+    expect(upload.with.path).toBe('.ci-learning/selftest-failure.json');
+    expect(upload.with['if-no-files-found']).toBe('error');
+    expect(upload.with['retention-days']).toBe(1);
+    expect(packageJson.scripts['ci:selftest-packet']).toBe(
+      'node scripts/ci-selftest-packet.mjs',
+    );
+  });
+
+  it('keeps every upload-artifact reference identical across both workflows', () => {
+    const references = [workflow, dependencyWorkflow].flatMap((currentWorkflow) =>
+      Object.values(currentWorkflow.jobs).flatMap((job) =>
+        job.steps
+          .map((step) => step.uses)
+          .filter((uses) => uses?.startsWith('actions/upload-artifact@')),
+      ),
+    );
+
+    expect(references.length).toBeGreaterThan(1);
+    expect(new Set(references).size).toBe(1);
   });
 
   it('limits permissions and pins actions to immutable revisions', () => {
