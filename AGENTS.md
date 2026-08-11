@@ -28,6 +28,8 @@ Design rules:
 
 ## CI verification
 
-- Before pushing or opening a PR from macOS, run `npm run verify` so local verification matches the required web and native CI checks.
-- When macOS is unavailable, run `npm run verify:web` and rely on the required `Native menu bar` GitHub check for the native build.
+- Run `npm run setup:hooks` once after cloning. `npm install` and `npm ci` also install the repository pre-push hook automatically.
+- On macOS, every push runs `npm run verify` so local verification uses the required Node version, performs a clean install, and matches the required web and native CI checks.
+- On other platforms, every push runs `npm run verify:web` and relies on the required `Native menu bar` GitHub check for the native build.
+- Use `SKIP_VERIFY=1 git push` only for an emergency push when local verification cannot run, and report why in the PR.
 - Keep the canonical verification commands in `package.json`; when a CI command changes, update the matching npm script in the same commit.

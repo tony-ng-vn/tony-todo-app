@@ -18,6 +18,10 @@ const nodeVersion = readFileSync(
   new URL('../.node-version', import.meta.url),
   'utf8',
 ).trim();
+const prePushHook = readFileSync(
+  new URL('../.githooks/pre-push', import.meta.url),
+  'utf8',
+);
 
 describe('CI workflow', () => {
   it('gates pull requests and main pushes with the deploy-critical checks', () => {
@@ -32,25 +36,16 @@ describe('CI workflow', () => {
       '.node-version',
     );
     expect(nodeVersion).toBe('24');
-    expect(stepsByName['Install dependencies'].run).toBe('npm ci');
-    expect(stepsByName['Run tests'].run).toBe('npm test');
-    expect(stepsByName['Build production bundle'].run).toBe('npm run build');
-    expect(stepsByName['Audit high-severity dependencies'].run).toBe(
-      'npm run audit:dependencies',
+    expect(stepsByName['Run canonical web verification'].run).toBe(
+      'npm run verify:web',
     );
 
     const nativeStepsByName = Object.fromEntries(
       workflow.jobs['native-menubar'].steps.map((step) => [step.name, step]),
     );
 
-    expect(nativeStepsByName['Verify Swift toolchain'].run).toBe(
-      'npm run check:swift-toolchain',
-    );
-    expect(nativeStepsByName['Test Swift menu bar host'].run).toBe(
-      'npm run test:native-menubar',
-    );
-    expect(nativeStepsByName['Build release binary'].run).toBe(
-      'npm run build:native-menubar',
+    expect(nativeStepsByName['Run canonical native verification'].run).toBe(
+      'npm run verify:native',
     );
   });
 
@@ -61,8 +56,14 @@ describe('CI workflow', () => {
     expect(packageJson.scripts['check:swift-toolchain']).toBe(
       'node scripts/check-swift-toolchain.mjs',
     );
-    expect(packageJson.scripts['verify:web']).toBe(
+    expect(packageJson.scripts['check:node-toolchain']).toBe(
+      'node scripts/check-node-toolchain.mjs',
+    );
+    expect(packageJson.scripts['verify:web:checks']).toBe(
       'npm test && npm run build && npm run audit:dependencies',
+    );
+    expect(packageJson.scripts['verify:web']).toBe(
+      'npm run check:node-toolchain && npm ci && npm run verify:web:checks',
     );
     expect(packageJson.scripts['verify:native']).toBe(
       'npm run check:swift-toolchain && npm run test:native-menubar && npm run build:native-menubar && npm run menubar:bundle',
@@ -70,11 +71,20 @@ describe('CI workflow', () => {
     expect(packageJson.scripts.verify).toBe(
       'npm run verify:web && npm run verify:native',
     );
+    expect(packageJson.scripts.prepare).toBe(
+      'node scripts/install-git-hooks.mjs',
+    );
+    expect(packageJson.scripts['setup:hooks']).toBe(
+      'node scripts/install-git-hooks.mjs',
+    );
+    expect(prePushHook).toContain('npm run verify');
+    expect(prePushHook).toContain('npm run verify:web');
+    expect(prePushHook).toContain('SKIP_VERIFY');
   });
 
   it('checks dependency health before feature work discovers advisories', () => {
     expect(dependencyWorkflow.on.schedule).toEqual([
-      { cron: '17 15 * * 1-5' },
+      { cron: '17 15 * * *' },
     ]);
     expect(dependencyWorkflow.on).toHaveProperty('workflow_dispatch');
     expect(dependencyWorkflow.jobs.audit.steps.at(-1).run).toBe(
