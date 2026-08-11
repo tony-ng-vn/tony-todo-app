@@ -80,6 +80,15 @@ describe('CI learning core', () => {
     expect(redacted).toContain('[REDACTED]');
   });
 
+  it('does not redact ordinary prose that happens to mention bearer', () => {
+    const output = 'no bearer token was provided\nERROR: build failed';
+
+    const redacted = redactSensitiveText(output);
+
+    expect(redacted).toContain('no bearer token was provided');
+    expect(redacted).toContain('ERROR: build failed');
+  });
+
   it('retrieves the most specific applicable lessons for a failure', () => {
     const record = buildFailureRecord({
       phase: 'web.node-toolchain',

@@ -7,8 +7,10 @@ const ANSI_PATTERN = /\u001b\[[0-9;]*m/g;
 export function redactSensitiveText(value) {
   return String(value)
     .replace(ANSI_PATTERN, '')
-    // bare "Bearer <token>" without an "Authorization:" prefix, keep the keyword to stay idempotent
-    .replace(/\b(bearer)\s+\S+/gi, '$1 [REDACTED]')
+    .replace(/(authorization\s*:\s*bearer\s+)[^\s]+/gi, '$1[REDACTED]')
+    // bare "Bearer <token>" without an "Authorization:" prefix; require a credential-shaped
+    // token on the same line so ordinary prose like "no bearer token was provided" survives
+    .replace(/\b(bearer)[^\S\n]+[A-Za-z0-9._~+/=-]{12,}/gi, '$1 [REDACTED]')
     .replace(/\b(gh[oprsu]_[A-Za-z0-9_]{20,})\b/g, '[REDACTED]')
     .replace(
       // KEY (not just API_KEY) so repo secrets like VITE_INSFORGE_ANON_KEY are covered
