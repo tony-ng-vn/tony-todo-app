@@ -1,24 +1,41 @@
-import { getTimes } from 'suncalc';
+import {
+  SUMMARY_BUCKETS,
+  addTodo,
+  closeActiveTimeSegment,
+  compareTodosNewestFirst,
+  completeTodo,
+  createInitialState,
+  createTodoId,
+  findDuplicateTodo,
+  formatDuration,
+  formatSummaryDayKey,
+  getActiveSegmentSeconds,
+  getBoardColumnId,
+  getCompletedTodos,
+  getCompletionTimestamp,
+  getDayPartLabel,
+  getDaySummary,
+  getPendingTodos,
+  normalizeTimeSegments,
+  normalizeTodo,
+  normalizedTrackedSeconds,
+} from './todoCommands.js';
 
-const SAN_FRANCISCO = { latitude: 37.774929, longitude: -122.419418 };
-const SAN_FRANCISCO_TIME_ZONE = 'America/Los_Angeles';
-const DEFAULT_SUNRISE_HOUR = 6;
-const SAN_FRANCISCO_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-US-u-nu-latn', {
-  timeZone: SAN_FRANCISCO_TIME_ZONE,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  hourCycle: 'h23',
-});
-const SUMMARY_BUCKETS = [
-  { label: 'Early morning', startAt: (dayKey) => dateAtSanFranciscoTime(dayKey, 0) },
-  { label: 'Morning', startAt: getSanFranciscoSunrise },
-  { label: 'Lunch', startAt: (dayKey) => dateAtSanFranciscoTime(dayKey, 11 * 60) },
-  { label: 'Evening', startAt: (dayKey) => dateAtSanFranciscoTime(dayKey, 14 * 60) },
-  { label: 'Night', startAt: (dayKey) => dateAtSanFranciscoTime(dayKey, 20 * 60) },
-];
+export {
+  addTodo,
+  closeActiveTimeSegment,
+  completeTodo,
+  createInitialState,
+  createTodoId,
+  findDuplicateTodo,
+  formatDuration,
+  getBoardColumnId,
+  getCompletedTodos,
+  getCompletionTimestamp,
+  getDayPartLabel,
+  getDaySummary,
+  getPendingTodos,
+};
 
 export const BOARD_COLUMNS = [
   { id: 'not_started', label: 'Not started' },
@@ -27,86 +44,6 @@ export const BOARD_COLUMNS = [
   { id: 'someday', label: 'Someday' },
   { id: 'done', label: 'Done' },
 ];
-
-export function createInitialState(todos = []) {
-  return { todos: todos.map(normalizeTodo) };
-}
-
-export function addTodo(state, title, createdAt = new Date(), { dueDate = null } = {}) {
-  const cleanTitle = title.trim();
-
-  if (!cleanTitle || findDuplicateTodo(state, cleanTitle)) {
-    return state;
-  }
-
-  const assignedDate = normalizeAssignedDate(dueDate, createdAt);
-
-  return {
-    ...state,
-    todos: [
-      ...state.todos,
-      {
-        id: createTodoId(cleanTitle, createdAt),
-        title: cleanTitle,
-        createdAt: createdAt.toISOString(),
-        completedAt: null,
-        somedayAt: null,
-        dueDate: assignedDate,
-        note: '',
-        source: 'app',
-        notionPageId: null,
-        notionDatabaseId: null,
-        notionStatus: null,
-        firstStartedAt: null,
-        activeStartedAt: null,
-        trackedSeconds: 0,
-        timeSegments: [],
-        isProgressive: false,
-        parentTaskId: null,
-        isProgressSession: false,
-        progressLabel: '',
-      },
-    ],
-  };
-}
-
-export function findDuplicateTodo(state, title, { excludeTodoId = null } = {}) {
-  const candidateTitle = normalizeTaskTitle(title);
-  if (!candidateTitle) {
-    return null;
-  }
-
-  return (
-    state.todos.find((todo) => {
-      if (todo.id === excludeTodoId || todo.completedAt || todo.isProgressSession) {
-        return false;
-      }
-
-      return taskTitlesMatch(candidateTitle, normalizeTaskTitle(todo.title));
-    }) ?? null
-  );
-}
-
-export function completeTodo(state, todoId, completedAt = new Date()) {
-  return {
-    ...state,
-    todos: state.todos.map((todo) => {
-      if (todo.id !== todoId) {
-        return todo;
-      }
-
-      const doneAt = getCompletionTimestamp(todo, completedAt);
-
-      return {
-        ...todo,
-        ...closeActiveTimeSegment(todo, doneAt),
-        completedAt: doneAt.toISOString(),
-        somedayAt: null,
-        activeStartedAt: null,
-      };
-    }),
-  };
-}
 
 export function failTodo(state, todoId, failedAt = new Date()) {
   return {
@@ -324,38 +261,12 @@ export function reopenTodo(state, todoId) {
   };
 }
 
-export function getPendingTodos(state) {
-  return state.todos
-    .filter((todo) => !todo.completedAt && !todo.isProgressSession)
-    .toSorted(compareTodosNewestFirst);
-}
-
 export function getActiveTodos(state) {
   return getPendingTodos(state).filter((todo) => !todo.somedayAt);
 }
 
 export function getSomedayTodos(state) {
   return getPendingTodos(state).filter((todo) => Boolean(todo.somedayAt));
-}
-
-export function getBoardColumnId(todo) {
-  if (todo.completedAt) {
-    return 'done';
-  }
-
-  if (todo.somedayAt) {
-    return 'someday';
-  }
-
-  if (todo.activeStartedAt) {
-    return 'in_progress';
-  }
-
-  if (todo.firstStartedAt) {
-    return 'paused';
-  }
-
-  return 'not_started';
 }
 
 export function partitionPendingTodos(todos) {
@@ -398,8 +309,6 @@ export function partitionTaskFlowTodos(todos, currentDate = new Date()) {
   };
 }
 
-// Board filter presets keyed off a task's due date. 'all' shows everything;
-// the rest only match tasks that actually have a due date.
 export const BOARD_DUE_FILTERS = ['all', 'overdue', 'today', 'week'];
 
 export function matchesDueFilter(todo, filter, now = new Date()) {
@@ -625,18 +534,6 @@ export function getOpenTodoSections(todos, currentDate = new Date()) {
     });
 }
 
-export function getCompletedTodos(state) {
-  return state.todos
-    .filter((todo) => todo.completedAt)
-    .toSorted((first, second) => {
-      const firstTime = new Date(first.completedAt).getTime();
-      const secondTime = new Date(second.completedAt).getTime();
-      const safeFirstTime = Number.isNaN(firstTime) ? -Infinity : firstTime;
-      const safeSecondTime = Number.isNaN(secondTime) ? -Infinity : secondTime;
-      return safeSecondTime - safeFirstTime;
-    });
-}
-
 export function getCompletedTodoSections(state, currentDate = new Date()) {
   const currentDayKey = formatDayKey(currentDate);
   const sectionsByDate = new Map();
@@ -665,10 +562,6 @@ export function getCompletedTodoSections(state, currentDate = new Date()) {
   );
 }
 
-// Month grid of completed tasks, grouped by the day each task was finished.
-// month is 0-based. Always returns 6 weeks x 7 days so the grid height is
-// stable, including leading/trailing days from adjacent months (flagged with
-// inMonth: false), Notion-calendar style.
 export function getCalendarMonth(state, { year, month, now = new Date() } = {}) {
   const byDay = new Map();
   for (const todo of getCompletedTodos(state)) {
@@ -709,52 +602,6 @@ export function getCalendarMonth(state, { year, month, now = new Date() } = {}) 
   };
 }
 
-export function getDaySummary(state, dayKey) {
-  const sections = new Map(SUMMARY_BUCKETS.map((bucket) => [bucket.label, []]));
-
-  for (const todo of getCompletedTodos(state)) {
-    const completedDate = new Date(todo.completedAt);
-    if (formatSummaryDayKey(completedDate) !== dayKey) {
-      continue;
-    }
-
-    const label = getDayPartLabel(completedDate);
-    sections.get(label).push({
-      id: todo.id,
-      title: todo.title,
-      startedAt: todo.firstStartedAt ?? null,
-      completedAt: todo.completedAt,
-      note: todo.note ?? '',
-      durationSeconds: normalizedTrackedSeconds(todo),
-      durationLabel: formatDuration(normalizedTrackedSeconds(todo)),
-      outcome: todo.notionStatus === 'Failed' ? 'failed' : 'done',
-      parentTaskId: todo.parentTaskId ?? null,
-      isProgressSession: Boolean(todo.isProgressSession),
-      progressLabel: todo.progressLabel ?? '',
-    });
-  }
-
-  return Array.from(sections, ([label, items]) => ({
-    label,
-    items: items.toSorted(compareSummaryItemsByStart),
-  }));
-}
-
-function compareSummaryItemsByStart(first, second) {
-  const firstStart = validTimestamp(first.startedAt);
-  const secondStart = validTimestamp(second.startedAt);
-
-  if (firstStart === null && secondStart === null) return 0;
-  if (firstStart === null) return 1;
-  if (secondStart === null) return -1;
-  return firstStart - secondStart;
-}
-
-function validTimestamp(value) {
-  const timestamp = value ? new Date(value).getTime() : Number.NaN;
-  return Number.isNaN(timestamp) ? null : timestamp;
-}
-
 export function updateTodoNote(state, todoId, note) {
   return {
     ...state,
@@ -781,8 +628,6 @@ export function setTodoDueDate(state, todoId, dueDate) {
   };
 }
 
-// Short, day-granular label for a task's due date (e.g. "Jun 12"). Empty for
-// no/invalid date. Formatted in local time to match the day the user picked.
 export function formatDueDate(dueDate) {
   if (!dueDate) {
     return '';
@@ -1032,151 +877,6 @@ export function getElapsedSeconds(todo, now = new Date()) {
   return baseSeconds + Math.max(0, elapsed);
 }
 
-export function formatDuration(seconds) {
-  const cleanSeconds = Math.max(0, seconds);
-  const totalMinutes = cleanSeconds === 0 ? 0 : Math.max(1, Math.floor(cleanSeconds / 60));
-  const days = Math.floor(totalMinutes / (24 * 60));
-  const hours = Math.floor((totalMinutes % (24 * 60)) / 60);
-  const minutes = totalMinutes % 60;
-
-  if (days > 0) {
-    return `${days}d ${hours}h ${minutes}m`;
-  }
-
-  if (hours > 0) {
-    return `${hours}h ${minutes}m`;
-  }
-
-  return `${totalMinutes}m`;
-}
-
-export function getDayPartLabel(date) {
-  const dayKey = formatSummaryDayKey(date);
-  if (!dayKey) {
-    return 'Night';
-  }
-
-  return SUMMARY_BUCKETS.toReversed().find((bucket) => date >= bucket.startAt(dayKey))?.label ?? 'Early morning';
-}
-
-export function createTodoId(title, date) {
-  const slug = title
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '-')
-    .replace(/(^-|-$)/g, '')
-    .slice(0, 32);
-
-  return `${date.getTime()}-${slug || 'todo'}`;
-}
-
-function normalizeTaskTitle(title) {
-  return String(title ?? '')
-    .normalize('NFKC')
-    .toLowerCase()
-    .replace(/&/g, ' and ')
-    .replace(/[^\p{L}\p{N}]+/gu, ' ')
-    .trim()
-    .replace(/\s+/g, ' ');
-}
-
-function taskTitlesMatch(candidateTitle, existingTitle) {
-  if (!existingTitle) {
-    return false;
-  }
-
-  if (candidateTitle === existingTitle) {
-    return true;
-  }
-
-  const candidateTokens = candidateTitle.split(' ');
-  const existingTokens = existingTitle.split(' ');
-  if (
-    candidateTokens.length >= 3 &&
-    candidateTokens.length === existingTokens.length &&
-    candidateTokens.toSorted().join(' ') === existingTokens.toSorted().join(' ')
-  ) {
-    return true;
-  }
-
-  const longerLength = Math.max(candidateTitle.length, existingTitle.length);
-  if (longerLength < 12) {
-    return false;
-  }
-
-  const allowedDistance = longerLength >= 24 ? 2 : 1;
-  if (Math.abs(candidateTitle.length - existingTitle.length) > allowedDistance) {
-    return false;
-  }
-
-  return editDistanceAtMost(candidateTitle, existingTitle, allowedDistance);
-}
-
-function editDistanceAtMost(first, second, limit) {
-  let previous = Array.from({ length: second.length + 1 }, (_, index) => index);
-  let previousPrevious = null;
-
-  for (let firstIndex = 1; firstIndex <= first.length; firstIndex += 1) {
-    const current = [firstIndex];
-    let rowMinimum = current[0];
-
-    for (let secondIndex = 1; secondIndex <= second.length; secondIndex += 1) {
-      const substitutionCost = first[firstIndex - 1] === second[secondIndex - 1] ? 0 : 1;
-      current[secondIndex] = Math.min(
-        current[secondIndex - 1] + 1,
-        previous[secondIndex] + 1,
-        previous[secondIndex - 1] + substitutionCost,
-      );
-      if (
-        previousPrevious &&
-        first[firstIndex - 1] === second[secondIndex - 2] &&
-        first[firstIndex - 2] === second[secondIndex - 1]
-      ) {
-        current[secondIndex] = Math.min(
-          current[secondIndex],
-          previousPrevious[secondIndex - 2] + 1,
-        );
-      }
-      rowMinimum = Math.min(rowMinimum, current[secondIndex]);
-    }
-
-    if (rowMinimum > limit) {
-      return false;
-    }
-
-    previousPrevious = previous;
-    previous = current;
-  }
-
-  return previous[second.length] <= limit;
-}
-
-function normalizedTrackedSeconds(todo) {
-  return Math.max(0, Math.floor(Number(todo.trackedSeconds ?? 0)));
-}
-
-function compareTodosNewestFirst(first, second) {
-  const firstCreatedAt = new Date(first.createdAt).getTime();
-  const secondCreatedAt = new Date(second.createdAt).getTime();
-  const firstTime = Number.isNaN(firstCreatedAt) ? -Infinity : firstCreatedAt;
-  const secondTime = Number.isNaN(secondCreatedAt) ? -Infinity : secondCreatedAt;
-  return secondTime - firstTime;
-}
-
-function normalizeAssignedDate(dueDate, createdAt) {
-  const explicitDate = dueDate ? new Date(dueDate) : null;
-  if (explicitDate && !Number.isNaN(explicitDate.getTime())) {
-    return explicitDate.toISOString();
-  }
-
-  const creationDate = new Date(createdAt);
-  if (Number.isNaN(creationDate.getTime())) {
-    return null;
-  }
-
-  creationDate.setHours(0, 0, 0, 0);
-  return creationDate.toISOString();
-}
-
 function getTodoAssignedDayKey(todo) {
   const assignedDate = todo?.dueDate ? new Date(todo.dueDate) : null;
   if (assignedDate && !Number.isNaN(assignedDate.getTime())) {
@@ -1194,90 +894,6 @@ function formatDateGroupLabel(dayKey) {
     day: 'numeric',
     year: 'numeric',
   }).format(date);
-}
-
-function getCompletionTimestamp(todo, requestedAt) {
-  const requestedDate = new Date(requestedAt);
-  if (!isPausedTodo(todo)) {
-    return requestedDate;
-  }
-
-  const lastSegmentEnd = normalizeTimeSegments(todo.timeSegments)
-    .map((segment) => new Date(segment.endedAt))
-    .filter((date) => !Number.isNaN(date.getTime()))
-    .toSorted((first, second) => second - first)[0];
-  return lastSegmentEnd && !Number.isNaN(lastSegmentEnd.getTime()) ? lastSegmentEnd : requestedDate;
-}
-
-function isPausedTodo(todo) {
-  return Boolean(todo && !todo.completedAt && todo.firstStartedAt && !todo.activeStartedAt);
-}
-
-function normalizeTimeSegments(segments) {
-  if (!Array.isArray(segments)) {
-    return [];
-  }
-
-  return segments
-    .map((segment) => {
-      if (!segment?.startedAt || !segment?.endedAt) {
-        return null;
-      }
-
-      const startedAt = new Date(segment?.startedAt);
-      const endedAt = new Date(segment?.endedAt);
-      if (Number.isNaN(startedAt.getTime()) || Number.isNaN(endedAt.getTime())) {
-        return null;
-      }
-
-      return {
-        startedAt: startedAt.toISOString(),
-        endedAt: endedAt.toISOString(),
-      };
-    })
-    .filter(Boolean);
-}
-
-function closeActiveTimeSegment(todo, stoppedAt) {
-  const timeSegments = normalizeTimeSegments(todo.timeSegments);
-  if (!todo.activeStartedAt) {
-    return {
-      trackedSeconds: normalizedTrackedSeconds(todo),
-      timeSegments,
-    };
-  }
-
-  const startedAt = new Date(todo.activeStartedAt);
-  const endedAt = new Date(stoppedAt);
-  if (Number.isNaN(startedAt.getTime()) || Number.isNaN(endedAt.getTime())) {
-    return {
-      trackedSeconds: normalizedTrackedSeconds(todo),
-      timeSegments,
-    };
-  }
-
-  const normalizedEnd = new Date(Math.max(startedAt.getTime(), endedAt.getTime()));
-  const durationSeconds = getActiveSegmentSeconds(startedAt, normalizedEnd);
-
-  return {
-    trackedSeconds: normalizedTrackedSeconds(todo) + durationSeconds,
-    timeSegments: [
-      ...timeSegments,
-      {
-        startedAt: startedAt.toISOString(),
-        endedAt: normalizedEnd.toISOString(),
-      },
-    ],
-  };
-}
-
-function getActiveSegmentSeconds(startedAt, endedAt) {
-  if (Number.isNaN(startedAt.getTime()) || Number.isNaN(endedAt.getTime())) {
-    return 0;
-  }
-
-  const elapsed = Math.floor((endedAt.getTime() - startedAt.getTime()) / 1000);
-  return Math.max(0, elapsed);
 }
 
 function totalTimeSegmentSeconds(segments) {
@@ -1306,27 +922,6 @@ function updateTimeSegmentBounds(segments, startTime, endTime) {
     startedAt: index === 0 ? startIso : segment.startedAt,
     endedAt: index === segments.length - 1 ? endIso : segment.endedAt,
   }));
-}
-
-function normalizeTodo(todo) {
-  return {
-    ...todo,
-    somedayAt: todo.somedayAt ?? null,
-    dueDate: todo.dueDate ?? null,
-    note: todo.note ?? '',
-    source: todo.source ?? 'app',
-    notionPageId: todo.notionPageId ?? null,
-    notionDatabaseId: todo.notionDatabaseId ?? null,
-    notionStatus: todo.notionStatus ?? null,
-    firstStartedAt: todo.firstStartedAt ?? null,
-    activeStartedAt: todo.activeStartedAt ?? null,
-    trackedSeconds: normalizedTrackedSeconds(todo),
-    timeSegments: normalizeTimeSegments(todo.timeSegments),
-    isProgressive: Boolean(todo.isProgressive),
-    parentTaskId: todo.parentTaskId ?? null,
-    isProgressSession: Boolean(todo.isProgressSession),
-    progressLabel: todo.progressLabel ?? '',
-  };
 }
 
 function createProgressSession(parent, completedAt) {
@@ -1359,54 +954,4 @@ function createProgressSessionId(parentId, completedAt) {
 function completedAtForBucketPosition(dayKey, bucketLabel, index, itemCount) {
   const bucket = SUMMARY_BUCKETS.find((candidate) => candidate.label === bucketLabel);
   return new Date(bucket.startAt(dayKey).getTime() + (itemCount - index - 1) * 60_000).toISOString();
-}
-
-function getSanFranciscoSunrise(dayKey) {
-  const referenceDate = dateAtSanFranciscoTime(dayKey, 12 * 60);
-  const sunrise = getTimes(referenceDate, SAN_FRANCISCO.latitude, SAN_FRANCISCO.longitude).sunrise;
-
-  if (!Number.isNaN(sunrise.getTime())) {
-    return new Date(Math.round(sunrise.getTime() / 60_000) * 60_000);
-  }
-
-  return dateAtSanFranciscoTime(dayKey, DEFAULT_SUNRISE_HOUR * 60);
-}
-
-function formatSummaryDayKey(date) {
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
-  const parts = getSanFranciscoDateTimeParts(date);
-  return `${parts.year}-${parts.month}-${parts.day}`;
-}
-
-function dateAtSanFranciscoTime(dayKey, minutesAfterMidnight) {
-  const [year, month, day] = dayKey.split('-').map(Number);
-  const hour = Math.floor(minutesAfterMidnight / 60);
-  const minute = minutesAfterMidnight % 60;
-  const desiredWallTime = Date.UTC(year, month - 1, day, hour, minute);
-  let result = new Date(desiredWallTime);
-
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const parts = getSanFranciscoDateTimeParts(result);
-    const renderedWallTime = Date.UTC(
-      Number(parts.year),
-      Number(parts.month) - 1,
-      Number(parts.day),
-      Number(parts.hour),
-      Number(parts.minute),
-    );
-    result = new Date(result.getTime() + desiredWallTime - renderedWallTime);
-  }
-
-  return result;
-}
-
-function getSanFranciscoDateTimeParts(date) {
-  return Object.fromEntries(
-    SAN_FRANCISCO_DATE_TIME_FORMATTER.formatToParts(date)
-      .filter((part) => part.type !== 'literal')
-      .map((part) => [part.type, part.value]),
-  );
 }
