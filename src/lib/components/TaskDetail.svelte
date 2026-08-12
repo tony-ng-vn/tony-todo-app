@@ -449,9 +449,6 @@
             </div>
             <label>
               <span>Start time</span>
-              {#if index === 0 && !selectedTask.firstStartedAt}
-                <small class="detail-start-missing">Defaults to creation time</small>
-              {/if}
               <CalendarPicker
                 mode="datetime"
                 triggerClass={index === 0 ? 'detail-start-picker' : 'time-block-start-picker'}
@@ -470,6 +467,9 @@
                 onChange={(nextValue) => handleTimingChange(index, 'endedAt', nextValue)}
               />
             </label>
+            {#if index === 0 && !selectedTask.firstStartedAt}
+              <small class="detail-start-missing">Defaults to creation time</small>
+            {/if}
             {#if block.startedAt && block.endedAt}
               <small class="time-block-duration">
                 {formatDuration(
