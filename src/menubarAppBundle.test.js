@@ -68,16 +68,19 @@ describe('menu bar app bundle', () => {
     expect(controller).toContain('contentController.onCloseWindow');
   });
 
-  it('uses one automatically named status item for the installed app', () => {
+  it('uses one stable visible status item for the installed app', () => {
     const controller = readFileSync(
       path.join(repoRoot, 'native/Sources/DoneLogMenuBar/MenuBarController.swift'),
       'utf8',
     );
 
-    expect(controller).toContain('statusItem.autosaveName = nil');
-    expect(controller).not.toContain('com.tonynguyen.donelog.status-item');
+    expect(controller).toContain(
+      'statusItem.autosaveName = "com.tonynguyen.donelog.primary-status-item"',
+    );
+    expect(controller).toContain('statusItem.isVisible = true');
     expect(controller).toContain('withLength: NSStatusItem.squareLength');
-    expect(controller).toContain('statusItem.button?.window?.isVisible == true');
+    expect(controller).toContain('statusItemWindow.isVisible');
+    expect(controller).toContain('statusItemFrameIsInMenuBar');
   });
 
   it('opens the browser-sized experience in a native window', () => {

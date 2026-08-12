@@ -72,4 +72,47 @@ struct MenuBarConfigurationTests {
     #expect(icon.isTemplate)
     #expect(icon.size == NSSize(width: 16, height: 16))
   }
+
+  @Test("Rejects an offscreen status item as ready")
+  func rejectsOffscreenStatusItem() {
+    #expect(
+      !MenuBarConfiguration.statusItemFrameIsInMenuBar(
+        NSRect(x: 0, y: -3, width: 38, height: 22),
+        usableAreas: [NSRect(x: 1000, y: 1130, width: 800, height: 39)]
+      )
+    )
+  }
+
+  @Test("Accepts a status item inside the menu bar")
+  func acceptsVisibleStatusItem() {
+    #expect(
+      MenuBarConfiguration.statusItemFrameIsInMenuBar(
+        NSRect(x: 1762, y: 1147, width: 38, height: 22),
+        usableAreas: [NSRect(x: 1000, y: 1130, width: 800, height: 39)]
+      )
+    )
+  }
+
+  @Test("Rejects a partially offscreen status item")
+  func rejectsPartiallyOffscreenStatusItem() {
+    #expect(
+      !MenuBarConfiguration.statusItemFrameIsInMenuBar(
+        NSRect(x: 1780, y: 1147, width: 38, height: 22),
+        usableAreas: [NSRect(x: 1000, y: 1130, width: 800, height: 39)]
+      )
+    )
+  }
+
+  @Test("Rejects a status item under the camera housing")
+  func rejectsStatusItemUnderCameraHousing() {
+    #expect(
+      !MenuBarConfiguration.statusItemFrameIsInMenuBar(
+        NSRect(x: 880, y: 1130, width: 38, height: 39),
+        usableAreas: [
+          NSRect(x: 0, y: 1130, width: 800, height: 39),
+          NSRect(x: 1000, y: 1130, width: 800, height: 39),
+        ]
+      )
+    )
+  }
 }

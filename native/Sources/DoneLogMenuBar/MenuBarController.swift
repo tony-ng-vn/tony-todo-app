@@ -31,9 +31,21 @@ final class MenuBarController: NSObject {
   }
 
   var isReady: Bool {
-    statusItem.isVisible
-      && statusItem.button?.image != nil
-      && statusItem.button?.window?.isVisible == true
+    guard
+      statusItem.isVisible,
+      statusItem.button?.image != nil,
+      let statusItemWindow = statusItem.button?.window,
+      statusItemWindow.isVisible
+    else {
+      return false
+    }
+
+    return NSScreen.screens.contains { screen in
+      MenuBarConfiguration.statusItemFrameIsInMenuBar(
+        statusItemWindow.frame,
+        usableAreas: MenuBarConfiguration.menuBarUsableAreas(for: screen)
+      )
+    }
   }
 
   var onLoadResult: ((Result<Void, Error>) -> Void)? {
@@ -96,7 +108,8 @@ final class MenuBarController: NSObject {
   }
 
   private func configureStatusItem() {
-    statusItem.autosaveName = nil
+    statusItem.autosaveName = "com.tonynguyen.donelog.primary-status-item"
+    statusItem.isVisible = true
 
     guard let button = statusItem.button else {
       return

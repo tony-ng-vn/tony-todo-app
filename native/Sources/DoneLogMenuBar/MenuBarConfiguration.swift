@@ -40,6 +40,42 @@ enum MenuBarConfiguration {
     )
   }
 
+  static func statusItemFrameIsInMenuBar(
+    _ statusItemFrame: NSRect,
+    usableAreas: [NSRect]
+  ) -> Bool {
+    !statusItemFrame.isEmpty && usableAreas.contains { area in
+      !area.isEmpty && area.contains(statusItemFrame)
+    }
+  }
+
+  @MainActor
+  static func menuBarUsableAreas(for screen: NSScreen) -> [NSRect] {
+    let candidateAreas: [NSRect?] = [
+      screen.auxiliaryTopLeftArea,
+      screen.auxiliaryTopRightArea,
+    ]
+    let auxiliaryAreas = candidateAreas.compactMap { area -> NSRect? in
+      guard let area, !area.isEmpty else {
+        return nil
+      }
+      return area
+    }
+
+    if !auxiliaryAreas.isEmpty {
+      return auxiliaryAreas
+    }
+
+    return [
+      NSRect(
+        x: screen.frame.minX,
+        y: screen.visibleFrame.maxY,
+        width: screen.frame.width,
+        height: screen.frame.maxY - screen.visibleFrame.maxY
+      )
+    ]
+  }
+
   @MainActor
   static func makeStatusIcon() -> NSImage? {
     guard
