@@ -63,14 +63,12 @@ if (process.env.FLOATING_NOTE_ONLY === '1') {
     !result.request?.url?.includes('note=floating-note-task') ||
     result.request?.target !== 'done-log-note-floating-note-task' ||
     !result.request?.features?.includes('width=360') ||
-    result.inlineRequest !== null ||
     result.presentation.title !== 'Running task' ||
     result.presentation.status !== 'Note saved automatically' ||
     result.presentation.overflow ||
     result.presentation.closeRight > result.presentation.viewportWidth ||
     result.presentation.statusBottom > result.presentation.viewportHeight ||
-    result.presentation.resize !== 'both' ||
-    !result.presentation.moved ||
+    result.presentation.isOverlay ||
     !result.noteSurvivedTimerChanges
   ) {
     throw new Error(`Floating note concurrency check failed: ${JSON.stringify(result)}`);
@@ -835,7 +833,7 @@ async function inspectFloatingNote() {
   });
   await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
 
-  const inlineRequest = await page.evaluate(() => {
+  const request = await page.evaluate(() => {
     let openRequest = null;
     const originalOpen = window.open;
     window.open = (url, target, features) => {
@@ -847,34 +845,22 @@ async function inspectFloatingNote() {
     return openRequest;
   });
 
-  try {
-    await page.waitForSelector('.floating-note-shell.is-overlay', { timeout: 5000 });
-  } catch {
-    throw new Error(
-      `Inline floating note did not load: ${await page.locator('body').innerText()}`,
-    );
-  }
-  await page.fill('.floating-note-input', 'Note from floating window');
-  await page.waitForFunction(() => {
+  const notePage = await context.newPage();
+  await notePage.goto(request.url, { waitUntil: 'networkidle' });
+  await notePage.waitForSelector('.floating-note-shell:not(.is-overlay)');
+  await notePage.fill('.floating-note-input', 'Note from floating window');
+  await notePage.waitForFunction(() => {
     const todo = JSON.parse(localStorage.getItem('done-log-state')).todos[0];
     return todo?.note === 'Note from floating window';
   });
-  await page.waitForFunction(
+  await notePage.waitForFunction(
     () =>
       document.querySelector('.floating-note-save-status')?.textContent.trim()
       === 'Note saved automatically',
   );
 
-  const beforeDrag = await page.locator('.floating-note-shell').boundingBox();
-  const dragHandle = await page.locator('.floating-note-header').boundingBox();
-  await page.mouse.move(dragHandle.x + 40, dragHandle.y + 20);
-  await page.mouse.down();
-  await page.mouse.move(dragHandle.x - 90, dragHandle.y - 60, { steps: 4 });
-  await page.mouse.up();
-
-  const presentation = await page.evaluate((before) => {
+  const presentation = await notePage.evaluate(() => {
     const shell = document.querySelector('.floating-note-shell');
-    const rect = shell.getBoundingClientRect();
     return {
       title: document.querySelector('.floating-note-title')?.textContent.trim(),
       status: document.querySelector('.floating-note-save-status')?.textContent.trim(),
@@ -887,26 +873,8 @@ async function inspectFloatingNote() {
       ),
       viewportWidth: window.innerWidth,
       viewportHeight: window.innerHeight,
-      resize: getComputedStyle(shell).resize,
-      moved: Math.abs(rect.left - before.x) > 20 || Math.abs(rect.top - before.y) > 20,
+      isOverlay: shell.classList.contains('is-overlay'),
     };
-  }, beforeDrag);
-
-  const nativePage = await context.newPage();
-  await nativePage.addInitScript(() => {
-    window.__doneLogNativeHost = true;
-  });
-  await nativePage.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
-  const request = await nativePage.evaluate(() => {
-    let openRequest = null;
-    const originalOpen = window.open;
-    window.open = (url, target, features) => {
-      openRequest = { url: String(url), target, features };
-      return { focus() {} };
-    };
-    document.querySelector('.menubar-open-note')?.click();
-    window.open = originalOpen;
-    return openRequest;
   });
 
   await page.click('.menubar-pause');
@@ -918,7 +886,7 @@ async function inspectFloatingNote() {
   });
   await context.close();
 
-  return { request, inlineRequest, presentation, noteSurvivedTimerChanges };
+  return { request, presentation, noteSurvivedTimerChanges };
 }
 
 async function inspectRunningTimingEdit() {
