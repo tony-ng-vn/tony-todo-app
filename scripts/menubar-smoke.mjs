@@ -66,6 +66,8 @@ if (process.env.FLOATING_NOTE_ONLY === '1') {
     !result.nativeRequest?.url?.includes('note=floating-note-task') ||
     result.legacyRequest !== null ||
     !result.legacyOverlay ||
+    result.legacyResizedBounds.width > result.legacyResizedBounds.viewportWidth - 16 ||
+    result.legacyResizedBounds.height > result.legacyResizedBounds.viewportHeight - 16 ||
     result.presentation.title !== 'Running task' ||
     result.presentation.status !== 'Note saved automatically' ||
     result.presentation.overflow ||
@@ -887,6 +889,18 @@ async function inspectFloatingNote() {
   const legacyRequest = await captureOpenRequest(legacyPage);
   await legacyPage.waitForSelector('.floating-note-shell.is-overlay');
   const legacyOverlay = await legacyPage.locator('.floating-note-shell').isVisible();
+  const legacyResizedBounds = await legacyPage.evaluate(() => {
+    const shell = document.querySelector('.floating-note-shell');
+    shell.style.width = '200vw';
+    shell.style.height = '200vh';
+    const bounds = shell.getBoundingClientRect();
+    return {
+      width: Math.round(bounds.width),
+      height: Math.round(bounds.height),
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    };
+  });
   await legacyContext.close();
 
   const notePage = await context.newPage();
@@ -935,6 +949,7 @@ async function inspectFloatingNote() {
     nativeRequest,
     legacyRequest,
     legacyOverlay,
+    legacyResizedBounds,
     presentation,
     noteSurvivedTimerChanges,
   };

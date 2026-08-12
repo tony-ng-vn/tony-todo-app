@@ -191,6 +191,8 @@
     height: min(440px, calc(100vh - 24px));
     min-width: min(300px, calc(100vw - 24px));
     min-height: min(300px, calc(100vh - 24px));
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
     border: 1px solid var(--border);
     border-radius: 20px;
     background: var(--canvas-soft);
