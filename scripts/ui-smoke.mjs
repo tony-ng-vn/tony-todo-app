@@ -17,6 +17,8 @@ try {
   const navigation = await inspectWorkspaceNavigation({ width: 1366, height: 900 });
   const runningTimingEdit = await inspectRunningTimingEdit({ width: 1366, height: 900 });
   const recapDayNavigation = await inspectRecapDayNavigation({ width: 1366, height: 900 });
+  const nativeWorkspaceLayout = await inspectNativeWorkspaceLayout({ width: 1280, height: 820 });
+  const nativeMinimumLayout = await inspectNativeWorkspaceLayout({ width: 900, height: 600 });
   const failures = [
     ...assertNoOverflow(mobile),
     ...assertNoOverflow(desktop),
@@ -56,6 +58,8 @@ try {
     ...assertWorkspaceNavigation(navigation),
     ...assertRunningTimingEdit(runningTimingEdit),
     ...assertRecapDayNavigation(recapDayNavigation),
+    ...assertNativeWorkspaceLayout(nativeWorkspaceLayout),
+    ...assertNativeWorkspaceLayout(nativeMinimumLayout),
   ];
 
   if (failures.length) {
@@ -64,6 +68,128 @@ try {
   }
 } finally {
   await browser.close();
+}
+
+async function inspectNativeWorkspaceLayout(viewport) {
+  const page = await browser.newPage({ viewport });
+  await page.addInitScript(() => {
+    const now = new Date();
+    const dayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const at = (hour, minute) =>
+      new Date(`${dayKey}T${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}:00`).toISOString();
+
+    localStorage.setItem('done-log-client-id', 'ui-smoke-native-layout');
+    localStorage.setItem(
+      'done-log-state',
+      JSON.stringify({
+        todos: [
+          {
+            id: 'ui-smoke-native-paused',
+            title: 'Exploring Grok Bot with a longer title',
+            createdAt: at(8, 0),
+            completedAt: null,
+            firstStartedAt: at(9, 15),
+            activeStartedAt: null,
+            trackedSeconds: 44 * 60,
+            timeSegments: [
+              {
+                startedAt: at(9, 15),
+                endedAt: at(9, 59),
+                durationSeconds: 44 * 60,
+              },
+            ],
+            note: 'A note that should fit correctly in the native details panel.',
+          },
+          {
+            id: 'ui-smoke-native-completed',
+            title: 'Completed native layout check',
+            createdAt: at(11, 30),
+            completedAt: at(12, 49),
+            trackedSeconds: 30 * 60,
+          },
+        ],
+      }),
+    );
+  });
+  await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
+
+  const defaultLayout = await captureNativeLayout(page);
+  await page.click('[data-todo-id="ui-smoke-native-paused"] .open-task-button');
+  await page.waitForSelector('.task-detail');
+  const detailLayout = await captureNativeLayout(page);
+
+  const views = {};
+  await page.click('#detail-close');
+  for (const label of ['Board', 'Calendar', 'Inbox', 'Waiting', 'History', 'Meetings', 'Settings']) {
+    await page.getByRole('button', { name: label, exact: true }).click();
+    await page.waitForTimeout(50);
+    views[label] = await page.evaluate(() => {
+      const workspace = document.querySelector('.workspace');
+      const panel = workspace?.querySelector(
+        '.board-panel, .calendar-panel, .inbox-panel, .waiting-panel, .history-panel, .meetings-panel, .settings-panel',
+      );
+      return {
+        workspaceOverflow: Math.max(0, (workspace?.scrollWidth ?? 0) - (workspace?.clientWidth ?? 0)),
+        panelOverflow: Math.max(0, (panel?.scrollWidth ?? 0) - (panel?.clientWidth ?? 0)),
+      };
+    });
+  }
+
+  await page.close();
+  return { defaultLayout, detailLayout, views };
+}
+
+async function captureNativeLayout(page) {
+  return page.evaluate(() => {
+    const measure = (selector) => {
+      const element = document.querySelector(selector);
+      const rect = element?.getBoundingClientRect();
+      return {
+        width: Math.round(rect?.width ?? 0),
+        overflow: Math.max(0, (element?.scrollWidth ?? 0) - (element?.clientWidth ?? 0)),
+      };
+    };
+
+    return {
+      workspace: measure('.workspace'),
+      taskPanel: measure('.task-panel'),
+      quickAddTitle: measure('#todo-title'),
+      taskContent: measure('[data-todo-id="ui-smoke-native-paused"] .task-content'),
+      taskActions: measure('[data-todo-id="ui-smoke-native-paused"] .task-actions'),
+      summaryPanel: measure('.summary-panel'),
+      taskDetail: measure('.task-detail'),
+    };
+  });
+}
+
+function assertNativeWorkspaceLayout(result) {
+  const failures = [];
+  for (const [state, layout] of Object.entries({
+    default: result.defaultLayout,
+    detail: result.detailLayout,
+  })) {
+    for (const [area, metrics] of Object.entries(layout)) {
+      if (metrics.overflow > 1) {
+        failures.push(`native ${state} ${area} overflows by ${metrics.overflow}px`);
+      }
+    }
+  }
+  if (result.defaultLayout.quickAddTitle.width < 220) {
+    failures.push(
+      `native quick-add title is too narrow at ${result.defaultLayout.quickAddTitle.width}px`,
+    );
+  }
+  if (result.detailLayout.taskContent.width < 180) {
+    failures.push(
+      `native detail-open task content is too narrow at ${result.detailLayout.taskContent.width}px`,
+    );
+  }
+  for (const [view, metrics] of Object.entries(result.views)) {
+    if (metrics.workspaceOverflow > 1 || metrics.panelOverflow > 1) {
+      failures.push(`native ${view} view has horizontal overflow: ${JSON.stringify(metrics)}`);
+    }
+  }
+  return failures;
 }
 
 async function inspectRecapDayNavigation(viewport) {
