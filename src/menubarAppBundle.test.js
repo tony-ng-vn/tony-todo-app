@@ -31,6 +31,19 @@ describe('menu bar app bundle', () => {
     expect(packageJson.scripts['menubar:install']).toBe('bash scripts/install-menubar-app.sh');
   });
 
+  it('runs native checks through the signed app bundle identity', () => {
+    const packageJson = JSON.parse(
+      readFileSync(path.join(repoRoot, 'package.json'), 'utf8'),
+    );
+
+    expect(packageJson.scripts.menubar).toBe('bash scripts/run-menubar-app.sh');
+    expect(packageJson.scripts['menubar:dev']).toContain('bash scripts/run-menubar-app.sh');
+    expect(packageJson.scripts['menubar:check']).toContain('bash scripts/run-menubar-app.sh');
+    expect(packageJson.scripts.menubar).not.toContain('swift run');
+    expect(packageJson.scripts['menubar:dev']).not.toContain('swift run');
+    expect(packageJson.scripts['menubar:check']).not.toContain('swift run');
+  });
+
   it('keeps local app identity stable when a signing certificate is available', () => {
     const buildScript = readFileSync(
       path.join(repoRoot, 'scripts/build-menubar-app.sh'),
@@ -55,14 +68,14 @@ describe('menu bar app bundle', () => {
     expect(controller).toContain('contentController.onCloseWindow');
   });
 
-  it('keeps the status item visible across app replacements', () => {
+  it('uses one automatically named status item for the installed app', () => {
     const controller = readFileSync(
       path.join(repoRoot, 'native/Sources/DoneLogMenuBar/MenuBarController.swift'),
       'utf8',
     );
 
-    expect(controller).toContain('statusItem.autosaveName');
-    expect(controller).toContain('statusItem.isVisible = true');
+    expect(controller).toContain('statusItem.autosaveName = nil');
+    expect(controller).not.toContain('com.tonynguyen.donelog.status-item');
     expect(controller).toContain('withLength: NSStatusItem.squareLength');
   });
 
@@ -80,6 +93,8 @@ describe('menu bar app bundle', () => {
     expect(controller).toContain('application.setActivationPolicy(.regular)');
     expect(controller).toContain('application.setActivationPolicy(.accessory)');
     expect(controller).toContain('.moveToActiveSpace');
+    expect(controller).toContain('windowWillUseStandardFrame');
+    expect(controller).toContain('screen?.visibleFrame');
     expect(app).toContain('NativeAppLaunchPolicy.shouldOpenFullApp');
   });
 

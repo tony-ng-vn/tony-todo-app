@@ -94,8 +94,7 @@ final class MenuBarController: NSObject {
   }
 
   private func configureStatusItem() {
-    statusItem.autosaveName = "com.tonynguyen.donelog.status-item"
-    statusItem.isVisible = true
+    statusItem.autosaveName = nil
 
     guard let button = statusItem.button else {
       return

@@ -142,7 +142,11 @@ enum DoneLogMenuBarApp {
     let application = NSApplication.shared
     let delegate = DoneLogApplicationDelegate()
     application.delegate = delegate
-    application.mainMenu = ApplicationMenuFactory.makeMainMenu()
+    let mainMenu = ApplicationMenuFactory.makeMainMenu()
+    application.mainMenu = mainMenu
+    application.windowsMenu = mainMenu.items.first {
+      $0.title == "Window"
+    }?.submenu
     application.setActivationPolicy(.accessory)
     withExtendedLifetime(instanceLock) {
       application.run()

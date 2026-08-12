@@ -18,7 +18,7 @@ final class FullAppWindowController: NSWindowController, NSWindowDelegate {
     )
     let window = NSWindow(
       contentRect: NSRect(origin: .zero, size: MenuBarConfiguration.fullAppSize),
-      styleMask: [.titled, .closable, .miniaturizable, .resizable],
+      styleMask: NativeWindowPolicy.primaryStyleMask,
       backing: .buffered,
       defer: false
     )
@@ -59,6 +59,16 @@ final class FullAppWindowController: NSWindowController, NSWindowDelegate {
 
   func windowWillClose(_ notification: Notification) {
     application.setActivationPolicy(.accessory)
+  }
+
+  func windowWillUseStandardFrame(
+    _ window: NSWindow,
+    defaultFrame newFrame: NSRect
+  ) -> NSRect {
+    NativeWindowPolicy.standardFrame(
+      defaultFrame: newFrame,
+      screenVisibleFrame: window.screen?.visibleFrame
+    )
   }
 
   private func openFloatingNote(_ url: URL) {
