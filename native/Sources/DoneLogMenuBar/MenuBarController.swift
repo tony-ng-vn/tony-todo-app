@@ -9,6 +9,7 @@ final class MenuBarController: NSObject {
   private let webViewController: MenuBarWebViewController
   private let loginItemManager: LoginItemManager
   private let launchAtLoginItem: NSMenuItem
+  private var floatingNoteWindows: [String: FloatingNoteWindowController] = [:]
 
   init(url: URL) {
     statusItem = NSStatusBar.system.statusItem(
@@ -45,7 +46,24 @@ final class MenuBarController: NSObject {
     popover.animates = true
     popover.contentSize = MenuBarConfiguration.popoverSize
     popover.contentViewController = webViewController
+    webViewController.onOpenFloatingNote = { [weak self] url in
+      self?.openFloatingNote(url)
+    }
     _ = webViewController.view
+  }
+
+  private func openFloatingNote(_ url: URL) {
+    let key = url.absoluteString
+    if let existingWindow = floatingNoteWindows[key] {
+      existingWindow.show()
+      return
+    }
+
+    let controller = FloatingNoteWindowController(url: url) { [weak self] in
+      self?.floatingNoteWindows[key] = nil
+    }
+    floatingNoteWindows[key] = controller
+    controller.show()
   }
 
   private func configureContextMenu() {

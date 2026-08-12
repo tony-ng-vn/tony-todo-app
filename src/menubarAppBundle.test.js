@@ -23,4 +23,16 @@ describe('menu bar app bundle', () => {
     expect(packageJson.scripts['menubar:bundle']).toBe('bash scripts/build-menubar-app.sh');
     expect(packageJson.scripts['menubar:install']).toBe('bash scripts/install-menubar-app.sh');
   });
+
+  it('keeps task notes in a draggable native window', () => {
+    const controller = readFileSync(
+      path.join(repoRoot, 'native/Sources/DoneLogMenuBar/FloatingNoteWindowController.swift'),
+      'utf8',
+    );
+
+    expect(controller).toContain('NSPanel');
+    expect(controller).toContain('window.level = .floating');
+    expect(controller).toContain('window.isMovableByWindowBackground = true');
+    expect(controller).toContain('contentController.onCloseWindow');
+  });
 });

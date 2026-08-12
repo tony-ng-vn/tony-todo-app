@@ -9,6 +9,19 @@ export function iconPage() {
   `;
 }
 
+export function iconDetails() {
+  return `
+    <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M2.5 4h3" />
+      <path d="M8.5 4h5" />
+      <circle cx="7" cy="4" r="1.5" />
+      <path d="M2.5 12h5" />
+      <path d="M10.5 12h3" />
+      <circle cx="9" cy="12" r="1.5" />
+    </svg>
+  `;
+}
+
 export function iconCheck() {
   return `
     <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">

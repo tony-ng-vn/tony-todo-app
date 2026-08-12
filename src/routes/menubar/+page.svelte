@@ -3,6 +3,7 @@
   import { onDestroy, onMount, tick } from 'svelte';
   import '../../styles.css';
   import AuthGate from '../../lib/components/AuthGate.svelte';
+  import FloatingTaskNote from '../../lib/components/FloatingTaskNote.svelte';
   import MenubarTaskRow from '../../lib/components/MenubarTaskRow.svelte';
   import {
     addTodo,
@@ -29,7 +30,12 @@
   } from '../../todoStore.js';
   import { getCurrentUser, signInWithPassword, signOut, signUp } from '../../auth.js';
   import { insforge, isInsForgeConfigured } from '../../insforgeClient.js';
-  import { loadLocalState, reconcileRemoteState, saveLocalState } from '../../todoPersistence.js';
+  import {
+    loadLocalState,
+    reconcileRemoteState,
+    saveLocalState as writeLocalState,
+    TODO_STORAGE_KEY,
+  } from '../../todoPersistence.js';
   import {
     createDebouncedSaveQueue,
     getPendingNoteEdits,
@@ -76,6 +82,7 @@
   let authError = '';
   let authLoading = false;
   let titleDraft = '';
+  let floatingNoteId = null;
   let expandedTaskId = null;
   let noteSaveStatuses = {};
   let liveTimer = null;
@@ -99,14 +106,17 @@
   $: openTodos = openTodoSections.flatMap((section) => section.items);
   $: somedayTodos = getSomedayTodos(state);
   $: completedTodoSections = getCompletedTodoSections(state, new Date());
+  $: floatingNoteTodo = floatingNoteId ? findTodo(floatingNoteId) : null;
 
   onMount(() => {
+    floatingNoteId = new URLSearchParams(window.location.search).get('note');
     useRemote = isInsForgeConfigured && !new URLSearchParams(window.location.search).has('local');
     syncMessage = useRemote ? 'Connecting' : 'Local only';
     state = loadLocalState();
     queuePendingNoteSaves();
     applyStoredTheme();
     window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener('storage', handleStorageChange);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     updateCheckTimer = window.setInterval(checkForUpdate, UPDATE_CHECK_INTERVAL_MS);
     void checkForUpdate();
@@ -118,6 +128,7 @@
     window.clearInterval(updateCheckTimer);
     void noteAutosave.flushAll().catch(() => {});
     window.removeEventListener('focus', handleWindowFocus);
+    window.removeEventListener('storage', handleStorageChange);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
   });
 
@@ -162,6 +173,15 @@
       refreshFromSource();
       void checkForUpdate();
     }
+  }
+
+  function handleStorageChange(event) {
+    if (event.key !== TODO_STORAGE_KEY) {
+      return;
+    }
+
+    state = loadLocalState();
+    renderSyncStatus();
   }
 
   async function checkForUpdate() {
@@ -366,9 +386,9 @@
   }
 
   function handleNoteInput(todoId, note) {
-    state = updateTodoNote(state, todoId, note);
-    saveLocalState(state);
     const edit = recordNoteEdit(todoId, note);
+    state = updateTodoNote(loadLocalState(), todoId, note);
+    saveLocalState(state);
     setNoteSaveStatus(todoId, 'saving');
     noteAutosave.schedule(todoId, edit);
   }
@@ -428,6 +448,17 @@
     if (changed) {
       saveLocalState(state);
     }
+  }
+
+  function saveLocalState(nextState) {
+    let mergedState = nextState;
+    for (const { todo, edit } of getPendingNoteEdits(nextState.todos)) {
+      if (todo.note !== edit.note) {
+        mergedState = updateTodoNote(mergedState, todo.id, edit.note);
+      }
+    }
+    state = mergedState;
+    writeLocalState(mergedState);
   }
 
   function setNoteSaveStatus(todoId, status) {
@@ -521,6 +552,18 @@
 
   function toggleDetails(todoId) {
     expandedTaskId = expandedTaskId === todoId ? null : todoId;
+  }
+
+  function openFloatingNote(todo) {
+    const noteUrl = new URL(window.location.href);
+    noteUrl.searchParams.set('note', todo.id);
+    noteUrl.searchParams.delete('updated');
+    const noteWindow = window.open(
+      noteUrl,
+      `done-log-note-${todo.id}`,
+      'popup,width=360,height=440,resizable=yes',
+    );
+    noteWindow?.focus();
   }
 
   async function syncRemoteChange(message, action) {
@@ -630,6 +673,14 @@
     onSubmit={handleAuthSubmit}
     onToggleMode={handleAuthToggleMode}
   />
+{:else if floatingNoteId && floatingNoteTodo}
+  <FloatingTaskNote
+    todo={floatingNoteTodo}
+    noteSaveStatus={noteSaveStatuses[floatingNoteTodo.id] ?? 'saved'}
+    onNoteInput={handleNoteInput}
+  />
+{:else if floatingNoteId}
+  <main class="menubar-loading" aria-label="Task note unavailable">This task is no longer available.</main>
 {:else}
   <main class="menubar-shell" aria-label="Done Log menu bar companion">
     <header class="menubar-header">
@@ -820,6 +871,7 @@
     onComplete={handleComplete}
     onTitleCommit={handleTitleCommit}
     onNoteInput={handleNoteInput}
+    onOpenNote={openFloatingNote}
     noteSaveStatus={noteSaveStatuses[todo.id] ?? 'saved'}
     onProgressiveChange={handleProgressiveChange}
     onProgressCommit={handleProgressCommit}

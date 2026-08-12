@@ -40,6 +40,30 @@ struct MenuBarPolicyTests {
     )
   }
 
+  @Test("Recognizes same-origin floating note pages")
+  func recognizesFloatingNotePages() throws {
+    let noteURL = try #require(
+      URL(
+        string:
+          "https://tony-todo-app.vercel.app/menubar?note=task-123"
+      )
+    )
+    let otherOrigin = try #require(
+      URL(string: "https://example.com/menubar?note=task-123")
+    )
+    let missingTask = try #require(
+      URL(string: "https://tony-todo-app.vercel.app/menubar?note=")
+    )
+    let wrongPath = try #require(
+      URL(string: "https://tony-todo-app.vercel.app/?note=task-123")
+    )
+
+    #expect(MenuBarNavigationPolicy.isFloatingNoteURL(noteURL, homeURL: homeURL))
+    #expect(!MenuBarNavigationPolicy.isFloatingNoteURL(otherOrigin, homeURL: homeURL))
+    #expect(!MenuBarNavigationPolicy.isFloatingNoteURL(missingTask, homeURL: homeURL))
+    #expect(!MenuBarNavigationPolicy.isFloatingNoteURL(wrongPath, homeURL: homeURL))
+  }
+
   @Test("Denies media capture")
   func deniesMediaCapture() {
     #expect(MenuBarPermissionPolicy.mediaCaptureDecision == .deny)

@@ -1,10 +1,10 @@
 import { createInitialState } from './todoStore.js';
 
-const STORAGE_KEY = 'done-log-state';
+export const TODO_STORAGE_KEY = 'done-log-state';
 
 export function loadLocalState(storage = localStorage) {
   try {
-    const stored = storage.getItem(STORAGE_KEY);
+    const stored = storage.getItem(TODO_STORAGE_KEY);
     return stored ? createInitialState(JSON.parse(stored).todos ?? []) : createInitialState();
   } catch {
     return createInitialState();
@@ -12,7 +12,7 @@ export function loadLocalState(storage = localStorage) {
 }
 
 export function saveLocalState(state, storage = localStorage) {
-  storage.setItem(STORAGE_KEY, JSON.stringify(state));
+  storage.setItem(TODO_STORAGE_KEY, JSON.stringify(state));
 }
 
 export function reconcileRemoteState(_cachedState, remoteTodos) {
