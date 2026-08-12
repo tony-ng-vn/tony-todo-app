@@ -43,6 +43,16 @@ describe('menu bar app bundle', () => {
     expect(controller).toContain('contentController.onCloseWindow');
   });
 
+  it('keeps the status item visible across app replacements', () => {
+    const controller = readFileSync(
+      path.join(repoRoot, 'native/Sources/DoneLogMenuBar/MenuBarController.swift'),
+      'utf8',
+    );
+
+    expect(controller).toContain('statusItem.autosaveName');
+    expect(controller).toContain('statusItem.isVisible = true');
+  });
+
   it('marks native web views before the menu bar page loads', () => {
     const controller = readFileSync(
       path.join(repoRoot, 'native/Sources/DoneLogMenuBar/MenuBarWebViewController.swift'),
