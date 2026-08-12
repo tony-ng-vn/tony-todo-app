@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
 import { describe, expect, it } from 'vitest';
@@ -99,6 +100,17 @@ describe('menu bar app bundle', () => {
     expect(installer).not.toContain('"$INSTALLED_BINARY" --register-login-item');
     expect(installer).not.toContain('/usr/bin/open -n');
     expect(installer).toContain('Open it from Applications when you are ready');
+  });
+
+  it('refuses to replace a newer installed app with an older build', () => {
+    const comparer = path.join(repoRoot, 'scripts/app-version-is-newer.sh');
+    const installer = readFileSync(path.join(repoRoot, 'scripts/install-menubar-app.sh'), 'utf8');
+
+    expect(spawnSync(comparer, ['0.8.0', '0.7.2']).status).toBe(0);
+    expect(spawnSync(comparer, ['0.8.0', '0.8.0']).status).toBe(1);
+    expect(spawnSync(comparer, ['0.7.2', '0.8.0']).status).toBe(1);
+    expect(installer).toContain('app-version-is-newer.sh');
+    expect(installer).toContain('refusing to replace newer Done Log');
   });
 
   it('marks native web views before the menu bar page loads', () => {
