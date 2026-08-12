@@ -88,9 +88,7 @@
   let authError = '';
   let authLoading = false;
   let titleDraft = '';
-  let floatingNoteId = null;
   let standaloneNoteId = null;
-  let isNativeHost = false;
   let themeMode = 'light';
   let expandedTaskId = null;
   let noteSaveStatuses = {};
@@ -115,15 +113,12 @@
   $: openTodos = openTodoSections.flatMap((section) => section.items);
   $: somedayTodos = getSomedayTodos(state);
   $: completedTodoSections = getCompletedTodoSections(state, new Date());
-  $: floatingNoteTodo = floatingNoteId ? findTodo(floatingNoteId) : null;
   $: standaloneNoteTodo = standaloneNoteId ? findTodo(standaloneNoteId) : null;
 
   onMount(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const requestedNoteId = searchParams.get('note');
-    isNativeHost = Boolean(window.__doneLogNativeHost);
-    standaloneNoteId = isNativeHost ? requestedNoteId : null;
-    floatingNoteId = isNativeHost ? null : requestedNoteId;
+    standaloneNoteId = requestedNoteId;
     useRemote = isInsForgeConfigured && !searchParams.has('local');
     syncMessage = useRemote ? 'Connecting' : 'Local only';
     state = loadLocalState();
@@ -576,11 +571,6 @@
   }
 
   function openFloatingNote(todo) {
-    if (!isNativeHost) {
-      floatingNoteId = todo.id;
-      return;
-    }
-
     const noteUrl = new URL(window.location.href);
     noteUrl.searchParams.set('note', todo.id);
     noteUrl.searchParams.delete('updated');
@@ -590,13 +580,6 @@
       'popup,width=360,height=440,resizable=yes',
     );
     noteWindow?.focus();
-  }
-
-  function closeFloatingNote() {
-    floatingNoteId = null;
-    const nextUrl = new URL(window.location.href);
-    nextUrl.searchParams.delete('note');
-    window.history.replaceState({}, '', nextUrl);
   }
 
   function toggleThemeMode() {
@@ -888,16 +871,6 @@
         </section>
       {/if}
     </div>
-
-    {#if floatingNoteTodo}
-      <FloatingTaskNote
-        todo={floatingNoteTodo}
-        noteSaveStatus={noteSaveStatuses[floatingNoteTodo.id] ?? 'saved'}
-        onNoteInput={handleNoteInput}
-        onClose={closeFloatingNote}
-        presentation="overlay"
-      />
-    {/if}
   </main>
 {/if}
 
