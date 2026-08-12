@@ -734,7 +734,25 @@ export function getDaySummary(state, dayKey) {
     });
   }
 
-  return Array.from(sections, ([label, items]) => ({ label, items }));
+  return Array.from(sections, ([label, items]) => ({
+    label,
+    items: items.toSorted(compareSummaryItemsByStart),
+  }));
+}
+
+function compareSummaryItemsByStart(first, second) {
+  const firstStart = validTimestamp(first.startedAt);
+  const secondStart = validTimestamp(second.startedAt);
+
+  if (firstStart === null && secondStart === null) return 0;
+  if (firstStart === null) return 1;
+  if (secondStart === null) return -1;
+  return firstStart - secondStart;
+}
+
+function validTimestamp(value) {
+  const timestamp = value ? new Date(value).getTime() : Number.NaN;
+  return Number.isNaN(timestamp) ? null : timestamp;
 }
 
 export function updateTodoNote(state, todoId, note) {
