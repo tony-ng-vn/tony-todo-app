@@ -24,6 +24,18 @@ enum MenuBarNavigationPolicy {
     return (scheme == "http" || scheme == "https") && url.host != nil
   }
 
+  static func isFloatingNoteURL(_ url: URL, homeURL: URL) -> Bool {
+    guard decide(url: url, homeURL: homeURL) == .allowInPopover,
+      url.path == homeURL.path,
+      let components = URLComponents(url: url, resolvingAgainstBaseURL: false),
+      let noteID = components.queryItems?.first(where: { $0.name == "note" })?.value
+    else {
+      return false
+    }
+
+    return !noteID.isEmpty
+  }
+
   private static func hasSameOrigin(_ first: URL, _ second: URL) -> Bool {
     first.scheme?.lowercased() == second.scheme?.lowercased()
       && first.host?.lowercased() == second.host?.lowercased()

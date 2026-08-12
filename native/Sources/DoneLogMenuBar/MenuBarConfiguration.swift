@@ -6,6 +6,8 @@ enum MenuBarConfiguration {
     string: "https://tony-todo-app.vercel.app/menubar"
   )!
   static let popoverSize = NSSize(width: 420, height: 640)
+  static let floatingNoteSize = NSSize(width: 360, height: 440)
+  static let floatingNoteMinimumSize = NSSize(width: 320, height: 400)
 
   static func resolveURL(
     environment: [String: String] = ProcessInfo.processInfo.environment

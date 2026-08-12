@@ -53,6 +53,25 @@ async function chooseCalendarDateTime(page, selector, value) {
   await page.click('.calendar-apply');
 }
 
+if (process.env.FLOATING_NOTE_ONLY === '1') {
+  const result = await inspectFloatingNote();
+  await browser.close();
+  if (
+    !result.request?.url?.includes('note=floating-note-task') ||
+    result.request?.target !== 'done-log-note-floating-note-task' ||
+    !result.request?.features?.includes('width=360') ||
+    result.presentation.title !== 'Running task' ||
+    result.presentation.status !== 'Note saved automatically' ||
+    result.presentation.overflow ||
+    result.presentation.closeRight > result.presentation.viewportWidth ||
+    result.presentation.statusBottom > result.presentation.viewportHeight ||
+    !result.noteSurvivedTimerChanges
+  ) {
+    throw new Error(`Floating note concurrency check failed: ${JSON.stringify(result)}`);
+  }
+  process.exit(0);
+}
+
 try {
   const runningTimingEdit = await inspectRunningTimingEdit();
   const page = await browser.newPage({ viewport: { width: 420, height: 640 } });
@@ -759,6 +778,85 @@ try {
   }
 } finally {
   await browser.close();
+}
+
+async function inspectFloatingNote() {
+  const context = await browser.newContext({ viewport: { width: 420, height: 640 } });
+  const page = await context.newPage();
+  await page.addInitScript(() => {
+    const now = new Date('2026-08-12T13:05:00.000Z').toISOString();
+    localStorage.setItem(
+      'done-log-state',
+      JSON.stringify({
+        todos: [
+          {
+            id: 'floating-note-task',
+            title: 'Running task',
+            createdAt: now,
+            firstStartedAt: now,
+            activeStartedAt: now,
+            completedAt: null,
+            note: '',
+            trackedSeconds: 0,
+            timeSegments: [],
+          },
+        ],
+      }),
+    );
+  });
+  await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
+
+  const request = await page.evaluate(() => {
+    let openRequest = null;
+    const originalOpen = window.open;
+    window.open = (url, target, features) => {
+      openRequest = { url: String(url), target, features };
+      return { focus() {} };
+    };
+    document.querySelector('.menubar-open-note')?.click();
+    window.open = originalOpen;
+    return openRequest;
+  });
+
+  const notePage = await context.newPage();
+  await notePage.setViewportSize({ width: 320, height: 400 });
+  await notePage.goto(request?.url ?? `${targetUrl}&note=missing`);
+  try {
+    await notePage.waitForSelector('.floating-note-shell', { timeout: 5000 });
+  } catch {
+    throw new Error(
+      `Floating note did not load for ${JSON.stringify(request)}: ${await notePage.locator('body').innerText()}`,
+    );
+  }
+  await notePage.fill('.floating-note-input', 'Note from floating window');
+  await notePage.waitForFunction(() => {
+    const todo = JSON.parse(localStorage.getItem('done-log-state')).todos[0];
+    return todo?.note === 'Note from floating window';
+  });
+  const presentation = await notePage.evaluate(() => ({
+    title: document.querySelector('.floating-note-title')?.textContent.trim(),
+    status: document.querySelector('.floating-note-save-status')?.textContent.trim(),
+    overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+    closeRight: Math.round(
+      document.querySelector('.floating-note-header button')?.getBoundingClientRect().right ?? -1,
+    ),
+    statusBottom: Math.round(
+      document.querySelector('.floating-note-save-status')?.getBoundingClientRect().bottom ?? -1,
+    ),
+    viewportWidth: window.innerWidth,
+    viewportHeight: window.innerHeight,
+  }));
+
+  await page.click('.menubar-pause');
+  await page.waitForSelector('.menubar-start');
+  await page.click('.menubar-start');
+  const noteSurvivedTimerChanges = await page.evaluate(() => {
+    const todo = JSON.parse(localStorage.getItem('done-log-state')).todos[0];
+    return Boolean(todo?.activeStartedAt) && todo?.note === 'Note from floating window';
+  });
+  await context.close();
+
+  return { request, presentation, noteSurvivedTimerChanges };
 }
 
 async function inspectRunningTimingEdit() {

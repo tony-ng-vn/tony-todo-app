@@ -4,6 +4,7 @@ import WebKit
 @MainActor
 final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WKUIDelegate {
   private let homeURL: URL
+  private let readySelector: String
   private var webView: WKWebView!
   private var didCompleteInitialLoad = false
   private var isValidatingInitialLoad = false
@@ -11,10 +12,18 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
 
   var onLoadResult: ((Result<Void, Error>) -> Void)?
 
-  init(homeURL: URL) {
+  var onOpenFloatingNote: ((URL) -> Void)?
+  var onCloseWindow: (() -> Void)?
+
+  init(
+    homeURL: URL,
+    preferredSize: NSSize = MenuBarConfiguration.popoverSize,
+    readySelector: String = ".menubar-shell"
+  ) {
     self.homeURL = homeURL
+    self.readySelector = readySelector
     super.init(nibName: nil, bundle: nil)
-    preferredContentSize = MenuBarConfiguration.popoverSize
+    preferredContentSize = preferredSize
   }
 
   @available(*, unavailable)
@@ -27,7 +36,7 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     configuration.websiteDataStore = .default()
 
     webView = WKWebView(
-      frame: NSRect(origin: .zero, size: MenuBarConfiguration.popoverSize),
+      frame: NSRect(origin: .zero, size: preferredContentSize),
       configuration: configuration
     )
     webView.navigationDelegate = self
@@ -43,12 +52,18 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     for navigationAction: WKNavigationAction,
     windowFeatures: WKWindowFeatures
   ) -> WKWebView? {
-    if let url = navigationAction.request.url,
-      MenuBarNavigationPolicy.isWebURL(url)
-    {
-      NSWorkspace.shared.open(url)
+    if let url = navigationAction.request.url {
+      if MenuBarNavigationPolicy.isFloatingNoteURL(url, homeURL: homeURL) {
+        onOpenFloatingNote?(url)
+      } else if MenuBarNavigationPolicy.isWebURL(url) {
+        NSWorkspace.shared.open(url)
+      }
     }
     return nil
+  }
+
+  func webViewDidClose(_ webView: WKWebView) {
+    onCloseWindow?()
   }
 
   func webView(
@@ -122,7 +137,7 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     }
 
     webView.evaluateJavaScript(
-      "document.querySelector('.menubar-shell') !== null"
+      "document.querySelector('\(readySelector)') !== null"
     ) { [weak self] value, error in
       guard let self else {
         return
