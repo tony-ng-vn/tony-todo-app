@@ -1,4 +1,11 @@
 const URL_PATTERN = /https?:\/\/[^\s<>"']+/g;
+const YOUTUBE_HOSTS = new Set([
+  'youtube.com',
+  'www.youtube.com',
+  'm.youtube.com',
+  'music.youtube.com',
+  'youtu.be',
+]);
 const PLATFORM_LABELS = new Map([
   ['linkedin.com', 'LinkedIn'],
   ['x.com', 'X'],
@@ -51,9 +58,21 @@ export function getStandaloneWebUrl(value) {
   }
 }
 
+export function isYouTubeUrl(value) {
+  try {
+    const parsedUrl = value instanceof URL ? value : new URL(String(value));
+    return YOUTUBE_HOSTS.has(parsedUrl.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 export function labelForUrl(url) {
   try {
     const parsedUrl = new URL(url);
+    if (isYouTubeUrl(parsedUrl)) {
+      return 'YouTube';
+    }
     const hostname = parsedUrl.hostname.toLowerCase().replace(/^www\./, '');
     return PLATFORM_LABELS.get(hostname) ?? hostname;
   } catch {
