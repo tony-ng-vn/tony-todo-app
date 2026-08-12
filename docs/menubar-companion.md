@@ -38,6 +38,7 @@ npm run menubar:dev
 
 The development command opens `http://127.0.0.1:5176/menubar?local=1`.
 Local mode stores data in the native WebKit profile and does not connect to InsForge.
+Development and smoke commands always run the signed `Done Log.app` bundle so macOS keeps one stable app identity instead of registering temporary Swift build executables.
 
 ## Run Against the Deployed App
 
@@ -63,6 +64,9 @@ DONE_LOG_MENUBAR_URL=https://example.com/menubar npm run menubar
 - Click the tray icon to show or hide the popover.
 - Click outside the popover to hide it.
 - Open Done Log from Spotlight, Applications, or the menu-bar context menu to show the root app in a resizable native window.
+- Use the standard Mac window controls to move, resize, minimize, zoom, and enter full screen.
+- Double-click the title bar to fill the usable screen, subject to the macOS Desktop & Dock title-bar preference.
+- Use the standard File, Edit, View, and Window menus and their usual keyboard shortcuts.
 - Close the full window to return to menu-bar-only mode.
 - Right-click the tray icon to control launch at login, open the full app, or quit the shell.
 - Ongoing tasks appear before open tasks.
@@ -98,4 +102,6 @@ For the manual native check:
 7. Click outside the popover and confirm it hides.
 8. Reopen it and confirm the task state remains.
 9. Open Done Log from Spotlight and confirm the full root app opens in a resizable native window.
-10. Right-click the tray icon and confirm Launch at Login, Open Done Log, and Quit are available.
+10. Double-click the title bar and confirm the window fills the usable screen, then double-click again to restore it.
+11. Confirm Command+M minimizes, Window > Zoom works, and Control+Command+F enters and exits full screen.
+12. Right-click the tray icon and confirm Launch at Login, Open Done Log, and Quit are available.

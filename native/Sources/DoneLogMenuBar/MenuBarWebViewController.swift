@@ -5,6 +5,7 @@ import WebKit
 final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WKUIDelegate {
   private let homeURL: URL
   private let readySelector: String?
+  private let initialSize: NSSize
   private var webView: WKWebView!
   private var didCompleteInitialLoad = false
   private var isValidatingInitialLoad = false
@@ -22,8 +23,8 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
   ) {
     self.homeURL = homeURL
     self.readySelector = readySelector
+    initialSize = preferredSize
     super.init(nibName: nil, bundle: nil)
-    preferredContentSize = preferredSize
   }
 
   @available(*, unavailable)
@@ -42,7 +43,7 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     configuration.userContentController.addUserScript(nativeHostScript)
 
     webView = WKWebView(
-      frame: NSRect(origin: .zero, size: preferredContentSize),
+      frame: NSRect(origin: .zero, size: initialSize),
       configuration: configuration
     )
     webView.navigationDelegate = self

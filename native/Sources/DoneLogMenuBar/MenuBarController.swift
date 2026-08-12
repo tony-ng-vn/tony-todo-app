@@ -31,7 +31,9 @@ final class MenuBarController: NSObject {
   }
 
   var isReady: Bool {
-    statusItem.button?.image != nil && statusItem.button?.window != nil
+    statusItem.isVisible
+      && statusItem.button?.image != nil
+      && statusItem.button?.window?.isVisible == true
   }
 
   var onLoadResult: ((Result<Void, Error>) -> Void)? {
@@ -94,8 +96,7 @@ final class MenuBarController: NSObject {
   }
 
   private func configureStatusItem() {
-    statusItem.autosaveName = "com.tonynguyen.donelog.status-item"
-    statusItem.isVisible = true
+    statusItem.autosaveName = nil
 
     guard let button = statusItem.button else {
       return

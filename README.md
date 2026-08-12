@@ -13,7 +13,7 @@ A quiet task tracker that keeps what is next beside proof of what got done.
 - Turns completed work into a time-of-day recap.
 - Keeps task notes, checklists, history, and due dates together.
 - Brings the same workflow to the macOS menu bar.
-- Opens the complete workflow in a resizable native macOS window.
+- Opens the complete workflow in a standard native macOS window with move, resize, minimize, zoom, full-screen, menus, and keyboard shortcuts.
 
 <p align="center">
   <img src="docs/images/done-log-menubar.jpg" alt="Done Log menu bar companion" width="420">

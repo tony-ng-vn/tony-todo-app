@@ -1,6 +1,6 @@
 {
   "name": "todo-day-summary",
-  "version": "0.8.1",
+  "version": "0.9.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -16,9 +16,9 @@
     "build": "vite build",
     "build:native-menubar": "swift build --package-path native -c release",
     "dev": "vite dev --host 127.0.0.1",
-    "menubar": "swift run --package-path native -c release done-log-menubar",
-    "menubar:dev": "DONE_LOG_MENUBAR_URL=http://127.0.0.1:5176/menubar?local=1 swift run --package-path native done-log-menubar",
-    "menubar:check": "DONE_LOG_MENUBAR_URL=http://127.0.0.1:5176/menubar?local=1 MENUBAR_NATIVE_SMOKE=1 swift run --package-path native done-log-menubar",
+    "menubar": "bash scripts/run-menubar-app.sh",
+    "menubar:dev": "DONE_LOG_MENUBAR_URL=http://127.0.0.1:5176/menubar?local=1 bash scripts/run-menubar-app.sh",
+    "menubar:check": "DONE_LOG_MENUBAR_URL=http://127.0.0.1:5176/menubar?local=1 MENUBAR_NATIVE_SMOKE=1 bash scripts/run-menubar-app.sh",
     "menubar:bundle": "bash scripts/build-menubar-app.sh",
     "menubar:install": "bash scripts/install-menubar-app.sh",
     "ci:replay": "node scripts/ci-replay.mjs",
