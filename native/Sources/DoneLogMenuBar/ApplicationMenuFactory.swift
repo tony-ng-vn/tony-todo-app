@@ -2,7 +2,9 @@ import AppKit
 
 enum ApplicationMenuFactory {
   @MainActor
-  static func makeMainMenu() -> NSMenu {
+  static func makeMainMenu(
+    windowCommands: NativeWindowCommandHandler
+  ) -> NSMenu {
     let mainMenu = NSMenu()
 
     let applicationItem = NSMenuItem()
@@ -41,11 +43,12 @@ enum ApplicationMenuFactory {
     let fileItem = NSMenuItem(title: "File", action: nil, keyEquivalent: "")
     mainMenu.addItem(fileItem)
     let fileMenu = NSMenu(title: "File")
-    fileMenu.addItem(
+    let closeItem = fileMenu.addItem(
       withTitle: "Close Window",
-      action: #selector(NSWindow.performClose(_:)),
+      action: #selector(NativeWindowCommandHandler.closeWindow(_:)),
       keyEquivalent: "w"
     )
+    closeItem.target = windowCommands
     fileItem.submenu = fileMenu
 
     let editItem = NSMenuItem(title: "Edit", action: nil, keyEquivalent: "")
@@ -89,31 +92,35 @@ enum ApplicationMenuFactory {
     let viewMenu = NSMenu(title: "View")
     let fullScreenItem = viewMenu.addItem(
       withTitle: "Enter Full Screen",
-      action: #selector(NSWindow.toggleFullScreen(_:)),
+      action: #selector(NativeWindowCommandHandler.toggleFullScreen(_:)),
       keyEquivalent: "f"
     )
     fullScreenItem.keyEquivalentModifierMask = [.control, .command]
+    fullScreenItem.target = windowCommands
     viewItem.submenu = viewMenu
 
     let windowItem = NSMenuItem(title: "Window", action: nil, keyEquivalent: "")
     mainMenu.addItem(windowItem)
     let windowMenu = NSMenu(title: "Window")
-    windowMenu.addItem(
+    let minimizeItem = windowMenu.addItem(
       withTitle: "Minimize",
-      action: #selector(NSWindow.performMiniaturize(_:)),
+      action: #selector(NativeWindowCommandHandler.minimizeWindow(_:)),
       keyEquivalent: "m"
     )
-    windowMenu.addItem(
+    minimizeItem.target = windowCommands
+    let zoomItem = windowMenu.addItem(
       withTitle: "Zoom",
-      action: #selector(NSWindow.performZoom(_:)),
+      action: #selector(NativeWindowCommandHandler.zoomWindow(_:)),
       keyEquivalent: ""
     )
+    zoomItem.target = windowCommands
     windowMenu.addItem(.separator())
-    windowMenu.addItem(
+    let bringAllToFrontItem = windowMenu.addItem(
       withTitle: "Bring All to Front",
-      action: #selector(NSApplication.arrangeInFront(_:)),
+      action: #selector(NativeWindowCommandHandler.bringAllToFront(_:)),
       keyEquivalent: ""
     )
+    bringAllToFrontItem.target = windowCommands
     windowItem.submenu = windowMenu
 
     return mainMenu

@@ -8,7 +8,10 @@ struct ApplicationMenuTests {
   @Test("Provides standard editing shortcuts to the web view")
   @MainActor
   func providesEditingShortcuts() throws {
-    let mainMenu = ApplicationMenuFactory.makeMainMenu()
+    let windowCommands = NativeWindowCommandHandler()
+    let mainMenu = ApplicationMenuFactory.makeMainMenu(
+      windowCommands: windowCommands
+    )
     let applicationMenu = try #require(
       mainMenu.items.first { $0.submenu?.title == "Done Log" }?.submenu
     )
@@ -19,7 +22,9 @@ struct ApplicationMenuTests {
     #expect(applicationMenu.item(withTitle: "About Done Log") != nil)
     #expect(applicationMenu.item(withTitle: "Hide Done Log")?.keyEquivalent == "h")
     #expect(applicationMenu.item(withTitle: "Quit Done Log")?.keyEquivalent == "q")
-    #expect(fileMenu.item(withTitle: "Close Window")?.keyEquivalent == "w")
+    let closeItem = try #require(fileMenu.item(withTitle: "Close Window"))
+    #expect(closeItem.keyEquivalent == "w")
+    #expect(closeItem.target === windowCommands)
 
     #expect(editMenu.item(withTitle: "Undo")?.keyEquivalent == "z")
     #expect(editMenu.item(withTitle: "Redo")?.keyEquivalent == "Z")
@@ -31,9 +36,13 @@ struct ApplicationMenuTests {
     let fullScreenItem = try #require(viewMenu.item(withTitle: "Enter Full Screen"))
     #expect(fullScreenItem.keyEquivalent == "f")
     #expect(fullScreenItem.keyEquivalentModifierMask == [.control, .command])
+    #expect(fullScreenItem.target === windowCommands)
     let windowMenu = try #require(mainMenu.items.first { $0.title == "Window" }?.submenu)
-    #expect(windowMenu.item(withTitle: "Minimize")?.keyEquivalent == "m")
-    #expect(windowMenu.item(withTitle: "Zoom")?.action == #selector(NSWindow.performZoom(_:)))
+    let minimizeItem = try #require(windowMenu.item(withTitle: "Minimize"))
+    let zoomItem = try #require(windowMenu.item(withTitle: "Zoom"))
+    #expect(minimizeItem.keyEquivalent == "m")
+    #expect(minimizeItem.target === windowCommands)
+    #expect(zoomItem.target === windowCommands)
     #expect(windowMenu.item(withTitle: "Bring All to Front") != nil)
   }
 }

@@ -14,4 +14,8 @@ enum NativeWindowPolicy {
   ) -> NSRect {
     screenVisibleFrame ?? defaultFrame
   }
+
+  static func fullScreenMenuTitle(isFullScreen: Bool) -> String {
+    isFullScreen ? "Exit Full Screen" : "Enter Full Screen"
+  }
 }

@@ -3,6 +3,7 @@ import Foundation
 
 @MainActor
 final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
+  let windowCommands = NativeWindowCommandHandler()
   private var menuBarController: MenuBarController?
   private var smokeTimeout: DispatchWorkItem?
   private var didFinishSmokeCheck = false
@@ -142,7 +143,9 @@ enum DoneLogMenuBarApp {
     let application = NSApplication.shared
     let delegate = DoneLogApplicationDelegate()
     application.delegate = delegate
-    let mainMenu = ApplicationMenuFactory.makeMainMenu()
+    let mainMenu = ApplicationMenuFactory.makeMainMenu(
+      windowCommands: delegate.windowCommands
+    )
     application.mainMenu = mainMenu
     application.windowsMenu = mainMenu.items.first {
       $0.title == "Window"

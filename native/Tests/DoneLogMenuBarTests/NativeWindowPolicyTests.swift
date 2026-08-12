@@ -15,6 +15,8 @@ struct NativeWindowPolicyTests {
     #expect(style.contains(.resizable))
     #expect(style != .borderless)
     #expect(!style.contains(.fullSizeContentView))
+    #expect(NativeWindowPolicy.fullScreenMenuTitle(isFullScreen: false) == "Enter Full Screen")
+    #expect(NativeWindowPolicy.fullScreenMenuTitle(isFullScreen: true) == "Exit Full Screen")
   }
 
   @Test("Zoom fills the usable screen while preserving a fallback")
@@ -46,6 +48,7 @@ struct NativeWindowPolicyTests {
 
     #expect(window.contentMaxSize.width > 1_800)
     #expect(window.contentMaxSize.height > 1_130)
+    #expect(window.contentViewController?.preferredContentSize == .zero)
   }
 
   @Test("Uses the screen visible frame for the native zoom action")
