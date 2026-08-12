@@ -900,7 +900,7 @@ async function exerciseDetailEditing(page) {
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
-    return state.todos.find((item) => item.id === 'ui-smoke-local-task')?.note === '\t- [x] Follow up with USCIS\n\t';
+    return state.todos.find((item) => item.id === 'ui-smoke-local-task')?.note === '\t- [x] Follow up with USCIS\n\t- [ ] ';
   });
   const enterIndentCheck = await page.evaluate(() => ({
     noteValue: document.querySelector('#detail-note')?.value,
@@ -1340,7 +1340,7 @@ function assertDetailEditing(result) {
     failures.push(`missing start time does not default to creation time: ${JSON.stringify(summaryTimeEdit)}`);
   }
 
-  if (editChecks.storedNote !== '\t- [x] Follow up with USCIS\n\t' || editChecks.storedTitle !== 'Smoke renamed task') {
+  if (editChecks.storedNote !== '\t- [x] Follow up with USCIS\n\t- [ ] ' || editChecks.storedTitle !== 'Smoke renamed task') {
     failures.push(`detail editing failed: ${JSON.stringify(editChecks)}`);
   }
 
@@ -1361,11 +1361,11 @@ function assertDetailEditing(result) {
   }
 
   if (
-    editChecks.enterIndentCheck?.noteValue !== '\t- [x] Follow up with USCIS\n\t' ||
-    editChecks.enterIndentCheck?.selectionStart !== 29 ||
+    editChecks.enterIndentCheck?.noteValue !== '\t- [x] Follow up with USCIS\n\t- [ ] ' ||
+    editChecks.enterIndentCheck?.selectionStart !== 35 ||
     editChecks.enterIndentCheck?.activeElementId !== 'detail-note'
   ) {
-    failures.push(`enter key did not preserve note indentation: ${JSON.stringify(editChecks.enterIndentCheck)}`);
+    failures.push(`enter key did not continue the indented checklist: ${JSON.stringify(editChecks.enterIndentCheck)}`);
   }
 
   if (
