@@ -85,7 +85,7 @@
     <div class="board-brand">
       <p class="eyebrow">Done Log</p>
       <h1 id="board-heading">Board</h1>
-      <p class="panel-note">Drag tasks across columns to start timing, then finish when you move them to Done.</p>
+      <p class="panel-note">Drag tasks across columns to time work, finish it, or move it to Someday.</p>
     </div>
 
     <div class="board-header-actions">

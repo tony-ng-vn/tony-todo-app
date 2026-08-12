@@ -25,6 +25,7 @@
   export let onProgressiveChange;
   export let onProgressCommit;
   export let onDueDateChange;
+  export let onSomedayChange;
   export let onTimingChange;
   export let onDelete;
 
@@ -71,7 +72,10 @@
 
   $: isRunning = Boolean(todo.activeStartedAt);
   $: isCompleted = Boolean(todo.completedAt);
-  $: isPaused = Boolean(todo.firstStartedAt && !todo.activeStartedAt && !todo.completedAt);
+  $: isSomeday = Boolean(todo.somedayAt && !todo.completedAt);
+  $: isPaused = Boolean(
+    todo.firstStartedAt && !todo.activeStartedAt && !todo.completedAt && !todo.somedayAt,
+  );
   $: taskUrl = getStandaloneWebUrl(todo.title);
   $: duration = formatDuration(getElapsedSeconds(todo));
   $: timingBlocksTotal = timingBlocksDraft.reduce((total, block) => {
@@ -264,6 +268,7 @@
 <article
   class:is-running={isRunning}
   class:is-paused={isPaused}
+  class:is-someday={isSomeday}
   class:is-expanded={expanded}
   class="menubar-task"
   data-menubar-id={todo.id}
@@ -275,6 +280,7 @@
         <span class="menubar-task-title-row">
           <MenubarLinkTitle url={taskUrl} fallbackTitle={shortenLinksText(todo.title)} />
           {#if isPaused}<span class="menubar-paused-badge">Paused</span>{/if}
+          {#if isSomeday}<span class="menubar-someday-badge">Someday</span>{/if}
         </span>
         {@render taskMetadata()}
       </div>
@@ -288,6 +294,7 @@
         <span class="menubar-task-title-row">
           <span class="menubar-task-title">{shortenLinksText(todo.title)}</span>
           {#if isPaused}<span class="menubar-paused-badge">Paused</span>{/if}
+          {#if isSomeday}<span class="menubar-someday-badge">Someday</span>{/if}
         </span>
         {@render taskMetadata()}
       </button>
@@ -306,7 +313,7 @@
             {@html iconPage()}
           </button>
         {/if}
-        {#if !isCompleted}
+        {#if !isCompleted && !isSomeday}
           <button
             type="button"
             class:menubar-pause={isRunning}
@@ -412,6 +419,18 @@
         />
       </label>
 
+      {#if !isCompleted}
+        <div class="menubar-someday-state">
+          <span>
+            <strong>{isSomeday ? 'Someday' : 'Active task'}</strong>
+            <small>{isSomeday ? 'Paused with no return date.' : 'Keep this for a possible future return.'}</small>
+          </span>
+          <button type="button" on:click={() => onSomedayChange(todo.id, !isSomeday)}>
+            {isSomeday ? 'Return to active' : 'Move to Someday'}
+          </button>
+        </div>
+      {/if}
+
       <div class="menubar-timing-controls" aria-label="Task timing">
         <div class="menubar-timing-heading">
           <div>
@@ -505,6 +524,11 @@
     background: color-mix(in srgb, var(--board-paused-surface) 56%, var(--block-surface));
   }
 
+  .menubar-task.is-someday {
+    border-color: color-mix(in srgb, var(--board-someday) 32%, var(--block-border));
+    background: color-mix(in srgb, var(--board-someday-surface) 56%, var(--block-surface));
+  }
+
   .menubar-task-summary {
     display: grid;
     grid-template-columns: 6px minmax(0, 1fr) auto;
@@ -529,6 +553,10 @@
   .is-paused .menubar-task-dot {
     background: var(--board-paused);
     animation: menubar-paused-breathe 2.8s ease-in-out infinite;
+  }
+
+  .is-someday .menubar-task-dot {
+    background: var(--board-someday);
   }
 
   .menubar-details-toggle {
@@ -564,7 +592,8 @@
     font-weight: 600;
   }
 
-  .menubar-paused-badge {
+  .menubar-paused-badge,
+  .menubar-someday-badge {
     flex: 0 0 auto;
     padding: 1px 5px;
     border: 1px solid var(--board-paused-soft);
@@ -575,6 +604,12 @@
     font-weight: 700;
     letter-spacing: 0.04em;
     text-transform: uppercase;
+  }
+
+  .menubar-someday-badge {
+    border-color: var(--board-someday-soft);
+    background: var(--board-someday-surface);
+    color: var(--board-someday);
   }
 
   .menubar-task-meta,
@@ -679,6 +714,49 @@
   .menubar-details-toggle:focus-visible,
   .menubar-icon-button:focus-visible,
   .menubar-delete:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
+  }
+
+  .menubar-someday-state {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 10px;
+    align-items: center;
+    padding: 10px;
+    border: 1px solid var(--board-someday-soft);
+    border-radius: 10px;
+    background: var(--board-someday-surface);
+  }
+
+  .menubar-someday-state > span {
+    display: grid;
+    gap: 2px;
+  }
+
+  .menubar-someday-state strong {
+    color: var(--strong);
+    font-size: 12px;
+  }
+
+  .menubar-someday-state small {
+    color: var(--subtle);
+    font-size: 11px;
+  }
+
+  .menubar-someday-state button {
+    min-height: 34px;
+    padding: 0 10px;
+    border: 1px solid var(--board-someday-soft);
+    border-radius: 9px;
+    background: var(--surface-strong);
+    color: var(--strong);
+    font: inherit;
+    font-weight: 500;
+    white-space: nowrap;
+  }
+
+  .menubar-someday-state button:focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 1px;
   }

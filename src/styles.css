@@ -696,7 +696,7 @@ h2 {
 
 .board-columns {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(5, minmax(0, 1fr));
   gap: var(--space-3);
   flex: 1 1 auto;
   min-height: 0;
@@ -728,6 +728,10 @@ h2 {
 
 .board-column[data-column='paused'] {
   background: var(--board-paused-surface);
+}
+
+.board-column[data-column='someday'] {
+  background: var(--board-someday-surface);
 }
 
 .board-column[data-column='done'] {
@@ -772,6 +776,11 @@ h2 {
   background: var(--board-paused);
 }
 
+.board-status-pill[data-status='someday'] {
+  background: var(--board-someday);
+  color: #f8f5f0;
+}
+
 .board-status-pill[data-status='done'] {
   background: var(--board-done);
 }
@@ -800,6 +809,10 @@ h2 {
 
 .board-column-count[data-status='paused'] {
   color: var(--board-paused);
+}
+
+.board-column-count[data-status='someday'] {
+  color: var(--board-someday);
 }
 
 .board-column-count[data-status='done'] {
@@ -986,6 +999,11 @@ h2 {
 .board-new-task[data-status='paused'] {
   border-color: var(--board-paused-soft);
   color: var(--board-paused);
+}
+
+.board-new-task[data-status='someday'] {
+  border-color: var(--board-someday-soft);
+  color: var(--board-someday);
 }
 
 .board-new-task[data-status='done'] {
@@ -1910,6 +1928,60 @@ h2 {
   line-height: 1.28;
 }
 
+.detail-someday-state {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--empty-surface);
+}
+
+.detail-someday-state.someday-active {
+  border-color: var(--board-someday-soft);
+  background: var(--board-someday-surface);
+}
+
+.detail-someday-state > span {
+  display: grid;
+  gap: 3px;
+}
+
+.detail-someday-state strong {
+  color: var(--strong);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.detail-someday-state small {
+  color: var(--subtle);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.detail-someday-button {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--board-someday-soft);
+  border-radius: 10px;
+  background: var(--surface-strong);
+  color: var(--strong);
+  font: inherit;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.detail-someday-button:hover {
+  background: var(--block-hover);
+}
+
+.detail-someday-button:focus-visible {
+  outline: 2px solid var(--subtle);
+  outline-offset: 2px;
+}
+
 .progress-toggle {
   display: grid;
   grid-template-columns: 18px minmax(0, 1fr);
@@ -2478,6 +2550,10 @@ h2 {
   }
 
   .detail-timeline {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-someday-state {
     grid-template-columns: 1fr;
   }
 }

@@ -10,6 +10,7 @@ import {
   updateRemoteTodoProgress,
   updateRemoteTodoTimer,
   updateRemoteTodoTitle,
+  updateRemoteTodoWorkflow,
 } from './todoRemote.js';
 
 describe('todo remote mapping', () => {
@@ -59,6 +60,7 @@ describe('todo remote mapping', () => {
           title: 'Send invoice',
           createdAt: '2026-06-08T08:00:00.000Z',
           completedAt: null,
+          somedayAt: '2026-06-08T09:30:00.000Z',
           dueDate: '2026-06-12T00:00:00.000Z',
           note: 'Bring account number',
           firstStartedAt: '2026-06-08T08:10:00.000Z',
@@ -83,6 +85,7 @@ describe('todo remote mapping', () => {
       title: 'Send invoice',
       created_at: '2026-06-08T08:00:00.000Z',
       completed_at: null,
+      someday_at: '2026-06-08T09:30:00.000Z',
       due_date: '2026-06-12T00:00:00.000Z',
       note: 'Bring account number',
       source: 'app',
@@ -112,6 +115,7 @@ describe('todo remote mapping', () => {
         title: 'Send invoice',
         created_at: '2026-06-08T08:00:00.000Z',
         completed_at: '2026-06-08T09:00:00.000Z',
+        someday_at: null,
         due_date: '2026-06-12T00:00:00.000Z',
         note: 'Bring account number',
         source: 'notion',
@@ -137,6 +141,7 @@ describe('todo remote mapping', () => {
       title: 'Send invoice',
       createdAt: '2026-06-08T08:00:00.000Z',
       completedAt: '2026-06-08T09:00:00.000Z',
+      somedayAt: null,
       dueDate: '2026-06-12T00:00:00.000Z',
       note: 'Bring account number',
       source: 'notion',
@@ -200,6 +205,65 @@ describe('todo remote mapping', () => {
       ).due_date,
     ).toBeNull();
     expect(fromRemoteRecord({ id: 'todo-1', title: 'No due date' }).dueDate).toBeNull();
+  });
+
+  it('maps a missing someday timestamp to null in both directions', () => {
+    expect(
+      toRemoteRecord(
+        { id: 'todo-1', title: 'Active task', createdAt: '2026-06-08T08:00:00.000Z' },
+        'user-123',
+      ).someday_at,
+    ).toBeNull();
+    expect(fromRemoteRecord({ id: 'todo-1', title: 'Active task' }).somedayAt).toBeNull();
+  });
+
+  it('updates the complete workflow state when a task moves to someday', async () => {
+    const calls = [];
+    const client = {
+      database: {
+        from(table) {
+          calls.push(['from', table]);
+          return {
+            update(values) {
+              calls.push(['update', values]);
+              return {
+                eq(column, value) {
+                  calls.push(['eq', column, value]);
+                  return this;
+                },
+                then(resolve) {
+                  resolve({ error: null });
+                },
+              };
+            },
+          };
+        },
+      },
+    };
+
+    await updateRemoteTodoWorkflow(client, 'user-123', {
+      id: 'todo-1',
+      completedAt: null,
+      somedayAt: '2026-06-08T09:30:00.000Z',
+      firstStartedAt: '2026-06-08T09:00:00.000Z',
+      activeStartedAt: null,
+      trackedSeconds: 1800,
+      timeSegments: [
+        {
+          startedAt: '2026-06-08T09:00:00.000Z',
+          endedAt: '2026-06-08T09:30:00.000Z',
+        },
+      ],
+    });
+
+    expect(calls[1][1]).toMatchObject({
+      completed_at: null,
+      someday_at: '2026-06-08T09:30:00.000Z',
+      active_started_at: null,
+      tracked_seconds: 1800,
+    });
+    expect(calls).toContainEqual(['eq', 'id', 'todo-1']);
+    expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
   });
 
   it('updates a remote due date scoped by user id', async () => {

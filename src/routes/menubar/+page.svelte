@@ -9,15 +9,18 @@
     createInitialState,
     deleteTodo,
     findDuplicateTodo,
+    getActiveTodos,
     getOpenTodoSections,
     getCompletedTodoSections,
-    getPendingTodos,
     getProgressSessions,
+    getSomedayTodos,
     logProgressSession,
     pauseTodoTimer,
     partitionTaskFlowTodos,
+    restoreTodoFromSomeday,
     setTodoDueDate,
     setTodoProgressive,
+    setTodoSomeday,
     startTodoTimer,
     updateTodoTimeSegments,
     updateTodoNote,
@@ -48,6 +51,7 @@
     updateRemoteTodoProgress,
     updateRemoteTodoTimer,
     updateRemoteTodoTitle,
+    updateRemoteTodoWorkflow,
   } from '../../todoRemote.js';
 
   const TIMER_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds', 'timeSegments'];
@@ -82,7 +86,7 @@
   let updateCheckTimer = null;
   const noteAutosave = createDebouncedSaveQueue(saveNoteToRemote);
 
-  $: pendingTodos = getPendingTodos(state).map((todo) => ({
+  $: pendingTodos = getActiveTodos(state).map((todo) => ({
     ...todo,
     latestProgressSession: getProgressSessions(state, todo.id)[0] ?? null,
   }));
@@ -93,6 +97,7 @@
   $: todayOpenSection = openTodoSections.find((section) => section.isToday) ?? null;
   $: datedOpenSections = openTodoSections.filter((section) => !section.isToday);
   $: openTodos = openTodoSections.flatMap((section) => section.items);
+  $: somedayTodos = getSomedayTodos(state);
   $: completedTodoSections = getCompletedTodoSections(state, new Date());
 
   onMount(() => {
@@ -466,6 +471,25 @@
     await syncRemoteChange('Saving due date', () => persistTodoDueDate(after));
   }
 
+  async function handleSomedayChange(todoId, moveToSomeday) {
+    const before = findTodo(todoId);
+    state = moveToSomeday
+      ? setTodoSomeday(state, todoId)
+      : restoreTodoFromSomeday(state, todoId);
+    const after = findTodo(todoId);
+
+    if (!before || !after || before.somedayAt === after.somedayAt) {
+      renderSyncStatus();
+      return;
+    }
+
+    expandedTaskId = null;
+    saveLocalState(state);
+    await syncRemoteChange(moveToSomeday ? 'Moving to Someday' : 'Returning to active tasks', () =>
+      persistTodoWorkflow(after),
+    );
+  }
+
   async function handleTimingChange(todoId, segments) {
     const beforeTodos = state.todos;
     state = updateTodoTimeSegments(state, todoId, segments);
@@ -529,6 +553,11 @@
   async function persistTodoTimer(todo) {
     if (!useRemote || !authUser || !todo) return;
     await updateRemoteTodoTimer(insforge, authUser.id, todo);
+  }
+
+  async function persistTodoWorkflow(todo) {
+    if (!useRemote || !authUser || !todo) return;
+    await updateRemoteTodoWorkflow(insforge, authUser.id, todo);
   }
 
   async function persistProgressSession(parent, session) {
@@ -738,6 +767,20 @@
         </section>
       {/if}
 
+      {#if somedayTodos.length}
+        <section data-menubar-section="someday" aria-labelledby="menubar-someday-heading">
+          <div class="menubar-section-heading">
+            <h2 id="menubar-someday-heading">Someday</h2>
+            <span>{somedayTodos.length} parked</span>
+          </div>
+          <div class="menubar-section-list">
+            {#each somedayTodos as todo (todo.id)}
+              {@render taskRow(todo)}
+            {/each}
+          </div>
+        </section>
+      {/if}
+
       {#if completedTodoSections.length}
         <section data-menubar-section="finished" aria-labelledby="menubar-finished-heading">
           <div class="menubar-section-heading">
@@ -781,6 +824,7 @@
     onProgressiveChange={handleProgressiveChange}
     onProgressCommit={handleProgressCommit}
     onDueDateChange={handleDueDateChange}
+    onSomedayChange={handleSomedayChange}
     onTimingChange={handleTimingChange}
     onDelete={handleDelete}
   />
