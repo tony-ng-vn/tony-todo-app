@@ -49,6 +49,13 @@ Repair history preserves the fingerprint before and after every attempt so a lat
 Humans still review promoted lessons in v1.
 That review is the taste and judgment boundary: a repair that happened to pass once is evidence, not yet a universal rule.
 
+## Self-testing the failure packet path
+
+The failure packet upload step in `ci.yml` only runs `if: failure()`, so a green CI run never exercises it.
+The `Dependency health` workflow closes that gap by running `npm run ci:selftest-packet` daily.
+It builds a synthetic failure record, checks that the fake secret and fake path were redacted and scrubbed, then uploads the packet unconditionally with `if-no-files-found: error`.
+That upload step failing is proof the pinned `actions/upload-artifact` version still works; the daily schedule is proof it keeps working after the next bump.
+
 ## Reusing this in another repository
 
 The portable boundary is:

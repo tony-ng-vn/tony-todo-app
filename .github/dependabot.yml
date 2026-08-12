@@ -8,6 +8,19 @@ updates:
       time: '08:00'
       timezone: America/Phoenix
     open-pull-requests-limit: 5
+    # patch/minor devDependency bumps conflict in the lockfile and must merge serially anyway,
+    # so batch them into one PR instead of costing a full CI run and a merge decision each
+    groups:
+      dev-tooling:
+        applies-to: version-updates
+        dependency-type: development
+        update-types:
+          - minor
+          - patch
+    # day-zero bad or compromised releases usually get yanked within days; security updates
+    # bypass cooldown automatically, so advisories still arrive immediately
+    cooldown:
+      default-days: 5
 
   - package-ecosystem: github-actions
     directory: /
@@ -17,3 +30,5 @@ updates:
       time: '08:15'
       timezone: America/Phoenix
     open-pull-requests-limit: 5
+    cooldown:
+      default-days: 5
