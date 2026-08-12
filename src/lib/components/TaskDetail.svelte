@@ -20,6 +20,7 @@
   export let onProgressInput;
   export let onTimeSegmentsChange;
   export let onDueDateChange;
+  export let onSomedayChange;
   export let onDeleteTask;
   export let formatDuration;
   export let completedTime;
@@ -300,6 +301,25 @@
         on:dblclick={startDetailTitleEdit}
       >
         {@html linkifyText(selectedTask.title)}
+      </div>
+    {/if}
+    {#if !selectedTask.completedAt}
+      <div class:someday-active={selectedTask.somedayAt} class="detail-someday-state">
+        <span>
+          <strong>{selectedTask.somedayAt ? 'Someday' : 'Active task'}</strong>
+          <small>
+            {selectedTask.somedayAt
+              ? 'Paused with no return date. It stays out of your active task list.'
+              : 'Move this out of your active list until you choose to return to it.'}
+          </small>
+        </span>
+        <button
+          type="button"
+          class="detail-someday-button"
+          on:click={() => onSomedayChange(selectedTask.id, !selectedTask.somedayAt)}
+        >
+          {selectedTask.somedayAt ? 'Return to active' : 'Move to Someday'}
+        </button>
       </div>
     {/if}
     <label class="progress-toggle">

@@ -24,6 +24,7 @@ export const BOARD_COLUMNS = [
   { id: 'not_started', label: 'Not started' },
   { id: 'in_progress', label: 'In progress' },
   { id: 'paused', label: 'Paused' },
+  { id: 'someday', label: 'Someday' },
   { id: 'done', label: 'Done' },
 ];
 
@@ -49,6 +50,7 @@ export function addTodo(state, title, createdAt = new Date(), { dueDate = null }
         title: cleanTitle,
         createdAt: createdAt.toISOString(),
         completedAt: null,
+        somedayAt: null,
         dueDate: assignedDate,
         note: '',
         source: 'app',
@@ -99,6 +101,7 @@ export function completeTodo(state, todoId, completedAt = new Date()) {
         ...todo,
         ...closeActiveTimeSegment(todo, doneAt),
         completedAt: doneAt.toISOString(),
+        somedayAt: null,
         activeStartedAt: null,
       };
     }),
@@ -119,6 +122,7 @@ export function failTodo(state, todoId, failedAt = new Date()) {
         ...todo,
         ...closeActiveTimeSegment(todo, doneAt),
         completedAt: doneAt.toISOString(),
+        somedayAt: null,
         activeStartedAt: null,
         notionStatus: 'Failed',
       };
@@ -277,6 +281,7 @@ export function startTodoTimer(state, todoId, startedAt = new Date()) {
 
       return {
         ...todo,
+        somedayAt: null,
         firstStartedAt: todo.firstStartedAt ?? startedAtIso,
         activeStartedAt: startedAtIso,
         trackedSeconds: normalizedTrackedSeconds(todo),
@@ -309,6 +314,7 @@ export function reopenTodo(state, todoId) {
         ? {
             ...todo,
             completedAt: null,
+            somedayAt: null,
             activeStartedAt: null,
             notionStatus: null,
             trackedSeconds: normalizedTrackedSeconds(todo),
@@ -324,9 +330,21 @@ export function getPendingTodos(state) {
     .toSorted(compareTodosNewestFirst);
 }
 
+export function getActiveTodos(state) {
+  return getPendingTodos(state).filter((todo) => !todo.somedayAt);
+}
+
+export function getSomedayTodos(state) {
+  return getPendingTodos(state).filter((todo) => Boolean(todo.somedayAt));
+}
+
 export function getBoardColumnId(todo) {
   if (todo.completedAt) {
     return 'done';
+  }
+
+  if (todo.somedayAt) {
+    return 'someday';
   }
 
   if (todo.activeStartedAt) {
@@ -424,6 +442,7 @@ export function getBoardColumns(state, { dayKey, dueFilter = 'all', now = new Da
   const notStarted = [];
   const inProgress = [];
   const paused = [];
+  const someday = [];
 
   for (const todo of pending) {
     if (!matchesDueFilter(todo, dueFilter, now)) {
@@ -435,6 +454,8 @@ export function getBoardColumns(state, { dayKey, dueFilter = 'all', now = new Da
       inProgress.push(enrichBoardItem(todo, now));
     } else if (columnId === 'paused') {
       paused.push(enrichBoardItem(todo, now));
+    } else if (columnId === 'someday') {
+      someday.push(enrichBoardItem(todo, now));
     } else {
       notStarted.push(enrichBoardItem(todo, now));
     }
@@ -457,20 +478,38 @@ export function getBoardColumns(state, { dayKey, dueFilter = 'all', now = new Da
       return { ...column, items: paused };
     }
 
+    if (column.id === 'someday') {
+      return { ...column, items: someday };
+    }
+
     return { ...column, items: done };
   });
 }
 
 export function moveTodoToBoardColumn(state, todoId, columnId, at = new Date()) {
-  const todo = state.todos.find((entry) => entry.id === todoId);
+  let todo = state.todos.find((entry) => entry.id === todoId);
 
   if (!todo || todo.isProgressSession || !BOARD_COLUMNS.some((column) => column.id === columnId)) {
     return state;
   }
 
-  const currentColumnId = getBoardColumnId(todo);
+  let currentColumnId = getBoardColumnId(todo);
   if (currentColumnId === columnId) {
     return state;
+  }
+
+  if (columnId === 'someday') {
+    return setTodoSomeday(state, todoId, at);
+  }
+
+  if (currentColumnId === 'someday' && columnId === 'paused' && !todo.firstStartedAt) {
+    return state;
+  }
+
+  if (currentColumnId === 'someday') {
+    state = restoreTodoFromSomeday(state, todoId);
+    todo = state.todos.find((entry) => entry.id === todoId);
+    currentColumnId = getBoardColumnId(todo);
   }
 
   if (columnId === 'not_started') {
@@ -506,6 +545,40 @@ export function moveTodoToBoardColumn(state, todoId, columnId, at = new Date()) 
   }
 
   return state;
+}
+
+export function setTodoSomeday(state, todoId, somedayAt = new Date()) {
+  const parkedAt = new Date(somedayAt);
+  if (Number.isNaN(parkedAt.getTime())) {
+    return state;
+  }
+
+  return {
+    ...state,
+    todos: state.todos.map((todo) => {
+      if (todo.id !== todoId || todo.isProgressSession) {
+        return todo;
+      }
+
+      return {
+        ...todo,
+        ...closeActiveTimeSegment(todo, parkedAt),
+        completedAt: null,
+        somedayAt: parkedAt.toISOString(),
+        activeStartedAt: null,
+        notionStatus: null,
+      };
+    }),
+  };
+}
+
+export function restoreTodoFromSomeday(state, todoId) {
+  return {
+    ...state,
+    todos: state.todos.map((todo) =>
+      todo.id === todoId && todo.somedayAt ? { ...todo, somedayAt: null } : todo,
+    ),
+  };
 }
 
 function enrichBoardItem(todo, now) {
@@ -1220,6 +1293,7 @@ function updateTimeSegmentBounds(segments, startTime, endTime) {
 function normalizeTodo(todo) {
   return {
     ...todo,
+    somedayAt: todo.somedayAt ?? null,
     dueDate: todo.dueDate ?? null,
     note: todo.note ?? '',
     source: todo.source ?? 'app',

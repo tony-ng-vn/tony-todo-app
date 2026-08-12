@@ -23,6 +23,7 @@
     findDuplicateTodo,
     formatDayKey,
     formatDuration,
+    getActiveTodos,
     getBoardColumns,
     getCalendarMonth,
     getDaySummary,
@@ -33,12 +34,13 @@
     logProgressSession,
     moveCompletedTodoToSummaryBucket,
     moveTodoToBoardColumn,
-    getPendingTodos,
     pauseTodoTimer,
     partitionTaskFlowTodos,
     reopenTodo,
+    restoreTodoFromSomeday,
     setTodoDueDate,
     setTodoProgressive,
+    setTodoSomeday,
     startTodoTimer,
     updateTodoTimeSegments,
     updateTodoCompletedAt,
@@ -60,6 +62,7 @@
     updateRemoteTodoProgress,
     updateRemoteTodoTimer,
     updateRemoteTodoTitle,
+    updateRemoteTodoWorkflow,
   } from '../todoRemote.js';
   import { loadLocalState, reconcileRemoteState, saveLocalState } from '../todoPersistence.js';
   import {
@@ -142,7 +145,7 @@
   let currentDayKey = formatDayKey(new Date());
   const noteAutosave = createDebouncedSaveQueue(saveNoteToRemote);
 
-  $: pendingTodos = getPendingTodos(state);
+  $: pendingTodos = getActiveTodos(state);
   $: pendingViewTodos = withLatestProgressSession(pendingTodos);
   $: pendingTodoGroups = partitionTaskFlowTodos(
     pendingViewTodos,
@@ -387,6 +390,24 @@
     await syncRemoteChange('Saving due date', () => persistTodoDueDate(after));
   }
 
+  async function handleSomedayChange(todoId, moveToSomeday) {
+    const before = findTodo(todoId);
+    state = moveToSomeday
+      ? setTodoSomeday(state, todoId)
+      : restoreTodoFromSomeday(state, todoId);
+    const after = findTodo(todoId);
+
+    if (!before || !after || before.somedayAt === after.somedayAt) {
+      renderRemoteStatus();
+      return;
+    }
+
+    saveLocalState(state);
+    await syncRemoteChange(moveToSomeday ? 'Moving to Someday' : 'Returning to active tasks', () =>
+      persistTodoWorkflow(after),
+    );
+  }
+
   function handleTitleKeydown(event, todoId, title) {
     if (event.key === 'Escape') {
       editingTaskId = null;
@@ -481,13 +502,17 @@
     state = moveTodoToBoardColumn(state, todoId, columnId);
     const afterTodo = findTodo(todoId);
     const createdTodo = state.todos.find((todo) => !beforeTodos.some((before) => before.id === todo.id));
-    const changedTimerTodos = getTimerChangedTodos(beforeTodos, state.todos);
-    const changedCompletionTodos = getCompletionChangedTodos(beforeTodos, state.todos);
+    const changedWorkflowTodos = getTodosWithChangedFields(beforeTodos, state.todos, [
+      ...TIMER_SYNC_FIELDS,
+      ...COMPLETION_SYNC_FIELDS,
+      'somedayAt',
+    ]);
 
     if (
       beforeTodo &&
       afterTodo &&
       beforeTodo.completedAt === afterTodo.completedAt &&
+      beforeTodo.somedayAt === afterTodo.somedayAt &&
       beforeTodo.activeStartedAt === afterTodo.activeStartedAt &&
       beforeTodo.trackedSeconds === afterTodo.trackedSeconds &&
       !createdTodo
@@ -509,18 +534,18 @@
     saveLocalState(state);
 
     if (beforeTodo?.isProgressive && columnId === 'done') {
-      await syncRemoteChange('Saving session', () => persistProgressSession(afterTodo, createdTodo));
+      await syncRemoteChange('Saving session', async () => {
+        await persistProgressSession(afterTodo, createdTodo);
+        if (beforeTodo.somedayAt !== afterTodo?.somedayAt) {
+          await persistTodoWorkflow(afterTodo);
+        }
+      });
       return;
     }
 
-    if (changedCompletionTodos.length > 0) {
-      await syncRemoteChange('Saving', () => persistCompletionChangedTodos(changedCompletionTodos));
-      return;
-    }
-
-    if (changedTimerTodos.length > 0) {
-      await syncRemoteChange('Saving time', () =>
-        Promise.all(changedTimerTodos.map((todo) => persistTodoTimer(todo))),
+    if (changedWorkflowTodos.length > 0) {
+      await syncRemoteChange('Saving task state', () =>
+        Promise.all(changedWorkflowTodos.map((todo) => persistTodoWorkflow(todo))),
       );
     }
   }
@@ -535,7 +560,7 @@
     const existingIds = new Set(state.todos.map((todo) => todo.id));
     state = addTodo(state, title, new Date(), { dueDate: dueDateInputToIso(selectedDay) });
 
-    if (columnId === 'in_progress' || columnId === 'done') {
+    if (columnId === 'in_progress' || columnId === 'someday' || columnId === 'done') {
       const created = state.todos.find((todo) => !existingIds.has(todo.id));
       if (created) {
         state = moveTodoToBoardColumn(state, created.id, columnId);
@@ -1177,6 +1202,11 @@
     await updateRemoteTodoTimer(insforge, authUser.id, todo);
   }
 
+  async function persistTodoWorkflow(todo) {
+    if (!useRemote || !authUser || !todo) return;
+    await updateRemoteTodoWorkflow(insforge, authUser.id, todo);
+  }
+
   async function persistProgressSession(parent, session) {
     if (!useRemote || !authUser || !parent || !session) return;
     await logRemoteProgressSession(insforge, parent, session);
@@ -1422,6 +1452,7 @@
     onProgressInput={handleProgressInput}
     onTimeSegmentsChange={handleTimeSegmentsChange}
     onDueDateChange={handleDueDateChange}
+    onSomedayChange={handleSomedayChange}
     onDeleteTask={handleDeleteTask}
     {formatDuration}
     {completedTime}

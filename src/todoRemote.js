@@ -1,5 +1,5 @@
 const TODO_SELECT_COLUMNS =
-  'id,title,created_at,completed_at,due_date,note,source,notion_page_id,notion_database_id,notion_status,first_started_at,active_started_at,tracked_seconds,time_segments,is_progressive,parent_task_id,is_progress_session,progress_label';
+  'id,title,created_at,completed_at,someday_at,due_date,note,source,notion_page_id,notion_database_id,notion_status,first_started_at,active_started_at,tracked_seconds,time_segments,is_progressive,parent_task_id,is_progress_session,progress_label';
 
 export function toRemoteRecord(todo, userId) {
   return {
@@ -8,6 +8,7 @@ export function toRemoteRecord(todo, userId) {
     title: todo.title,
     created_at: todo.createdAt,
     completed_at: todo.completedAt,
+    someday_at: todo.somedayAt ?? null,
     due_date: todo.dueDate ?? null,
     note: todo.note ?? '',
     source: todo.source ?? 'app',
@@ -31,6 +32,7 @@ export function fromRemoteRecord(record) {
     title: record.title,
     createdAt: record.created_at,
     completedAt: record.completed_at,
+    somedayAt: record.someday_at ?? null,
     dueDate: record.due_date ?? null,
     note: record.note ?? '',
     source: record.source ?? 'app',
@@ -95,6 +97,10 @@ export async function updateRemoteTodoCompletion(client, userId, todo) {
   await updateRemoteTodo(client, userId, todo, completionFields(todo));
 }
 
+export async function updateRemoteTodoWorkflow(client, userId, todo) {
+  await updateRemoteTodo(client, userId, todo, completionFields(todo));
+}
+
 export async function logRemoteProgressSession(client, parent, session) {
   const { error } = await client.database.rpc('log_progress_session', {
     p_parent_id: parent.id,
@@ -134,6 +140,7 @@ async function updateRemoteTodo(client, userId, todo, fields) {
 function completionFields(todo) {
   return {
     completed_at: todo.completedAt,
+    someday_at: todo.somedayAt ?? null,
     notion_status: todo.notionStatus ?? null,
     ...timerFields(todo),
   };
