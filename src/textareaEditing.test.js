@@ -131,6 +131,19 @@ describe('textarea editing', () => {
     ).toEqual({ value: '- Parent\n', cursor: 9 });
   });
 
+  it('ends empty checkbox items even when they have no trailing space', () => {
+    for (const value of ['- [x]', '- [ ]']) {
+      expect(
+        getTextareaKeyEdit({
+          value,
+          selectionStart: value.length,
+          selectionEnd: value.length,
+          key: 'Enter',
+        }),
+      ).toEqual({ value: '', cursor: 0 });
+    }
+  });
+
   it('uses native shift enter behavior instead of creating another list item', () => {
     const value = '- First item';
 

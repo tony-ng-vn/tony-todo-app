@@ -83,13 +83,14 @@ function insertAt(value, index, insertion, cursor) {
 }
 
 function parseListItem(line) {
-  const checkbox = line.match(/^([\t ]*)([-+*][\t ]+\[[ xX]\][\t ]+)(.*)$/);
+  const checkbox = line.match(/^([\t ]*)([-+*][\t ]+\[[ xX]\])(?:([\t ]+)(.*))?$/);
   if (checkbox) {
+    const spacing = checkbox[3] ?? ' ';
     return {
       indentation: checkbox[1],
-      prefix: checkbox[2],
-      nextPrefix: checkbox[2].replace(/\[[xX]\]/, '[ ]'),
-      content: checkbox[3],
+      prefix: `${checkbox[2]}${spacing}`,
+      nextPrefix: `${checkbox[2].replace(/\[[xX]\]/, '[ ]')}${spacing}`,
+      content: checkbox[4] ?? '',
     };
   }
 
