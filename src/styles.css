@@ -92,6 +92,8 @@
 .task-panel {
   display: flex;
   flex-direction: column;
+  container-name: task-panel;
+  container-type: inline-size;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -102,6 +104,8 @@
 .summary-panel {
   display: flex;
   flex-direction: column;
+  container-name: summary-panel;
+  container-type: inline-size;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
@@ -1824,6 +1828,8 @@ h2 {
 
 .task-detail {
   display: grid;
+  container-name: task-detail;
+  container-type: inline-size;
   grid-template-rows: auto auto auto auto auto minmax(220px, 1fr) auto auto;
   gap: 18px;
   min-width: 0;
@@ -2362,6 +2368,63 @@ h2 {
   color: var(--strong);
   font-size: 13px;
   font-weight: 500;
+}
+
+@container task-panel (max-width: 620px) {
+  .input-row {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: stretch;
+  }
+
+  .input-row input {
+    grid-column: 1 / -1;
+    width: 100%;
+  }
+
+  .new-task-calendar {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .input-row > button {
+    min-width: 88px;
+  }
+}
+
+@container task-panel (max-width: 480px) {
+  .todo-item {
+    grid-template-columns: 10px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  .task-block-dot {
+    margin-top: 5px;
+  }
+
+  .task-actions {
+    grid-column: 2;
+    justify-self: end;
+  }
+}
+
+@container summary-panel (max-width: 460px) {
+  .summary-top {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .summary-date-navigation {
+    width: 100%;
+  }
+}
+
+@container task-detail (max-width: 420px) {
+  .detail-timeline,
+  .detail-someday-state,
+  .time-block-item {
+    grid-template-columns: 1fr;
+  }
 }
 
 @media (max-width: 900px) {
