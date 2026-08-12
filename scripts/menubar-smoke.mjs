@@ -833,6 +833,11 @@ async function inspectFloatingNote() {
     const todo = JSON.parse(localStorage.getItem('done-log-state')).todos[0];
     return todo?.note === 'Note from floating window';
   });
+  await notePage.waitForFunction(
+    () =>
+      document.querySelector('.floating-note-save-status')?.textContent.trim()
+      === 'Note saved automatically',
+  );
   const presentation = await notePage.evaluate(() => ({
     title: document.querySelector('.floating-note-title')?.textContent.trim(),
     status: document.querySelector('.floating-note-save-status')?.textContent.trim(),
