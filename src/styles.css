@@ -1915,11 +1915,10 @@ h2 {
 
 .detail-notes {
   display: flex;
-  flex: 1 1 auto;
+  flex: 0 0 auto;
   flex-direction: column;
   gap: 8px;
   min-width: 0;
-  min-height: 220px;
 }
 
 .detail-note-row {
@@ -2056,15 +2055,18 @@ h2 {
 
 .detail-note-shell {
   display: grid;
-  flex: 1 1 auto;
-  min-height: 220px;
+  flex: 0 0 auto;
+  min-height: 0;
 }
 
 .detail-note {
   width: 100%;
-  height: 100%;
-  min-height: 220px;
+  field-sizing: content;
+  height: auto;
+  min-height: 96px;
+  max-height: min(36vh, 280px);
   resize: vertical;
+  overflow: auto;
   padding: 14px 16px;
   -webkit-appearance: none;
   appearance: none;
@@ -2072,6 +2074,13 @@ h2 {
   font-size: 14px;
   font-weight: 400;
   line-height: 1.45;
+  scrollbar-width: none;
+}
+
+.detail-note::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;
 }
 
 .detail-note::placeholder {

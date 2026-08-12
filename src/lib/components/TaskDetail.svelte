@@ -359,7 +359,7 @@
         <textarea
           id="detail-note"
           class="detail-note"
-          rows="8"
+          rows="4"
           placeholder="Add context, links, or reminders for this task."
           value={noteDraft}
           on:input={handleNoteTextareaInput}
