@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 describe('menu bar app bundle', () => {
-  it('declares a background-only macOS app bundle', () => {
+  it('declares a menu bar macOS app bundle', () => {
     const plist = readFileSync(path.join(repoRoot, 'native/App/Info.plist'), 'utf8');
     const packageJson = JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
 
@@ -51,6 +51,32 @@ describe('menu bar app bundle', () => {
 
     expect(controller).toContain('statusItem.autosaveName');
     expect(controller).toContain('statusItem.isVisible = true');
+  });
+
+  it('opens the browser-sized experience in a native window', () => {
+    const controller = readFileSync(
+      path.join(repoRoot, 'native/Sources/DoneLogMenuBar/FullAppWindowController.swift'),
+      'utf8',
+    );
+    const app = readFileSync(
+      path.join(repoRoot, 'native/Sources/DoneLogMenuBar/DoneLogMenuBarApp.swift'),
+      'utf8',
+    );
+
+    expect(controller).toContain('MenuBarConfiguration.fullAppSize');
+    expect(controller).toContain('application.setActivationPolicy(.regular)');
+    expect(controller).toContain('application.setActivationPolicy(.accessory)');
+    expect(app).toContain('NativeAppLaunchPolicy.shouldOpenFullApp');
+  });
+
+  it('keeps generated app bundles out of Spotlight-visible dist', () => {
+    const builder = readFileSync(path.join(repoRoot, 'scripts/build-menubar-app.sh'), 'utf8');
+    const installer = readFileSync(path.join(repoRoot, 'scripts/install-menubar-app.sh'), 'utf8');
+
+    expect(builder).toContain('BUILD_ROOT="$REPO_ROOT/.build/app-bundle"');
+    expect(installer).toContain('SOURCE_APP="$REPO_ROOT/.build/app-bundle/Done Log.app"');
+    expect(builder).not.toContain('BUILD_ROOT="$REPO_ROOT/dist"');
+    expect(installer).not.toContain('SOURCE_APP="$REPO_ROOT/dist/Done Log.app"');
   });
 
   it('marks native web views before the menu bar page loads', () => {

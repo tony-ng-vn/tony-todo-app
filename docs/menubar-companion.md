@@ -1,6 +1,7 @@
 # macOS Menu Bar Companion
 
-The menu bar companion provides a compact Done Log surface at `/menubar`.
+The macOS app opens the complete Done Log experience in a native window and keeps a compact companion available from the menu bar.
+The compact surface runs at `/menubar`.
 It supports quick capture, ongoing and open task lists, timer controls, normal completion, progressive session logging, and inline task details.
 
 ## Install
@@ -11,10 +12,10 @@ Install Done Log in Applications:
 npm run menubar:install
 ```
 
-The installer builds and signs `/Applications/Done Log.app`, enables launch at login, and opens it.
-The app then runs independently from the terminal and returns automatically after the next login.
-Open Done Log later from Applications or Spotlight.
-Right-click the menu bar icon to turn Launch at Login on or off, open the full app, or quit.
+The installer builds and signs `/Applications/Done Log.app`, enables launch at login, and opens the full native window.
+The app then runs independently from the terminal and returns in menu-bar-only mode after the next login.
+Open Done Log later from Applications or Spotlight to show the full native window.
+Right-click the menu bar icon to turn Launch at Login on or off, open the full window, or quit.
 
 ## Run Locally
 
@@ -60,7 +61,8 @@ DONE_LOG_MENUBAR_URL=https://example.com/menubar npm run menubar
 
 - Click the tray icon to show or hide the popover.
 - Click outside the popover to hide it.
-- Use Open full app to open the root app in the default browser.
+- Open Done Log from Spotlight, Applications, or the menu-bar context menu to show the root app in a resizable native window.
+- Close the full window to return to menu-bar-only mode.
 - Right-click the tray icon to control launch at login, open the full app, or quit the shell.
 - Ongoing tasks appear before open tasks.
 - Starting a timer does not pause other running tasks because the current app supports parallel timers.
@@ -94,5 +96,5 @@ For the manual native check:
 6. Expand the task, edit its fields, and confirm the note saves automatically.
 7. Click outside the popover and confirm it hides.
 8. Reopen it and confirm the task state remains.
-9. Use Open full app and confirm the root app opens in the default browser.
+9. Open Done Log from Spotlight and confirm the full root app opens in a resizable native window.
 10. Right-click the tray icon and confirm Launch at Login, Open Done Log, and Quit are available.

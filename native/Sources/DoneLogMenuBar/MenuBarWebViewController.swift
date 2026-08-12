@@ -4,7 +4,7 @@ import WebKit
 @MainActor
 final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WKUIDelegate {
   private let homeURL: URL
-  private let readySelector: String
+  private let readySelector: String?
   private var webView: WKWebView!
   private var didCompleteInitialLoad = false
   private var isValidatingInitialLoad = false
@@ -18,7 +18,7 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
   init(
     homeURL: URL,
     preferredSize: NSSize = MenuBarConfiguration.popoverSize,
-    readySelector: String = ".menubar-shell"
+    readySelector: String? = ".menubar-shell"
   ) {
     self.homeURL = homeURL
     self.readySelector = readySelector
@@ -134,6 +134,11 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
 
   private func validateInitialLoad(in webView: WKWebView) {
     guard !didCompleteInitialLoad, !isValidatingInitialLoad else {
+      return
+    }
+
+    guard let readySelector else {
+      completeInitialLoad(with: .success(()))
       return
     }
 

@@ -38,8 +38,8 @@ final class SingleInstanceLock {
 }
 
 extension Notification.Name {
-  static let doneLogShowPopover = Notification.Name(
-    "com.tonynguyen.done-log-menubar.show-popover"
+  static let doneLogShowFullApp = Notification.Name(
+    "com.tonynguyen.done-log-menubar.show-full-app"
   )
   static let doneLogQuit = Notification.Name(
     "com.tonynguyen.done-log-menubar.quit"
@@ -47,6 +47,12 @@ extension Notification.Name {
 }
 
 enum MenuBarLaunchPolicy {
+  static func lockContentionNotification(
+    isSmokeCheck: Bool
+  ) -> Notification.Name? {
+    isSmokeCheck ? nil : .doneLogShowFullApp
+  }
+
   static func lockContentionExitCode(isSmokeCheck: Bool) -> Int32 {
     isSmokeCheck ? 1 : 0
   }

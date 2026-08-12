@@ -5,7 +5,7 @@ final class MenuBarController: NSObject {
   private let statusItem: NSStatusItem
   private let popover: NSPopover
   private let contextMenu: NSMenu
-  private let fullAppURL: URL
+  private let fullAppWindowController: FullAppWindowController
   private let webViewController: MenuBarWebViewController
   private let loginItemManager: LoginItemManager
   private let launchAtLoginItem: NSMenuItem
@@ -17,7 +17,9 @@ final class MenuBarController: NSObject {
     )
     popover = NSPopover()
     contextMenu = NSMenu()
-    fullAppURL = MenuBarConfiguration.fullAppURL(for: url)
+    fullAppWindowController = FullAppWindowController(
+      url: MenuBarConfiguration.fullAppURL(for: url)
+    )
     webViewController = MenuBarWebViewController(homeURL: url)
     loginItemManager = LoginItemManager()
     launchAtLoginItem = NSMenuItem()
@@ -69,7 +71,7 @@ final class MenuBarController: NSObject {
   private func configureContextMenu() {
     let openItem = NSMenuItem(
       title: "Open Done Log",
-      action: #selector(openFullApp),
+      action: #selector(showFullApp),
       keyEquivalent: ""
     )
     openItem.target = self
@@ -108,8 +110,8 @@ final class MenuBarController: NSObject {
 
     DistributedNotificationCenter.default().addObserver(
       self,
-      selector: #selector(showPopoverFromNotification),
-      name: .doneLogShowPopover,
+      selector: #selector(showFullApp),
+      name: .doneLogShowFullApp,
       object: nil
     )
     DistributedNotificationCenter.default().addObserver(
@@ -153,11 +155,6 @@ final class MenuBarController: NSObject {
       preferredEdge: .minY
     )
     popover.contentViewController?.view.window?.makeKey()
-  }
-
-  @objc
-  private func showPopoverFromNotification() {
-    showPopover()
   }
 
   private func showContextMenu() {
@@ -214,8 +211,8 @@ final class MenuBarController: NSObject {
   }
 
   @objc
-  private func openFullApp() {
-    NSWorkspace.shared.open(fullAppURL)
+  func showFullApp() {
+    fullAppWindowController.show()
   }
 
   @objc

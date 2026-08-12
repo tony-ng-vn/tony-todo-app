@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
-SOURCE_APP="$REPO_ROOT/dist/Done Log.app"
+SOURCE_APP="$REPO_ROOT/.build/app-bundle/Done Log.app"
 SOURCE_BINARY="$SOURCE_APP/Contents/MacOS/done-log-menubar"
 INSTALLED_APP="/Applications/Done Log.app"
 INSTALLED_BINARY="$INSTALLED_APP/Contents/MacOS/done-log-menubar"

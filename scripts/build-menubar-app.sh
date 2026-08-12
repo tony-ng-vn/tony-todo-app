@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
-BUILD_ROOT="$REPO_ROOT/dist"
+BUILD_ROOT="$REPO_ROOT/.build/app-bundle"
 APP_BUNDLE="$BUILD_ROOT/Done Log.app"
 
 swift build \
