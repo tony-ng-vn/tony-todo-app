@@ -1585,8 +1585,7 @@ h2 {
 .sign-out-button:focus-visible,
 .detail-close:focus-visible,
 .detail-timing-controls input:focus-visible,
-.detail-delete-task:focus-visible,
-.detail-note:focus-visible {
+.detail-delete-task:focus-visible {
   outline: 2px solid var(--subtle);
   outline-offset: 2px;
 }
@@ -1827,10 +1826,10 @@ h2 {
 }
 
 .task-detail {
-  display: grid;
+  display: flex;
+  flex-direction: column;
   container-name: task-detail;
   container-type: inline-size;
-  grid-template-rows: auto auto auto auto auto minmax(220px, 1fr) auto auto;
   gap: 18px;
   min-width: 0;
   min-height: 0;
@@ -1914,8 +1913,18 @@ h2 {
   text-transform: uppercase;
 }
 
+.detail-notes {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  min-height: 220px;
+}
+
 .detail-note-row {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -2045,26 +2054,41 @@ h2 {
   line-height: 1.45;
 }
 
+.detail-note-shell {
+  display: grid;
+  flex: 1 1 auto;
+  min-height: 220px;
+}
+
 .detail-note {
   width: 100%;
+  height: 100%;
   min-height: 220px;
   resize: vertical;
-  padding: 14px;
+  padding: 14px 16px;
+  -webkit-appearance: none;
+  appearance: none;
   color: var(--strong);
   font-size: 14px;
   font-weight: 400;
   line-height: 1.45;
 }
 
-.task-detail[style*='height'] .detail-note {
-  height: 100%;
-  min-height: 0;
+.detail-note::placeholder {
+  color: var(--subtle);
+  opacity: 1;
+}
+
+.detail-note:focus,
+.detail-note:focus-visible {
+  outline: none;
+  border-color: var(--focus-ring);
 }
 
 .note-todo-list {
   display: grid;
+  flex: 0 0 auto;
   gap: 8px;
-  margin-top: -8px;
 }
 
 .note-todo-item {
