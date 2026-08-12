@@ -77,6 +77,7 @@ describe('menu bar app bundle', () => {
     expect(controller).toContain('statusItem.autosaveName = nil');
     expect(controller).not.toContain('com.tonynguyen.donelog.status-item');
     expect(controller).toContain('withLength: NSStatusItem.squareLength');
+    expect(controller).toContain('statusItem.button?.window?.isVisible == true');
   });
 
   it('opens the browser-sized experience in a native window', () => {

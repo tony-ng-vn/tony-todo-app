@@ -31,7 +31,9 @@ final class MenuBarController: NSObject {
   }
 
   var isReady: Bool {
-    statusItem.button?.image != nil && statusItem.button?.window != nil
+    statusItem.isVisible
+      && statusItem.button?.image != nil
+      && statusItem.button?.window?.isVisible == true
   }
 
   var onLoadResult: ((Result<Void, Error>) -> Void)? {
