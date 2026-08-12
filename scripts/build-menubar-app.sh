@@ -56,11 +56,22 @@ swift "$REPO_ROOT/native/App/generate-app-icon.swift" "$ICONSET"
   --output "$APP_BUNDLE/Contents/Resources/AppIcon.icns" \
   "$ICONSET"
 
+CODE_SIGN_IDENTITY="${DONE_LOG_CODESIGN_IDENTITY:-}"
+if [[ -z "$CODE_SIGN_IDENTITY" ]]; then
+  CODE_SIGN_IDENTITY="$(
+    security find-identity -v -p codesigning 2>/dev/null \
+      | awk '/^[[:space:]]*[0-9]+\)/ { print $2; exit }'
+  )"
+fi
+if [[ -z "$CODE_SIGN_IDENTITY" ]]; then
+  CODE_SIGN_IDENTITY="-"
+fi
+
 /usr/bin/plutil -lint "$APP_BUNDLE/Contents/Info.plist" >/dev/null
 /usr/bin/codesign \
   --force \
   --deep \
-  --sign - \
+  --sign "$CODE_SIGN_IDENTITY" \
   --identifier com.tonynguyen.donelog \
   "$APP_BUNDLE"
 /usr/bin/codesign --verify --deep --strict "$APP_BUNDLE"

@@ -30,6 +30,17 @@ describe('menu bar app bundle', () => {
     expect(packageJson.scripts['menubar:install']).toBe('bash scripts/install-menubar-app.sh');
   });
 
+  it('keeps local app identity stable when a signing certificate is available', () => {
+    const buildScript = readFileSync(
+      path.join(repoRoot, 'scripts/build-menubar-app.sh'),
+      'utf8',
+    );
+
+    expect(buildScript).toContain('DONE_LOG_CODESIGN_IDENTITY');
+    expect(buildScript).toContain('security find-identity -v -p codesigning');
+    expect(buildScript).toContain('--sign "$CODE_SIGN_IDENTITY"');
+  });
+
   it('keeps task notes in a draggable native window', () => {
     const controller = readFileSync(
       path.join(repoRoot, 'native/Sources/DoneLogMenuBar/FloatingNoteWindowController.swift'),
@@ -51,6 +62,7 @@ describe('menu bar app bundle', () => {
 
     expect(controller).toContain('statusItem.autosaveName');
     expect(controller).toContain('statusItem.isVisible = true');
+    expect(controller).toContain('withLength: NSStatusItem.squareLength');
   });
 
   it('opens the browser-sized experience in a native window', () => {

@@ -13,7 +13,7 @@ final class MenuBarController: NSObject {
 
   init(url: URL) {
     statusItem = NSStatusBar.system.statusItem(
-      withLength: NSStatusItem.variableLength
+      withLength: NSStatusItem.squareLength
     )
     popover = NSPopover()
     contextMenu = NSMenu()
