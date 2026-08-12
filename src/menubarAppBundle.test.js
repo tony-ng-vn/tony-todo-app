@@ -80,6 +80,15 @@ describe('menu bar app bundle', () => {
     expect(installer).not.toContain('SOURCE_APP="$REPO_ROOT/dist/Done Log.app"');
   });
 
+  it('installs one app and leaves startup to the user', () => {
+    const installer = readFileSync(path.join(repoRoot, 'scripts/install-menubar-app.sh'), 'utf8');
+
+    expect(installer).toContain('"$INSTALLED_BINARY" --unregister-login-item');
+    expect(installer).not.toContain('"$INSTALLED_BINARY" --register-login-item');
+    expect(installer).not.toContain('/usr/bin/open -n');
+    expect(installer).toContain('Open it from Applications when you are ready');
+  });
+
   it('marks native web views before the menu bar page loads', () => {
     const controller = readFileSync(
       path.join(repoRoot, 'native/Sources/DoneLogMenuBar/MenuBarWebViewController.swift'),

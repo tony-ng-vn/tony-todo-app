@@ -7,7 +7,6 @@ SOURCE_APP="$REPO_ROOT/.build/app-bundle/Done Log.app"
 SOURCE_BINARY="$SOURCE_APP/Contents/MacOS/done-log-menubar"
 INSTALLED_APP="/Applications/Done Log.app"
 INSTALLED_BINARY="$INSTALLED_APP/Contents/MacOS/done-log-menubar"
-SHOULD_REGISTER_LOGIN_ITEM=true
 
 app_is_running() {
   pgrep -f -x "$INSTALLED_BINARY" >/dev/null
@@ -49,13 +48,7 @@ if [[ -d "$INSTALLED_APP" ]]; then
     exit 1
   fi
 
-  INSTALLED_LOGIN_ITEM_STATUS="$(
-    "$INSTALLED_BINARY" --login-item-status 2>/dev/null || true
-  )"
-  if [[ "$INSTALLED_LOGIN_ITEM_STATUS" == *"not-registered"* ]] \
-    || [[ "$INSTALLED_LOGIN_ITEM_STATUS" == *"not-found"* ]]; then
-    SHOULD_REGISTER_LOGIN_ITEM=false
-  else
+  if [[ -x "$INSTALLED_BINARY" ]]; then
     "$INSTALLED_BINARY" --unregister-login-item || true
   fi
 
@@ -79,9 +72,5 @@ fi
 /usr/bin/ditto "$SOURCE_APP" "$INSTALLED_APP"
 /usr/bin/codesign --verify --deep --strict "$INSTALLED_APP"
 
-if [[ "$SHOULD_REGISTER_LOGIN_ITEM" == true ]]; then
-  "$INSTALLED_BINARY" --register-login-item
-fi
-/usr/bin/open -n "$INSTALLED_APP"
-
-echo "Done Log is installed and running from $INSTALLED_APP"
+echo "Done Log is installed at $INSTALLED_APP."
+echo "Open it from Applications when you are ready."

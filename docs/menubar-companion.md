@@ -12,8 +12,9 @@ Install Done Log in Applications:
 npm run menubar:install
 ```
 
-The installer builds and signs `/Applications/Done Log.app`, enables launch at login, and opens the full native window.
-The app then runs independently from the terminal and returns in menu-bar-only mode after the next login.
+The installer builds and signs `/Applications/Done Log.app` without opening it or enabling launch at login.
+Open the app yourself when you are ready.
+Use the menu-bar context menu to enable Launch at Login if you want it to return automatically after the next login.
 Open Done Log later from Applications or Spotlight to show the full native window.
 Right-click the menu bar icon to turn Launch at Login on or off, open the full window, or quit.
 
