@@ -66,6 +66,7 @@ describe('menu bar app bundle', () => {
     expect(controller).toContain('MenuBarConfiguration.fullAppSize');
     expect(controller).toContain('application.setActivationPolicy(.regular)');
     expect(controller).toContain('application.setActivationPolicy(.accessory)');
+    expect(controller).toContain('.moveToActiveSpace');
     expect(app).toContain('NativeAppLaunchPolicy.shouldOpenFullApp');
   });
 

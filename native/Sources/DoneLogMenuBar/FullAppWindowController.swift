@@ -26,7 +26,7 @@ final class FullAppWindowController: NSWindowController, NSWindowDelegate {
     window.contentMinSize = MenuBarConfiguration.fullAppMinimumSize
     window.contentViewController = contentController
     window.isReleasedWhenClosed = false
-    window.collectionBehavior.insert(.fullScreenPrimary)
+    window.collectionBehavior = [.fullScreenPrimary, .moveToActiveSpace]
 
     let frameName = "com.tonynguyen.donelog.main-window"
     if !window.setFrameUsingName(frameName) {
