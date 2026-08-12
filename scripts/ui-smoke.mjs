@@ -120,9 +120,18 @@ async function inspectNativeWorkspaceLayout(viewport) {
 
   const views = {};
   await page.click('#detail-close');
-  for (const label of ['Board', 'Calendar', 'Inbox', 'Waiting', 'History', 'Meetings', 'Settings']) {
+  const viewPanels = {
+    Board: '.board-panel',
+    Calendar: '.calendar-panel',
+    Inbox: '.inbox-panel',
+    Waiting: '.waiting-panel',
+    History: '.history-panel',
+    Meetings: '.meetings-panel',
+    Settings: '.settings-panel',
+  };
+  for (const [label, panelSelector] of Object.entries(viewPanels)) {
     await page.getByRole('button', { name: label, exact: true }).click();
-    await page.waitForTimeout(50);
+    await page.waitForSelector(panelSelector);
     views[label] = await page.evaluate(() => {
       const workspace = document.querySelector('.workspace');
       const panel = workspace?.querySelector(
@@ -141,12 +150,31 @@ async function inspectNativeWorkspaceLayout(viewport) {
 
 async function captureNativeLayout(page) {
   return page.evaluate(() => {
-    const measure = (selector) => {
-      const element = document.querySelector(selector);
+    function boundsFor(element) {
       const rect = element?.getBoundingClientRect();
       return {
+        left: Math.round(rect?.left ?? 0),
+        right: Math.round(rect?.right ?? 0),
+        top: Math.round(rect?.top ?? 0),
+        bottom: Math.round(rect?.bottom ?? 0),
         width: Math.round(rect?.width ?? 0),
+        height: Math.round(rect?.height ?? 0),
+      };
+    }
+
+    const measure = (selector) => {
+      const element = document.querySelector(selector);
+      return {
+        ...boundsFor(element),
         overflow: Math.max(0, (element?.scrollWidth ?? 0) - (element?.clientWidth ?? 0)),
+      };
+    };
+
+    const measureGroup = (parentSelector, childSelector) => {
+      const parent = document.querySelector(parentSelector);
+      return {
+        parent: boundsFor(parent),
+        children: Array.from(parent?.querySelectorAll(childSelector) ?? []).map(boundsFor),
       };
     };
 
@@ -156,8 +184,18 @@ async function captureNativeLayout(page) {
       quickAddTitle: measure('#todo-title'),
       taskContent: measure('[data-todo-id="ui-smoke-native-paused"] .task-content'),
       taskActions: measure('[data-todo-id="ui-smoke-native-paused"] .task-actions'),
+      quickAddControls: measureGroup('.input-row', '#todo-title, .new-task-calendar, :scope > button'),
+      taskCardControls: measureGroup(
+        '[data-todo-id="ui-smoke-native-paused"]',
+        ':scope > .task-content, :scope > .task-actions',
+      ),
+      taskActionControls: measureGroup(
+        '[data-todo-id="ui-smoke-native-paused"] .task-actions',
+        ':scope > button',
+      ),
       summaryPanel: measure('.summary-panel'),
       taskDetail: measure('.task-detail'),
+      taskDetailContent: measure('.task-detail .detail-title-display'),
     };
   });
 }
@@ -184,12 +222,57 @@ function assertNativeWorkspaceLayout(result) {
       `native detail-open task content is too narrow at ${result.detailLayout.taskContent.width}px`,
     );
   }
+  if (result.detailLayout.taskDetail.width < 320 || result.detailLayout.taskDetailContent.width < 240) {
+    failures.push(
+      `native detail panel is too narrow: ${JSON.stringify({
+        panel: result.detailLayout.taskDetail,
+        content: result.detailLayout.taskDetailContent,
+      })}`,
+    );
+  }
+  for (const [state, layout] of Object.entries({
+    default: result.defaultLayout,
+    detail: result.detailLayout,
+  })) {
+    failures.push(...assertControlGroup(layout.quickAddControls, `native ${state} quick-add controls`, 44));
+    failures.push(...assertControlGroup(layout.taskCardControls, `native ${state} task-card regions`));
+    failures.push(...assertControlGroup(layout.taskActionControls, `native ${state} task actions`, 42));
+  }
   for (const [view, metrics] of Object.entries(result.views)) {
     if (metrics.workspaceOverflow > 1 || metrics.panelOverflow > 1) {
       failures.push(`native ${view} view has horizontal overflow: ${JSON.stringify(metrics)}`);
     }
   }
   return failures;
+}
+
+function assertControlGroup(group, label, minimumWidth = 1) {
+  const failures = [];
+  for (const [index, child] of group.children.entries()) {
+    if (child.width < minimumWidth) {
+      failures.push(`${label} child ${index + 1} is only ${child.width}px wide`);
+    }
+    if (child.left < group.parent.left - 1 || child.right > group.parent.right + 1) {
+      failures.push(`${label} child ${index + 1} escapes its parent`);
+    }
+  }
+  for (let firstIndex = 0; firstIndex < group.children.length; firstIndex += 1) {
+    for (let secondIndex = firstIndex + 1; secondIndex < group.children.length; secondIndex += 1) {
+      if (rectanglesOverlap(group.children[firstIndex], group.children[secondIndex])) {
+        failures.push(`${label} children ${firstIndex + 1} and ${secondIndex + 1} overlap`);
+      }
+    }
+  }
+  return failures;
+}
+
+function rectanglesOverlap(first, second) {
+  return (
+    first.left < second.right - 1 &&
+    first.right > second.left + 1 &&
+    first.top < second.bottom - 1 &&
+    first.bottom > second.top + 1
+  );
 }
 
 async function inspectRecapDayNavigation(viewport) {
