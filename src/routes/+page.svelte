@@ -429,7 +429,6 @@
 
   function openTask(todoId) {
     selectedTaskId = todoId;
-    tick().then(() => document.querySelector('#detail-note')?.focus());
   }
 
   function closeTask() {
