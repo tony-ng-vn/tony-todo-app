@@ -2079,6 +2079,11 @@ h2 {
   opacity: 1;
 }
 
+.detail-note:focus::placeholder,
+.detail-note:focus-visible::placeholder {
+  color: transparent;
+}
+
 .detail-note:focus,
 .detail-note:focus-visible {
   outline: none;
