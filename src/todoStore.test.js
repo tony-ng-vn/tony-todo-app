@@ -432,6 +432,44 @@ describe('todo day summary', () => {
     expect(getDaySummary(state, '2026-06-08')[3].items[0].title).toBe('Call Sam');
   });
 
+  it('orders completed tasks with recorded starts chronologically by start time', () => {
+    const state = createInitialState([
+      {
+        id: 'latest-start',
+        title: 'Latest start',
+        createdAt: '2026-06-08T08:00:00-07:00',
+        firstStartedAt: '2026-06-08T09:03:00-07:00',
+        completedAt: '2026-06-08T10:02:00-07:00',
+        trackedSeconds: 59 * 60,
+      },
+      {
+        id: 'earliest-start',
+        title: 'Earliest start',
+        createdAt: '2026-06-08T06:00:00-07:00',
+        firstStartedAt: '2026-06-08T06:34:00-07:00',
+        completedAt: '2026-06-08T07:21:00-07:00',
+        trackedSeconds: 47 * 60,
+      },
+      {
+        id: 'middle-start',
+        title: 'Middle start',
+        createdAt: '2026-06-08T07:00:00-07:00',
+        firstStartedAt: '2026-06-08T07:21:00-07:00',
+        completedAt: '2026-06-08T07:27:00-07:00',
+        trackedSeconds: 6 * 60,
+      },
+    ]);
+
+    const morningItems = getDaySummary(state, '2026-06-08')[1].items;
+
+    expect(morningItems.map((item) => item.title)).toEqual([
+      'Earliest start',
+      'Middle start',
+      'Latest start',
+    ]);
+    expect(morningItems.map((item) => item.durationLabel)).toEqual(['47m', '6m', '59m']);
+  });
+
   it('separates pre-sunrise completions from Morning using San Francisco sunrise', () => {
     let state = createInitialState();
     state = addTodo(state, 'Midnight task', new Date('2026-06-08T00:00:00-07:00'));
