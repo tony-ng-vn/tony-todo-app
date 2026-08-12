@@ -18,5 +18,7 @@ struct ApplicationMenuTests {
     #expect(editMenu.item(withTitle: "Paste")?.keyEquivalent == "v")
     #expect(editMenu.item(withTitle: "Select All")?.keyEquivalent == "a")
     #expect(editMenu.item(withTitle: "Paste")?.action == #selector(NSText.paste(_:)))
+    let windowMenu = try #require(mainMenu.items.first { $0.title == "Window" }?.submenu)
+    #expect(windowMenu.item(withTitle: "Close Window")?.keyEquivalent == "w")
   }
 }

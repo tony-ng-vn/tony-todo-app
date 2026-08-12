@@ -88,7 +88,10 @@
   let authError = '';
   let authLoading = false;
   let titleDraft = '';
+  let floatingNoteId = null;
   let standaloneNoteId = null;
+  let isNativeHost = false;
+  let isLegacyNativeHost = false;
   let themeMode = 'light';
   let expandedTaskId = null;
   let noteSaveStatuses = {};
@@ -113,11 +116,15 @@
   $: openTodos = openTodoSections.flatMap((section) => section.items);
   $: somedayTodos = getSomedayTodos(state);
   $: completedTodoSections = getCompletedTodoSections(state, new Date());
+  $: floatingNoteTodo = floatingNoteId ? findTodo(floatingNoteId) : null;
   $: standaloneNoteTodo = standaloneNoteId ? findTodo(standaloneNoteId) : null;
 
   onMount(() => {
     const searchParams = new URLSearchParams(window.location.search);
     const requestedNoteId = searchParams.get('note');
+    isNativeHost = Boolean(window.__doneLogNativeHost);
+    isLegacyNativeHost =
+      !isNativeHost && Boolean(window.webkit) && !navigator.userAgent.includes('Safari/');
     standaloneNoteId = requestedNoteId;
     useRemote = isInsForgeConfigured && !searchParams.has('local');
     syncMessage = useRemote ? 'Connecting' : 'Local only';
@@ -571,6 +578,11 @@
   }
 
   function openFloatingNote(todo) {
+    if (isLegacyNativeHost) {
+      floatingNoteId = todo.id;
+      return;
+    }
+
     const noteUrl = new URL(window.location.href);
     noteUrl.searchParams.set('note', todo.id);
     noteUrl.searchParams.delete('updated');
@@ -580,6 +592,10 @@
       'popup,width=360,height=440,resizable=yes',
     );
     noteWindow?.focus();
+  }
+
+  function closeFloatingNote() {
+    floatingNoteId = null;
   }
 
   function toggleThemeMode() {
@@ -871,6 +887,16 @@
         </section>
       {/if}
     </div>
+
+    {#if floatingNoteTodo}
+      <FloatingTaskNote
+        todo={floatingNoteTodo}
+        noteSaveStatus={noteSaveStatuses[floatingNoteTodo.id] ?? 'saved'}
+        onNoteInput={handleNoteInput}
+        onClose={closeFloatingNote}
+        presentation="overlay"
+      />
+    {/if}
   </main>
 {/if}
 

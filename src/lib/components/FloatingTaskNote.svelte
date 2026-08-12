@@ -7,8 +7,12 @@
   export let noteSaveStatus = 'saved';
   export let onNoteInput;
   export let onClose = () => window.close();
+  export let presentation = 'window';
 
   let noteInput;
+  let noteShell;
+  let panelStyle = '';
+  let dragState = null;
 
   onMount(() => {
     noteInput?.focus();
@@ -60,13 +64,60 @@
     await tick();
     textarea.setSelectionRange(edit.cursor, edit.cursor);
   }
+
+  function startDrag(event) {
+    if (presentation !== 'overlay' || event.button !== 0 || event.target.closest('button')) {
+      return;
+    }
+
+    const rect = noteShell.getBoundingClientRect();
+    dragState = {
+      pointerId: event.pointerId,
+      offsetX: event.clientX - rect.left,
+      offsetY: event.clientY - rect.top,
+    };
+    event.currentTarget.setPointerCapture(event.pointerId);
+  }
+
+  function moveDrag(event) {
+    if (!dragState || dragState.pointerId !== event.pointerId) {
+      return;
+    }
+
+    const rect = noteShell.getBoundingClientRect();
+    const left = Math.max(
+      8,
+      Math.min(event.clientX - dragState.offsetX, window.innerWidth - rect.width - 8),
+    );
+    const top = Math.max(
+      8,
+      Math.min(event.clientY - dragState.offsetY, window.innerHeight - rect.height - 8),
+    );
+    panelStyle = `left: ${left}px; top: ${top}px; right: auto; bottom: auto;`;
+  }
+
+  function stopDrag(event) {
+    if (dragState?.pointerId === event.pointerId) {
+      dragState = null;
+    }
+  }
 </script>
 
-<main class="floating-note-shell" aria-label={`Note for ${todo.title}`}>
+<main
+  bind:this={noteShell}
+  class="floating-note-shell"
+  class:is-overlay={presentation === 'overlay'}
+  style={panelStyle}
+  aria-label={`Note for ${todo.title}`}
+>
   <header
     class="floating-note-header"
     role="group"
     aria-label="Quick note window controls"
+    on:pointerdown={startDrag}
+    on:pointermove={moveDrag}
+    on:pointerup={stopDrag}
+    on:pointercancel={stopDrag}
   >
     <div>
       <p>Task note</p>
@@ -131,11 +182,36 @@
     -webkit-backdrop-filter: blur(28px) saturate(1.18);
   }
 
+  .floating-note-shell.is-overlay {
+    position: fixed;
+    right: 16px;
+    bottom: 16px;
+    z-index: 100;
+    width: min(360px, calc(100vw - 24px));
+    height: min(440px, calc(100vh - 24px));
+    min-width: min(300px, calc(100vw - 24px));
+    min-height: min(300px, calc(100vh - 24px));
+    max-width: calc(100vw - 16px);
+    max-height: calc(100vh - 16px);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    background: var(--canvas-soft);
+    box-shadow: 0 24px 64px var(--shadow);
+    resize: both;
+    animation: panel-enter var(--motion-reveal) var(--ease-out);
+  }
+
   .floating-note-header {
     display: grid;
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: flex-start;
     gap: 12px;
+  }
+
+  .is-overlay .floating-note-header {
+    cursor: move;
+    touch-action: none;
+    user-select: none;
   }
 
   .floating-note-header div {
@@ -253,6 +329,12 @@
       background: var(--surface-strong);
       backdrop-filter: none;
       -webkit-backdrop-filter: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .floating-note-shell.is-overlay {
+      animation: reduced-fade var(--motion-hover) ease;
     }
   }
 </style>

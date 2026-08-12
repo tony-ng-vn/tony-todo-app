@@ -13,9 +13,25 @@ final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
     )
     menuBarController = controller
 
-    if ProcessInfo.processInfo.environment["MENUBAR_NATIVE_SMOKE"] == "1" {
+    let environment = ProcessInfo.processInfo.environment
+    if NativeAppLaunchPolicy.shouldOpenFullApp(
+      launchDate: NSRunningApplication.current.launchDate,
+      environment: environment
+    ) {
+      controller.showFullApp()
+    }
+
+    if environment["MENUBAR_NATIVE_SMOKE"] == "1" {
       startSmokeCheck(controller: controller)
     }
+  }
+
+  func applicationShouldHandleReopen(
+    _ sender: NSApplication,
+    hasVisibleWindows flag: Bool
+  ) -> Bool {
+    menuBarController?.showFullApp()
+    return false
   }
 
   private func startSmokeCheck(controller: MenuBarController) {
@@ -99,12 +115,16 @@ enum DoneLogMenuBarApp {
           Data("MENUBAR_NATIVE_FAILED another smoke check is running\n".utf8)
         )
       } else {
-        DistributedNotificationCenter.default().postNotificationName(
-          .doneLogShowPopover,
-          object: nil,
-          userInfo: nil,
-          deliverImmediately: true
-        )
+        if let notificationName = MenuBarLaunchPolicy.lockContentionNotification(
+          isSmokeCheck: false
+        ) {
+          DistributedNotificationCenter.default().postNotificationName(
+            notificationName,
+            object: nil,
+            userInfo: nil,
+            deliverImmediately: true
+          )
+        }
         FileHandle.standardOutput.write(
           Data("Done Log is already running\n".utf8)
         )

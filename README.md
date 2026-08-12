@@ -13,6 +13,7 @@ A quiet task tracker that keeps what is next beside proof of what got done.
 - Turns completed work into a time-of-day recap.
 - Keeps task notes, checklists, history, and due dates together.
 - Brings the same workflow to the macOS menu bar.
+- Opens the complete workflow in a resizable native macOS window.
 
 <p align="center">
   <img src="docs/images/done-log-menubar.jpg" alt="Done Log menu bar companion" width="420">
@@ -30,7 +31,7 @@ Open the local URL with `?local=1` to use browser storage without an account.
 Optional cloud sync is configured through a local `.env.local` copied from [.env.example](.env.example).
 Never commit environment files or credentials.
 
-## macOS menu bar
+## macOS app and menu bar
 
 ```bash
 npm run menubar:install

@@ -51,6 +51,16 @@ enum ApplicationMenuFactory {
     )
     editItem.submenu = editMenu
 
+    let windowItem = NSMenuItem(title: "Window", action: nil, keyEquivalent: "")
+    mainMenu.addItem(windowItem)
+    let windowMenu = NSMenu(title: "Window")
+    windowMenu.addItem(
+      withTitle: "Close Window",
+      action: #selector(NSWindow.performClose(_:)),
+      keyEquivalent: "w"
+    )
+    windowItem.submenu = windowMenu
+
     return mainMenu
   }
 }

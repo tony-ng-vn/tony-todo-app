@@ -63,6 +63,11 @@ if (process.env.FLOATING_NOTE_ONLY === '1') {
     !result.request?.url?.includes('note=floating-note-task') ||
     result.request?.target !== 'done-log-note-floating-note-task' ||
     !result.request?.features?.includes('width=360') ||
+    !result.nativeRequest?.url?.includes('note=floating-note-task') ||
+    result.legacyRequest !== null ||
+    !result.legacyOverlay ||
+    result.legacyResizedBounds.width > result.legacyResizedBounds.viewportWidth - 16 ||
+    result.legacyResizedBounds.height > result.legacyResizedBounds.viewportHeight - 16 ||
     result.presentation.title !== 'Running task' ||
     result.presentation.status !== 'Note saved automatically' ||
     result.presentation.overflow ||
@@ -845,6 +850,59 @@ async function inspectFloatingNote() {
     return openRequest;
   });
 
+  const nativePage = await context.newPage();
+  await nativePage.addInitScript(() => {
+    window.__doneLogNativeHost = true;
+  });
+  await nativePage.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
+  const nativeRequest = await captureOpenRequest(nativePage);
+
+  const legacyContext = await browser.newContext({
+    viewport: { width: 420, height: 640 },
+    userAgent:
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko)',
+  });
+  const legacyPage = await legacyContext.newPage();
+  await legacyPage.addInitScript(() => {
+    Object.defineProperty(window, 'webkit', { value: {}, configurable: true });
+    const now = new Date('2026-08-12T13:05:00.000Z').toISOString();
+    localStorage.setItem(
+      'done-log-state',
+      JSON.stringify({
+        todos: [
+          {
+            id: 'floating-note-task',
+            title: 'Running task',
+            createdAt: now,
+            firstStartedAt: now,
+            activeStartedAt: now,
+            completedAt: null,
+            note: '',
+            trackedSeconds: 0,
+            timeSegments: [],
+          },
+        ],
+      }),
+    );
+  });
+  await legacyPage.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
+  const legacyRequest = await captureOpenRequest(legacyPage);
+  await legacyPage.waitForSelector('.floating-note-shell.is-overlay');
+  const legacyOverlay = await legacyPage.locator('.floating-note-shell').isVisible();
+  const legacyResizedBounds = await legacyPage.evaluate(() => {
+    const shell = document.querySelector('.floating-note-shell');
+    shell.style.width = '200vw';
+    shell.style.height = '200vh';
+    const bounds = shell.getBoundingClientRect();
+    return {
+      width: Math.round(bounds.width),
+      height: Math.round(bounds.height),
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+    };
+  });
+  await legacyContext.close();
+
   const notePage = await context.newPage();
   await notePage.goto(request.url, { waitUntil: 'networkidle' });
   await notePage.waitForSelector('.floating-note-shell:not(.is-overlay)');
@@ -886,7 +944,29 @@ async function inspectFloatingNote() {
   });
   await context.close();
 
-  return { request, presentation, noteSurvivedTimerChanges };
+  return {
+    request,
+    nativeRequest,
+    legacyRequest,
+    legacyOverlay,
+    legacyResizedBounds,
+    presentation,
+    noteSurvivedTimerChanges,
+  };
+}
+
+async function captureOpenRequest(page) {
+  return page.evaluate(() => {
+    let openRequest = null;
+    const originalOpen = window.open;
+    window.open = (url, target, features) => {
+      openRequest = { url: String(url), target, features };
+      return { focus() {} };
+    };
+    document.querySelector('.menubar-open-note')?.click();
+    window.open = originalOpen;
+    return openRequest;
+  });
 }
 
 async function inspectRunningTimingEdit() {

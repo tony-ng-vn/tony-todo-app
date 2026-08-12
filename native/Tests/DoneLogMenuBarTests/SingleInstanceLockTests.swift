@@ -27,4 +27,16 @@ struct SingleInstanceLockTests {
     #expect(MenuBarLaunchPolicy.lockContentionExitCode(isSmokeCheck: true) == 1)
     #expect(MenuBarLaunchPolicy.lockContentionExitCode(isSmokeCheck: false) == 0)
   }
+
+  @Test("Repeated app launches request the full native window")
+  func repeatedLaunchRequestsFullNativeWindow() {
+    #expect(
+      MenuBarLaunchPolicy.lockContentionNotification(isSmokeCheck: false)
+        == .doneLogShowFullApp
+    )
+    #expect(
+      MenuBarLaunchPolicy.lockContentionNotification(isSmokeCheck: true)
+        == nil
+    )
+  }
 }
