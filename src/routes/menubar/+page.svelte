@@ -5,6 +5,13 @@
   import AuthGate from '../../lib/components/AuthGate.svelte';
   import FloatingTaskNote from '../../lib/components/FloatingTaskNote.svelte';
   import MenubarTaskRow from '../../lib/components/MenubarTaskRow.svelte';
+  import ThemeToggle from '../../lib/components/ThemeToggle.svelte';
+  import {
+    applyThemeMode,
+    loadThemeMode,
+    nextThemeMode,
+    THEME_STORAGE_KEY,
+  } from '../../theme.js';
   import {
     addTodo,
     createInitialState,
@@ -68,7 +75,6 @@
     'trackedSeconds',
     'timeSegments',
   ];
-  const THEME_STORAGE_KEY = 'done-log-theme';
   const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
   let state = createInitialState();
@@ -83,6 +89,9 @@
   let authLoading = false;
   let titleDraft = '';
   let floatingNoteId = null;
+  let standaloneNoteId = null;
+  let isNativeHost = false;
+  let themeMode = 'light';
   let expandedTaskId = null;
   let noteSaveStatuses = {};
   let liveTimer = null;
@@ -107,14 +116,20 @@
   $: somedayTodos = getSomedayTodos(state);
   $: completedTodoSections = getCompletedTodoSections(state, new Date());
   $: floatingNoteTodo = floatingNoteId ? findTodo(floatingNoteId) : null;
+  $: standaloneNoteTodo = standaloneNoteId ? findTodo(standaloneNoteId) : null;
 
   onMount(() => {
-    floatingNoteId = new URLSearchParams(window.location.search).get('note');
-    useRemote = isInsForgeConfigured && !new URLSearchParams(window.location.search).has('local');
+    const searchParams = new URLSearchParams(window.location.search);
+    const requestedNoteId = searchParams.get('note');
+    isNativeHost = Boolean(window.__doneLogNativeHost);
+    standaloneNoteId = isNativeHost ? requestedNoteId : null;
+    floatingNoteId = isNativeHost ? null : requestedNoteId;
+    useRemote = isInsForgeConfigured && !searchParams.has('local');
     syncMessage = useRemote ? 'Connecting' : 'Local only';
     state = loadLocalState();
     queuePendingNoteSaves();
-    applyStoredTheme();
+    themeMode = loadThemeMode();
+    applyThemeMode(themeMode);
     window.addEventListener('focus', handleWindowFocus);
     window.addEventListener('storage', handleStorageChange);
     document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -176,6 +191,12 @@
   }
 
   function handleStorageChange(event) {
+    if (event.key === THEME_STORAGE_KEY) {
+      themeMode = loadThemeMode();
+      applyThemeMode(themeMode);
+      return;
+    }
+
     if (event.key !== TODO_STORAGE_KEY) {
       return;
     }
@@ -555,6 +576,11 @@
   }
 
   function openFloatingNote(todo) {
+    if (!isNativeHost) {
+      floatingNoteId = todo.id;
+      return;
+    }
+
     const noteUrl = new URL(window.location.href);
     noteUrl.searchParams.set('note', todo.id);
     noteUrl.searchParams.delete('updated');
@@ -564,6 +590,18 @@
       'popup,width=360,height=440,resizable=yes',
     );
     noteWindow?.focus();
+  }
+
+  function closeFloatingNote() {
+    floatingNoteId = null;
+    const nextUrl = new URL(window.location.href);
+    nextUrl.searchParams.delete('note');
+    window.history.replaceState({}, '', nextUrl);
+  }
+
+  function toggleThemeMode() {
+    themeMode = nextThemeMode(themeMode);
+    applyThemeMode(themeMode);
   }
 
   async function syncRemoteChange(message, action) {
@@ -649,16 +687,6 @@
     });
   }
 
-  function applyStoredTheme() {
-    const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
-    const theme =
-      storedTheme === 'dark' || storedTheme === 'light'
-        ? storedTheme
-        : window.matchMedia('(prefers-color-scheme: dark)').matches
-          ? 'dark'
-          : 'light';
-    document.documentElement.dataset.theme = theme;
-  }
 </script>
 
 {#if !authChecked}
@@ -673,13 +701,13 @@
     onSubmit={handleAuthSubmit}
     onToggleMode={handleAuthToggleMode}
   />
-{:else if floatingNoteId && floatingNoteTodo}
+{:else if standaloneNoteId && standaloneNoteTodo}
   <FloatingTaskNote
-    todo={floatingNoteTodo}
-    noteSaveStatus={noteSaveStatuses[floatingNoteTodo.id] ?? 'saved'}
+    todo={standaloneNoteTodo}
+    noteSaveStatus={noteSaveStatuses[standaloneNoteTodo.id] ?? 'saved'}
     onNoteInput={handleNoteInput}
   />
-{:else if floatingNoteId}
+{:else if standaloneNoteId}
   <main class="menubar-loading" aria-label="Task note unavailable">This task is no longer available.</main>
 {:else}
   <main class="menubar-shell" aria-label="Done Log menu bar companion">
@@ -689,6 +717,7 @@
         <h1 class="menubar-heading">Done Log</h1>
       </div>
       <div class="menubar-header-actions">
+        <ThemeToggle {themeMode} onToggle={toggleThemeMode} compact={true} />
         <button
           type="button"
           class="menubar-update"
@@ -859,6 +888,16 @@
         </section>
       {/if}
     </div>
+
+    {#if floatingNoteTodo}
+      <FloatingTaskNote
+        todo={floatingNoteTodo}
+        noteSaveStatus={noteSaveStatuses[floatingNoteTodo.id] ?? 'saved'}
+        onNoteInput={handleNoteInput}
+        onClose={closeFloatingNote}
+        presentation="overlay"
+      />
+    {/if}
   </main>
 {/if}
 
@@ -964,6 +1003,18 @@
     font-size: 11px;
     font-weight: 600;
     text-decoration: none;
+    transition:
+      background-color var(--motion-hover) ease,
+      border-color var(--motion-hover) ease,
+      color var(--motion-hover) ease,
+      transform var(--motion-press) var(--ease-out);
+  }
+
+  .menubar-open-full:active,
+  .menubar-update:active,
+  .menubar-sign-out:active,
+  .menubar-quick-add button:active {
+    transform: scale(0.97);
   }
 
   .menubar-update:disabled {
@@ -1019,6 +1070,22 @@
     color: var(--button-fg);
     font-size: 12px;
     font-weight: 600;
+    transition:
+      opacity var(--motion-hover) ease,
+      transform var(--motion-press) var(--ease-out);
+  }
+
+  @media (hover: hover) and (pointer: fine) {
+    .menubar-open-full:hover,
+    .menubar-update:hover,
+    .menubar-sign-out:hover {
+      border-color: var(--subtle);
+      background: var(--block-hover);
+    }
+
+    .menubar-quick-add button:hover {
+      opacity: 0.86;
+    }
   }
 
   .menubar-quick-add input:focus-visible,

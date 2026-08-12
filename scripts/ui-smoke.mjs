@@ -3,7 +3,10 @@ import { chromium } from 'playwright';
 const targetUrl = new URL(process.env.UI_SMOKE_URL ?? 'http://127.0.0.1:5174/');
 targetUrl.searchParams.set('local', '1');
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+  headless: true,
+  executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH,
+});
 
 try {
   const mobile = await inspectViewport({ width: 390, height: 844 }, true);
@@ -535,6 +538,7 @@ async function inspectViewport(viewport, isMobile) {
           state: row?.getAttribute('data-task-state'),
           badge: row?.querySelector('.task-state-badge')?.textContent.trim(),
           animationName: row ? getComputedStyle(row.querySelector('.task-block-dot')).animationName : null,
+          boxShadow: row ? getComputedStyle(row.querySelector('.task-block-dot')).boxShadow : null,
         };
       })(),
       recapRhythm: Array.from(document.querySelectorAll('.summary-section')).map((section) => {
@@ -1160,7 +1164,8 @@ function assertOngoingSection(result) {
     result.pausedTodayPresentation?.section === 'Today todos' &&
     result.pausedTodayPresentation?.state === 'paused' &&
     result.pausedTodayPresentation?.badge === 'Paused' &&
-    result.pausedTodayPresentation?.animationName === 'paused-breathe'
+    result.pausedTodayPresentation?.animationName === 'none' &&
+    result.pausedTodayPresentation?.boxShadow !== 'none'
     ? []
     : [`running, paused, and dated tasks are not separated correctly: ${JSON.stringify(result.taskSections)}`];
 }

@@ -8,6 +8,12 @@
   import CalendarPanel from '../lib/components/CalendarPanel.svelte';
   import InboxPanel from '../lib/components/InboxPanel.svelte';
   import WaitingPanel from '../lib/components/WaitingPanel.svelte';
+  import {
+    applyThemeMode,
+    loadThemeMode,
+    nextThemeMode,
+    THEME_STORAGE_KEY,
+  } from '../theme.js';
   import HistoryPanel from '../lib/components/HistoryPanel.svelte';
   import MeetingsPanel from '../lib/components/MeetingsPanel.svelte';
   import SettingsPanel from '../lib/components/SettingsPanel.svelte';
@@ -91,7 +97,6 @@
 
   const TIMER_SYNC_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds', 'timeSegments'];
   const COMPLETION_SYNC_FIELDS = ['completedAt'];
-  const THEME_STORAGE_KEY = 'done-log-theme';
   const VIEW_STORAGE_KEY = 'done-log-view';
 
   let state = createInitialState();
@@ -181,6 +186,7 @@
     viewMode = loadViewMode();
     applyThemeMode(themeMode);
     window.addEventListener('focus', syncSelectedDayToToday);
+    window.addEventListener('storage', handleThemeStorageChange);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     scheduleSelectedDayRefresh();
     initializeAuth();
@@ -194,6 +200,7 @@
     window.clearTimeout(completionCueTimer);
     void noteAutosave.flushAll().catch(() => {});
     window.removeEventListener('focus', syncSelectedDayToToday);
+    window.removeEventListener('storage', handleThemeStorageChange);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
   });
 
@@ -431,7 +438,16 @@
   }
 
   function toggleThemeMode() {
-    themeMode = themeMode === 'dark' ? 'light' : 'dark';
+    themeMode = nextThemeMode(themeMode);
+    applyThemeMode(themeMode);
+  }
+
+  function handleThemeStorageChange(event) {
+    if (event.key !== THEME_STORAGE_KEY) {
+      return;
+    }
+
+    themeMode = loadThemeMode();
     applyThemeMode(themeMode);
   }
 
@@ -617,7 +633,7 @@
   }
 
   function triggerCompletionCue(todo) {
-    if (!todo || window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    if (!todo) {
       return;
     }
 
@@ -1230,22 +1246,8 @@
     syncMessage = `Offline cache: ${error.message}`;
   }
 
-  function loadThemeMode() {
-    const storedTheme = localStorage.getItem(THEME_STORAGE_KEY);
-    if (storedTheme === 'light' || storedTheme === 'dark') {
-      return storedTheme;
-    }
-
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
-  }
-
   function loadViewMode() {
     return normalizeViewMode(localStorage.getItem(VIEW_STORAGE_KEY));
-  }
-
-  function applyThemeMode(nextThemeMode) {
-    document.documentElement.dataset.theme = nextThemeMode;
-    localStorage.setItem(THEME_STORAGE_KEY, nextThemeMode);
   }
 
   function findTodo(todoId) {

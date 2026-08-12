@@ -132,7 +132,8 @@
       ? Math.max(VIEWPORT_MARGIN, rect.top - estimatedHeight - 12)
       : Math.min(rect.bottom + 10, window.innerHeight - estimatedHeight - VIEWPORT_MARGIN);
 
-    popoverStyle = `position: fixed; left: ${Math.round(left)}px; top: ${Math.round(top)}px; width: ${Math.round(width)}px;`;
+    const originY = shouldOpenAbove ? 'bottom' : 'top';
+    popoverStyle = `position: fixed; left: ${Math.round(left)}px; top: ${Math.round(top)}px; width: ${Math.round(width)}px; --popover-origin-y: ${originY};`;
   }
 
   function portal(node) {

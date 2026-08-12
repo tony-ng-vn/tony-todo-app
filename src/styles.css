@@ -234,6 +234,8 @@
   z-index: 40;
   color: #2d2d2f;
   filter: drop-shadow(0 20px 50px rgb(0 0 0 / 0.22));
+  transform-origin: center var(--popover-origin-y, top);
+  animation: popover-enter var(--motion-reveal) var(--ease-out);
 }
 
 .calendar-shell {
@@ -540,9 +542,23 @@ h2 {
   font-weight: 500;
   white-space: nowrap;
   transition:
-    background-color 180ms ease,
-    border-color 180ms ease,
-    transform 180ms ease;
+    background-color var(--motion-hover) ease,
+    border-color var(--motion-hover) ease,
+    color var(--motion-hover) ease,
+    transform var(--motion-press) var(--ease-out);
+}
+
+.theme-toggle.is-compact {
+  width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border-radius: 10px;
+}
+
+.theme-toggle-icon {
+  display: grid;
+  place-items: center;
+  animation: theme-icon-enter var(--motion-hover) var(--ease-out);
 }
 
 .theme-toggle:hover {
@@ -853,7 +869,7 @@ h2 {
 }
 
 .board-card.is-newly-added {
-  animation: block-enter 700ms ease;
+  animation: block-enter var(--motion-reveal) var(--ease-out);
 }
 
 .board-card.is-failed {
@@ -1218,13 +1234,12 @@ h2 {
 }
 
 .todo-item.is-new-block {
-  animation: block-enter 520ms cubic-bezier(0.16, 1, 0.3, 1);
+  animation: block-enter var(--motion-reveal) var(--ease-out);
 }
 
 .todo-item:hover {
   border-color: var(--border);
   background: var(--block-hover);
-  transform: translateY(-1px);
 }
 
 .block-insertion-cue {
@@ -1339,7 +1354,7 @@ h2 {
 .todo-item.is-paused .task-block-dot {
   border-color: var(--board-paused);
   background: var(--board-paused);
-  animation: paused-breathe 2.8s ease-in-out infinite;
+  box-shadow: 0 0 0 4px var(--board-paused-soft);
 }
 
 .task-content,
@@ -1692,7 +1707,6 @@ h2 {
 
 .summary-section li:hover {
   background: var(--block-hover);
-  transform: translateY(-1px);
 }
 
 .summary-section li.is-drop-target::before {
@@ -1819,9 +1833,7 @@ h2 {
   scrollbar-width: none;
   -ms-overflow-style: none;
   padding: clamp(20px, 2.4vw, 28px);
-  transition:
-    opacity 180ms ease,
-    transform 180ms ease;
+  animation: panel-enter var(--motion-reveal) var(--ease-out);
 }
 
 .task-detail::-webkit-scrollbar {
@@ -2558,48 +2570,58 @@ h2 {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
-    transition-duration: 0.01ms !important;
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    scroll-behavior: auto !important;
+@media (hover: hover) and (pointer: fine) {
+  .todo-item:hover,
+  .summary-section li:hover {
+    transform: translateY(-1px);
   }
 }
 
 @keyframes block-enter {
-  0% {
+  from {
     opacity: 0;
-    transform: translateY(-8px) scale(0.99);
-    background: var(--bg-selected);
-    border-color: var(--block-enter-border);
+    transform: translateY(-5px) scale(0.99);
   }
 
-  60% {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-    background: var(--bg-selected);
-    border-color: var(--block-border);
-  }
-
-  100% {
+  to {
     opacity: 1;
     transform: translateY(0) scale(1);
   }
 }
 
-@keyframes paused-breathe {
-  0%,
-  100% {
-    box-shadow: 0 0 0 0 var(--board-paused-soft);
-    transform: scale(0.92);
+@keyframes popover-enter {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
   }
 
-  50% {
-    box-shadow: 0 0 0 5px transparent;
+  to {
+    opacity: 1;
     transform: scale(1);
+  }
+}
+
+@keyframes panel-enter {
+  from {
+    opacity: 0;
+    transform: translateX(10px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes theme-icon-enter {
+  from {
+    opacity: 0;
+    transform: rotate(-18deg) scale(0.9);
+  }
+
+  to {
+    opacity: 1;
+    transform: rotate(0) scale(1);
   }
 }
 
@@ -2624,5 +2646,37 @@ h2 {
   to {
     opacity: 1;
     transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes reduced-fade {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+  }
+
+  .todo-item:hover,
+  .summary-section li:hover {
+    transform: none;
+  }
+
+  .board-card.is-newly-added,
+  .todo-item.is-new-block,
+  .calendar-popover,
+  .task-detail,
+  .completion-cue,
+  .theme-toggle-icon {
+    animation: reduced-fade var(--motion-hover) ease;
   }
 }
