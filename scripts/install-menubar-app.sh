@@ -25,6 +25,13 @@ wait_for_app_exit() {
 
 bash "$SCRIPT_DIR/build-menubar-app.sh"
 
+SOURCE_VERSION="$(
+  /usr/bin/plutil \
+    -extract CFBundleShortVersionString \
+    raw \
+    "$SOURCE_APP/Contents/Info.plist"
+)"
+
 if [[ -e "$INSTALLED_APP" && ! -d "$INSTALLED_APP" ]]; then
   echo "installation target is not an app directory: $INSTALLED_APP" >&2
   exit 1
@@ -45,6 +52,26 @@ if [[ -d "$INSTALLED_APP" ]]; then
   )"
   if [[ "$INSTALLED_IDENTIFIER" != "com.tonynguyen.donelog" ]]; then
     echo "refusing to replace an app with another bundle identifier" >&2
+    exit 1
+  fi
+
+  INSTALLED_VERSION="$(
+    /usr/bin/plutil \
+      -extract CFBundleShortVersionString \
+      raw \
+      "$INSTALLED_APP/Contents/Info.plist"
+  )"
+  VERSION_STATUS=0
+  "$SCRIPT_DIR/app-version-is-newer.sh" \
+    "$INSTALLED_VERSION" \
+    "$SOURCE_VERSION" \
+    || VERSION_STATUS=$?
+  if [[ "$VERSION_STATUS" -eq 0 ]]; then
+    echo "refusing to replace newer Done Log $INSTALLED_VERSION with $SOURCE_VERSION" >&2
+    exit 1
+  fi
+  if [[ "$VERSION_STATUS" -ne 1 ]]; then
+    echo "could not safely compare Done Log app versions" >&2
     exit 1
   fi
 
