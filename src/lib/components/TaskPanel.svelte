@@ -7,7 +7,8 @@
     getElapsedSeconds,
   } from '../../todoStore.js';
   import { linkifyText } from '../../linkify.js';
-  import { iconCheck, iconMoon, iconPage, iconPause, iconPlay, iconSun, iconX } from './icons.js';
+  import { iconCheck, iconPage, iconPause, iconPlay, iconX } from './icons.js';
+  import ThemeToggle from './ThemeToggle.svelte';
   import WorkspaceTabs from './WorkspaceTabs.svelte';
 
   export let syncMessage = 'Local only';
@@ -61,15 +62,7 @@
     </div>
     <div class="header-actions">
       <output class="sync-status" id="sync-status" aria-live="polite">{syncMessage}</output>
-      <button
-        type="button"
-        class="theme-toggle"
-        on:click={onToggleTheme}
-        aria-label={`Switch to ${themeMode === 'dark' ? 'light' : 'dark'} mode`}
-      >
-        {@html themeMode === 'dark' ? iconSun() : iconMoon()}
-        <span>{themeMode === 'dark' ? 'Light' : 'Dark'}</span>
-      </button>
+      <ThemeToggle {themeMode} onToggle={onToggleTheme} />
       {#if showSignOut}
         <button type="button" class="sign-out-button" on:click={onSignOut}>Sign out</button>
       {/if}

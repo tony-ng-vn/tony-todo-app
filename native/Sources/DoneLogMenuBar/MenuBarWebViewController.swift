@@ -34,6 +34,12 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
   override func loadView() {
     let configuration = WKWebViewConfiguration()
     configuration.websiteDataStore = .default()
+    let nativeHostScript = WKUserScript(
+      source: "window.__doneLogNativeHost = true;",
+      injectionTime: .atDocumentStart,
+      forMainFrameOnly: true
+    )
+    configuration.userContentController.addUserScript(nativeHostScript)
 
     webView = WKWebView(
       frame: NSRect(origin: .zero, size: preferredContentSize),

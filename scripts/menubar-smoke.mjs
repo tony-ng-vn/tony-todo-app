@@ -4,7 +4,10 @@ const targetUrl = new URL(process.env.UI_SMOKE_URL ?? 'http://127.0.0.1:5176/men
 targetUrl.searchParams.set('local', '1');
 const expectUpdateAvailable = process.env.EXPECT_UPDATE_AVAILABLE === '1';
 
-const browser = await chromium.launch({ headless: true });
+const browser = await chromium.launch({
+  headless: true,
+  executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH,
+});
 
 async function moveCalendarToMonth(page, target) {
   const targetTitle = new Intl.DateTimeFormat([], { month: 'long', year: 'numeric' }).format(target);
@@ -60,11 +63,14 @@ if (process.env.FLOATING_NOTE_ONLY === '1') {
     !result.request?.url?.includes('note=floating-note-task') ||
     result.request?.target !== 'done-log-note-floating-note-task' ||
     !result.request?.features?.includes('width=360') ||
+    result.inlineRequest !== null ||
     result.presentation.title !== 'Running task' ||
     result.presentation.status !== 'Note saved automatically' ||
     result.presentation.overflow ||
     result.presentation.closeRight > result.presentation.viewportWidth ||
     result.presentation.statusBottom > result.presentation.viewportHeight ||
+    result.presentation.resize !== 'both' ||
+    !result.presentation.moved ||
     !result.noteSurvivedTimerChanges
   ) {
     throw new Error(`Floating note concurrency check failed: ${JSON.stringify(result)}`);
@@ -243,12 +249,17 @@ try {
       updateButtonLabel: document.querySelector('.menubar-update')?.textContent.trim(),
       updateAvailable: document.querySelector('.menubar-update')?.classList.contains('is-available'),
       updateLiveRegion: document.querySelector('.menubar-update')?.getAttribute('aria-live'),
+      themeLabel: document.querySelector('.theme-toggle')?.getAttribute('aria-label'),
+      themeMode: document.documentElement.dataset.theme,
       scrollWidth: document.documentElement.scrollWidth,
       clientWidth: document.documentElement.clientWidth,
       scrollbarWidth: shellStyle.scrollbarWidth,
       taskTransitionDuration: getComputedStyle(
         document.querySelector('[data-menubar-id="menubar-running"]'),
       ).transitionDuration,
+      taskTransitionProperty: getComputedStyle(
+        document.querySelector('[data-menubar-id="menubar-running"]'),
+      ).transitionProperty,
     };
   });
 
@@ -257,6 +268,14 @@ try {
     .locator('[data-menubar-id="menubar-paused"] .menubar-task-dot')
     .evaluate((element) => getComputedStyle(element).animationName);
   await page.emulateMedia({ reducedMotion: 'reduce' });
+
+  await page.click('.theme-toggle');
+  const themeChange = await page.evaluate(() => ({
+    mode: document.documentElement.dataset.theme,
+    stored: localStorage.getItem('done-log-theme'),
+    label: document.querySelector('.theme-toggle')?.getAttribute('aria-label'),
+  }));
+  await page.click('.theme-toggle');
 
   await page.click('.menubar-update');
   await page.waitForURL((url) => url.searchParams.has('updated'));
@@ -492,14 +511,13 @@ try {
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     const todo = state.todos.find((item) => item.id === 'menubar-open');
-    return Boolean(todo?.completedAt) && !todo?.activeStartedAt;
+    return !todo?.completedAt && !todo?.activeStartedAt && todo?.timeSegments?.length === 1;
   });
   await page.waitForFunction(() =>
-    Boolean(
-      document
-        .querySelector('[data-menubar-id="menubar-open"]')
-        ?.closest('[data-menubar-section="finished"]'),
-    ),
+    Boolean(document.querySelector('[data-menubar-id="menubar-open"]')) &&
+    !document
+      .querySelector('[data-menubar-id="menubar-open"]')
+      ?.closest('[data-menubar-section="finished"]'),
   );
   await page.waitForSelector('[data-menubar-details="menubar-open"]');
   await chooseCalendarDateTime(
@@ -639,7 +657,7 @@ try {
     !initial.pausedInToday ||
     initial.pausedInPausedSection ||
     initial.pausedBadge !== 'Paused' ||
-    !pausedAnimationName.endsWith('menubar-paused-breathe')
+    pausedAnimationName !== 'none'
   ) {
     failures.push(
       `today's paused task is not clearly presented in Today: ${JSON.stringify({ initial, pausedAnimationName })}`,
@@ -666,6 +684,14 @@ try {
   }
   if (initial.fullAppHref !== '/') failures.push(`full app link is wrong: ${JSON.stringify(initial)}`);
   if (
+    !initial.themeLabel?.startsWith('Switch to ') ||
+    themeChange.mode === initial.themeMode ||
+    themeChange.stored !== themeChange.mode ||
+    !themeChange.label?.includes(initial.themeMode)
+  ) {
+    failures.push(`theme toggle did not persist its state: ${JSON.stringify({ initial, themeChange })}`);
+  }
+  if (
     initial.updateButtonLabel !== (expectUpdateAvailable ? 'Update available' : 'Update') ||
     initial.updateAvailable !== expectUpdateAvailable ||
     initial.updateLiveRegion !== 'polite' ||
@@ -677,8 +703,11 @@ try {
   if (initial.scrollWidth > initial.clientWidth || initial.scrollbarWidth !== 'none') {
     failures.push(`compact shell overflows or shows a scrollbar: ${JSON.stringify(initial)}`);
   }
-  if (Number.parseFloat(initial.taskTransitionDuration) > 0.001) {
-    failures.push(`reduced motion is not respected: ${JSON.stringify(initial)}`);
+  if (
+    Number.parseFloat(initial.taskTransitionDuration) > 0.2 ||
+    initial.taskTransitionProperty.includes('transform')
+  ) {
+    failures.push(`reduced motion is not gentle and non-spatial: ${JSON.stringify(initial)}`);
   }
   if (countAfterEmptyAdd !== 6) {
     failures.push(`empty quick add created a task: ${countAfterEmptyAdd}`);
@@ -739,7 +768,7 @@ try {
     !final.addedDueDate ||
     final.renamed !== 'Renamed in menu bar' ||
     final.note !== '- [x] Review menu bar' ||
-    !final.completed ||
+    final.completed ||
     !final.pausedCompleted ||
     final.progress !== 'Chapter\t3' ||
     !final.dueDate?.startsWith('2026-08-01') ||
@@ -781,7 +810,7 @@ try {
 }
 
 async function inspectFloatingNote() {
-  const context = await browser.newContext({ viewport: { width: 420, height: 640 } });
+  const context = await browser.newContext({ viewport: { width: 772, height: 532 } });
   const page = await context.newPage();
   await page.addInitScript(() => {
     const now = new Date('2026-08-12T13:05:00.000Z').toISOString();
@@ -806,7 +835,7 @@ async function inspectFloatingNote() {
   });
   await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
 
-  const request = await page.evaluate(() => {
+  const inlineRequest = await page.evaluate(() => {
     let openRequest = null;
     const originalOpen = window.open;
     window.open = (url, target, features) => {
@@ -818,39 +847,67 @@ async function inspectFloatingNote() {
     return openRequest;
   });
 
-  const notePage = await context.newPage();
-  await notePage.setViewportSize({ width: 320, height: 400 });
-  await notePage.goto(request?.url ?? `${targetUrl}&note=missing`);
   try {
-    await notePage.waitForSelector('.floating-note-shell', { timeout: 5000 });
+    await page.waitForSelector('.floating-note-shell.is-overlay', { timeout: 5000 });
   } catch {
     throw new Error(
-      `Floating note did not load for ${JSON.stringify(request)}: ${await notePage.locator('body').innerText()}`,
+      `Inline floating note did not load: ${await page.locator('body').innerText()}`,
     );
   }
-  await notePage.fill('.floating-note-input', 'Note from floating window');
-  await notePage.waitForFunction(() => {
+  await page.fill('.floating-note-input', 'Note from floating window');
+  await page.waitForFunction(() => {
     const todo = JSON.parse(localStorage.getItem('done-log-state')).todos[0];
     return todo?.note === 'Note from floating window';
   });
-  await notePage.waitForFunction(
+  await page.waitForFunction(
     () =>
       document.querySelector('.floating-note-save-status')?.textContent.trim()
       === 'Note saved automatically',
   );
-  const presentation = await notePage.evaluate(() => ({
-    title: document.querySelector('.floating-note-title')?.textContent.trim(),
-    status: document.querySelector('.floating-note-save-status')?.textContent.trim(),
-    overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
-    closeRight: Math.round(
-      document.querySelector('.floating-note-header button')?.getBoundingClientRect().right ?? -1,
-    ),
-    statusBottom: Math.round(
-      document.querySelector('.floating-note-save-status')?.getBoundingClientRect().bottom ?? -1,
-    ),
-    viewportWidth: window.innerWidth,
-    viewportHeight: window.innerHeight,
-  }));
+
+  const beforeDrag = await page.locator('.floating-note-shell').boundingBox();
+  const dragHandle = await page.locator('.floating-note-header').boundingBox();
+  await page.mouse.move(dragHandle.x + 40, dragHandle.y + 20);
+  await page.mouse.down();
+  await page.mouse.move(dragHandle.x - 90, dragHandle.y - 60, { steps: 4 });
+  await page.mouse.up();
+
+  const presentation = await page.evaluate((before) => {
+    const shell = document.querySelector('.floating-note-shell');
+    const rect = shell.getBoundingClientRect();
+    return {
+      title: document.querySelector('.floating-note-title')?.textContent.trim(),
+      status: document.querySelector('.floating-note-save-status')?.textContent.trim(),
+      overflow: document.documentElement.scrollWidth > document.documentElement.clientWidth,
+      closeRight: Math.round(
+        document.querySelector('.floating-note-header button')?.getBoundingClientRect().right ?? -1,
+      ),
+      statusBottom: Math.round(
+        document.querySelector('.floating-note-save-status')?.getBoundingClientRect().bottom ?? -1,
+      ),
+      viewportWidth: window.innerWidth,
+      viewportHeight: window.innerHeight,
+      resize: getComputedStyle(shell).resize,
+      moved: Math.abs(rect.left - before.x) > 20 || Math.abs(rect.top - before.y) > 20,
+    };
+  }, beforeDrag);
+
+  const nativePage = await context.newPage();
+  await nativePage.addInitScript(() => {
+    window.__doneLogNativeHost = true;
+  });
+  await nativePage.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
+  const request = await nativePage.evaluate(() => {
+    let openRequest = null;
+    const originalOpen = window.open;
+    window.open = (url, target, features) => {
+      openRequest = { url: String(url), target, features };
+      return { focus() {} };
+    };
+    document.querySelector('.menubar-open-note')?.click();
+    window.open = originalOpen;
+    return openRequest;
+  });
 
   await page.click('.menubar-pause');
   await page.waitForSelector('.menubar-start');
@@ -861,7 +918,7 @@ async function inspectFloatingNote() {
   });
   await context.close();
 
-  return { request, presentation, noteSurvivedTimerChanges };
+  return { request, inlineRequest, presentation, noteSurvivedTimerChanges };
 }
 
 async function inspectRunningTimingEdit() {

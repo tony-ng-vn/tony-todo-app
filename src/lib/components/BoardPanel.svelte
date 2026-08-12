@@ -3,7 +3,8 @@
   import CalendarPicker from './CalendarPicker.svelte';
   import { linkifyText } from '../../linkify.js';
   import { formatDueDate, formatTaskTimestamp } from '../../todoStore.js';
-  import { iconMoon, iconPlus, iconSun } from './icons.js';
+  import { iconPlus } from './icons.js';
+  import ThemeToggle from './ThemeToggle.svelte';
   import WorkspaceTabs from './WorkspaceTabs.svelte';
 
   export let syncMessage = 'Local only';
@@ -98,15 +99,7 @@
           onChange={(nextDate) => onSelectedDayChange?.(nextDate)}
         />
       </div>
-      <button
-        type="button"
-        class="theme-toggle"
-        on:click={onToggleTheme}
-        aria-label={`Switch to ${themeMode === 'dark' ? 'light' : 'dark'} mode`}
-      >
-        {@html themeMode === 'dark' ? iconSun() : iconMoon()}
-        <span>{themeMode === 'dark' ? 'Light' : 'Dark'}</span>
-      </button>
+      <ThemeToggle {themeMode} onToggle={onToggleTheme} />
       {#if showSignOut}
         <button type="button" class="sign-out-button" on:click={onSignOut}>Sign out</button>
       {/if}

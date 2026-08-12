@@ -518,8 +518,8 @@
     background: var(--block-surface);
     box-shadow: inset 0 1px 0 var(--inset-highlight);
     transition:
-      border-color 160ms ease,
-      background-color 160ms ease;
+      border-color var(--motion-hover) ease,
+      background-color var(--motion-hover) ease;
   }
 
   .menubar-task.is-running {
@@ -560,7 +560,7 @@
 
   .is-paused .menubar-task-dot {
     background: var(--board-paused);
-    animation: menubar-paused-breathe 2.8s ease-in-out infinite;
+    box-shadow: 0 0 0 4px var(--board-paused-soft);
   }
 
   .is-someday .menubar-task-dot {
@@ -646,8 +646,8 @@
     background: var(--surface-strong);
     color: var(--strong);
     transition:
-      background-color 160ms ease,
-      transform 160ms ease;
+      background-color var(--motion-hover) ease,
+      transform var(--motion-press) var(--ease-out);
   }
 
   .menubar-icon-button:hover {
@@ -675,6 +675,7 @@
     padding: 12px;
     border-top: 1px solid var(--border);
     background: color-mix(in srgb, var(--surface-strong) 68%, transparent);
+    animation: panel-enter var(--motion-reveal) var(--ease-out);
   }
 
   .menubar-task-details label {
@@ -909,26 +910,8 @@
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .menubar-task,
-    .menubar-icon-button {
-      transition: none;
-    }
-
-    .is-paused .menubar-task-dot {
-      animation: none;
-    }
-  }
-
-  @keyframes menubar-paused-breathe {
-    0%,
-    100% {
-      box-shadow: 0 0 0 0 var(--board-paused-soft);
-      transform: scale(0.9);
-    }
-
-    50% {
-      box-shadow: 0 0 0 4px transparent;
-      transform: scale(1);
+    .menubar-task-details {
+      animation: reduced-fade var(--motion-hover) ease;
     }
   }
 </style>

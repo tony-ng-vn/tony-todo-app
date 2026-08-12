@@ -33,6 +33,17 @@ describe('menu bar app bundle', () => {
     expect(controller).toContain('NSPanel');
     expect(controller).toContain('window.level = .floating');
     expect(controller).toContain('window.isMovableByWindowBackground = true');
+    expect(controller).toContain('window.contentMinSize');
     expect(controller).toContain('contentController.onCloseWindow');
+  });
+
+  it('marks native web views before the menu bar page loads', () => {
+    const controller = readFileSync(
+      path.join(repoRoot, 'native/Sources/DoneLogMenuBar/MenuBarWebViewController.swift'),
+      'utf8',
+    );
+
+    expect(controller).toContain('window.__doneLogNativeHost = true');
+    expect(controller).toContain('injectionTime: .atDocumentStart');
   });
 });

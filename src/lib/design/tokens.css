@@ -34,6 +34,11 @@
   --space-4: 16px;
   --space-5: 20px;
   --space-6: 24px;
+  --motion-press: 140ms;
+  --motion-hover: 160ms;
+  --motion-reveal: 220ms;
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --board-not-started: #9065d0;
   --board-not-started-soft: rgba(144, 101, 208, 0.14);
   --board-not-started-surface: rgba(144, 101, 208, 0.08);
