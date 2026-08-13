@@ -62,7 +62,7 @@ export async function proxyToInsForge({ request, url }) {
 
   try {
     const backendResponse = await fetch(targetUrl, init);
-    return createProxyResponse(backendResponse);
+    return await createProxyResponse(backendResponse);
   } catch (error) {
     return proxyUpstreamErrorResponse(error);
   }
@@ -70,10 +70,11 @@ export async function proxyToInsForge({ request, url }) {
 
 export function proxyUpstreamErrorResponse(error) {
   const cause = error?.cause?.message || error?.message || 'network error';
+  console.error('InsForge proxy could not reach the backend:', cause);
   return new Response(
     JSON.stringify({
       error: 'BAD_GATEWAY',
-      message: `Could not reach the backend (${cause})`,
+      message: 'Could not reach the backend',
     }),
     {
       status: 502,
@@ -85,10 +86,14 @@ export function proxyUpstreamErrorResponse(error) {
 export async function createProxyResponse(backendResponse) {
   const responseHeaders = new Headers();
   for (const [key, value] of backendResponse.headers) {
+    const header = key.toLowerCase();
     // Set-Cookie is handled separately below so multiple cookies survive.
-    if (key.toLowerCase() !== 'set-cookie') {
-      responseHeaders.set(key, value);
+    // Undici already decoded the body, so forwarding compression metadata
+    // would make the browser try to decode it again.
+    if (header === 'set-cookie' || header === 'content-encoding' || header === 'content-length') {
+      continue;
     }
+    responseHeaders.set(key, value);
   }
 
   // getSetCookie() returns each Set-Cookie header individually (Node 18+/undici).
