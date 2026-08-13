@@ -33,4 +33,27 @@ enum NativeWindowPolicy {
   static func fullScreenMenuTitle(isFullScreen: Bool) -> String {
     isFullScreen ? "Exit Full Screen" : "Enter Full Screen"
   }
+
+  @MainActor
+  static func titlebarInset(in contentView: NSView, window: NSWindow) -> CGFloat {
+    let layout = contentView.convert(window.contentLayoutRect, from: nil)
+    let measured = max(0, contentView.bounds.maxY - layout.maxY)
+    if measured > 0 {
+      return measured
+    }
+
+    return window.standardWindowButton(.closeButton)?.superview?.bounds.height ?? 28
+  }
+
+  static func isTitlebarPassthroughPoint(
+    _ point: NSPoint,
+    in bounds: NSRect,
+    titlebarInset: CGFloat
+  ) -> Bool {
+    titlebarInset > 0 && point.y >= bounds.maxY - titlebarInset
+  }
+
+  static func titlebarInsetCSSValue(_ inset: CGFloat) -> String {
+    "\(Int(inset.rounded(.toNearestOrAwayFromZero)))px"
+  }
 }

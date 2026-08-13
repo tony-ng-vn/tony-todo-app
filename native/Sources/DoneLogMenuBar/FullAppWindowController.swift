@@ -3,6 +3,7 @@ import AppKit
 @MainActor
 final class FullAppWindowController: NSWindowController, NSWindowDelegate {
   private let application: NSApplication
+  private let contentController: MenuBarWebViewController
   private var floatingNoteWindows: [String: FloatingNoteWindowController] = [:]
 
   init(
@@ -11,7 +12,7 @@ final class FullAppWindowController: NSWindowController, NSWindowDelegate {
   ) {
     self.application = application
 
-    let contentController = MenuBarWebViewController(
+    contentController = MenuBarWebViewController(
       homeURL: url,
       preferredSize: MenuBarConfiguration.fullAppSize,
       readySelector: nil,
@@ -53,6 +54,7 @@ final class FullAppWindowController: NSWindowController, NSWindowDelegate {
     application.setActivationPolicy(.regular)
     if let window {
       NativeWindowPolicy.applyChrome(to: window)
+      contentController.syncNativeChrome(from: window)
     }
     if window?.isMiniaturized == true {
       window?.deminiaturize(nil)
@@ -60,6 +62,21 @@ final class FullAppWindowController: NSWindowController, NSWindowDelegate {
     showWindow(nil)
     window?.makeKeyAndOrderFront(nil)
     application.activate(ignoringOtherApps: true)
+  }
+
+  func windowDidResize(_ notification: Notification) {
+    guard let window else {
+      return
+    }
+    contentController.syncNativeChrome(from: window)
+  }
+
+  func windowDidExitFullScreen(_ notification: Notification) {
+    guard let window else {
+      return
+    }
+    NativeWindowPolicy.applyChrome(to: window)
+    contentController.syncNativeChrome(from: window)
   }
 
   func windowWillClose(_ notification: Notification) {

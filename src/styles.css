@@ -2855,6 +2855,10 @@ html.is-native-host body {
   background: var(--canvas);
 }
 
+html.is-native-host {
+  --native-titlebar-inset: 28px;
+}
+
 html.is-native-host body::before {
   opacity: 0.45;
 }
@@ -2866,7 +2870,7 @@ html.is-native-host .workspace.is-board-view.has-detail {
   width: 100%;
   height: 100dvh;
   margin: 0;
-  padding: 0;
+  padding: var(--native-titlebar-inset) 0 0;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -2877,36 +2881,38 @@ html.is-native-host .workspace.is-board-view.has-detail {
 html.is-native-host .task-panel,
 html.is-native-host .summary-panel,
 html.is-native-host .flow-rail,
-html.is-native-host .task-detail {
+html.is-native-host .task-detail,
+html.is-native-host .board-panel,
+html.is-native-host .projects-panel,
+html.is-native-host .calendar-panel,
+html.is-native-host .inbox-panel,
+html.is-native-host .waiting-panel,
+html.is-native-host .history-panel,
+html.is-native-host .meetings-panel,
+html.is-native-host .settings-panel {
   border-radius: 0;
   box-shadow: none;
 }
 
 html.is-native-host .task-panel {
   border-width: 0 1px 0 0;
-  padding-top: 10px;
 }
 
 html.is-native-host .brand-row {
-  min-height: 44px;
-  padding-inline-start: 62px;
-  align-items: center;
+  align-items: flex-start;
 }
 
 html.is-native-host .flow-rail {
   border: 0;
-  padding-top: 10px;
 }
 
 html.is-native-host .summary-panel,
 html.is-native-host .workspace.has-detail .task-detail {
   border-width: 0 0 0 1px;
   border-radius: 0;
-  padding-top: 10px;
 }
 
 html.is-native-host .summary-top,
 html.is-native-host .detail-header {
-  min-height: 44px;
-  align-items: center;
+  align-items: flex-start;
 }
