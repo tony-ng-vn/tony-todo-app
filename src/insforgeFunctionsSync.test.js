@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  INSFORGE_CLI_SPEC,
   listDeployableSlugs,
   parseSyncArgs,
   slugsFromChangedPaths,
@@ -105,6 +106,32 @@ describe('syncInsforgeFunctions', () => {
       deployed: ['agent-todos'],
       checked: ['agent-todos', 'draft-follow-up'],
     });
+  });
+
+  it('fails before any deploy when a changed function file was deleted', () => {
+    const deployed = [];
+
+    expect(() =>
+      syncInsforgeFunctions({
+        root: '/repo',
+        argv: ['--deploy-changed', '--base', 'abc', '--head', 'def'],
+        listFiles: () => ['agent-todos.ts'],
+        gitDiff: () => ['functions/draft-follow-up.ts'],
+        runInsforge: (args) => {
+          if (args[1] === 'deploy') {
+            deployed.push(args[2]);
+          }
+          return '';
+        },
+        log: { error() {} },
+      }),
+    ).toThrow(/deleted and cannot be deployed: draft-follow-up/);
+
+    expect(deployed).toEqual([]);
+  });
+
+  it('pins the InsForge CLI package version', () => {
+    expect(INSFORGE_CLI_SPEC).toBe('@insforge/cli@0.2.6');
   });
 
   it('fails when live source does not match the repo', () => {

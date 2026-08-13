@@ -9,6 +9,7 @@ const SHELL_SUFFIX = '.shell.ts';
 const SOURCE_SUFFIX = '.ts';
 
 export const TODO_APP_PROJECT_ID = '7e77e15d-9e4d-4591-9951-8b99289200cd';
+export const INSFORGE_CLI_SPEC = '@insforge/cli@0.2.6';
 
 const LIVE_SOURCE_HEADER = /^Function:.*\n(?:Status:.*\n)?---\n/;
 
@@ -117,7 +118,7 @@ function defaultGitDiff(root, base, head) {
 }
 
 function defaultRunInsforge(args, { capture = false, cwd = ROOT } = {}) {
-  return execFileSync('npx', ['-y', '@insforge/cli', ...args], {
+  return execFileSync('npx', ['-y', INSFORGE_CLI_SPEC, ...args], {
     cwd,
     encoding: 'utf8',
     stdio: capture ? ['ignore', 'pipe', 'inherit'] : 'inherit',
@@ -145,7 +146,14 @@ export function syncInsforgeFunctions({
   if (options.deployAll) {
     slugsToDeploy = allSlugs;
   } else if (options.deployChanged) {
-    slugsToDeploy = slugsFromChangedPaths(gitDiff(root, options.base, options.head));
+    const changedSlugs = slugsFromChangedPaths(gitDiff(root, options.base, options.head));
+    const missing = changedSlugs.filter((slug) => !allSlugs.includes(slug));
+    if (missing.length > 0) {
+      throw new Error(
+        `These function files were deleted and cannot be deployed: ${missing.join(', ')}. Remove the live functions in the InsForge dashboard, then re-run the job.`,
+      );
+    }
+    slugsToDeploy = changedSlugs;
   }
 
   for (const slug of slugsToDeploy) {
