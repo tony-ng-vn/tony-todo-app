@@ -8,8 +8,6 @@ const FUNCTIONS_DIR = 'functions';
 const SHELL_SUFFIX = '.shell.ts';
 const SOURCE_SUFFIX = '.ts';
 
-export const TODO_APP_PROJECT_ID = '7e77e15d-9e4d-4591-9951-8b99289200cd';
-
 const LIVE_SOURCE_HEADER = /^Function:.*\n(?:Status:.*\n)?---\n/;
 
 export function listDeployableSlugs(fileNames) {
