@@ -164,6 +164,31 @@ describe('note entries', () => {
       `@ ${formatNoteAtLocal(first)}\nLeft voicemail\n\n@ ${formatNoteAtLocal(later)}\nWaiting on callback`,
     );
   });
+
+  it('stamps every bullet by identity instead of by position, so reordering keeps each time', () => {
+    const first = new Date('2026-06-08T15:00:00.000Z');
+    const later = new Date('2026-06-08T15:12:00.000Z');
+    const now = new Date('2026-06-08T16:00:00.000Z');
+    let stored = applyTodoNote('', '- Call Sam', first);
+    stored = applyTodoNote(stored, '- Call Sam\n- Email the landlord', later);
+
+    const reordered = applyTodoNote(stored, '- Email the landlord\n- Call Sam', now);
+
+    expect(parseNoteEntries(reordered)).toEqual([
+      { at: later.toISOString(), text: '- Email the landlord' },
+      { at: first.toISOString(), text: '- Call Sam' },
+    ]);
+  });
+
+  it('gives every bullet in a legacy multi-dash chunk its own stamp instead of one shared stamp', () => {
+    const legacyAt = dateAtSanFranciscoTime('2026-06-08', 8 * 60).toISOString();
+    const legacy = '@ 2026-06-08 08:00\n- Call Sam\n- Email the landlord';
+
+    expect(parseNoteEntries(legacy)).toEqual([
+      { at: legacyAt, text: '- Call Sam' },
+      { at: legacyAt, text: '- Email the landlord' },
+    ]);
+  });
 });
 
 describe('runTodoCommand create', () => {
