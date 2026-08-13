@@ -28,14 +28,26 @@ function createInitialState(todos = []) {
   return { todos: todos.map(normalizeTodo) };
 }
 
-function addTodo(state, title, createdAt = new Date(), { dueDate = null, source = 'app' } = {}) {
+const TODO_KINDS = ['task', 'project'];
+
+function parseTodoKind(value) {
+  return value === 'project' ? 'project' : 'task';
+}
+
+function addTodo(
+  state,
+  title,
+  createdAt = new Date(),
+  { dueDate = null, source = 'app', kind = 'task' } = {},
+) {
   const cleanTitle = title.trim();
 
   if (!cleanTitle || findDuplicateTodo(state, cleanTitle)) {
     return state;
   }
 
-  const assignedDate = normalizeAssignedDate(dueDate, createdAt);
+  const todoKind = parseTodoKind(kind);
+  const assignedDate = todoKind === 'project' ? null : normalizeAssignedDate(dueDate, createdAt);
 
   return {
     ...state,
@@ -46,6 +58,7 @@ function addTodo(state, title, createdAt = new Date(), { dueDate = null, source 
         title: cleanTitle,
         createdAt: createdAt.toISOString(),
         completedAt: null,
+        kind: todoKind,
         somedayAt: null,
         dueDate: assignedDate,
         note: '',
@@ -94,7 +107,15 @@ function completeTodo(state, todoId, completedAt = new Date()) {
 
 function getPendingTodos(state) {
   return state.todos
-    .filter((todo) => !todo.completedAt && !todo.isProgressSession)
+    .filter((todo) => parseTodoKind(todo.kind) === 'task' && !todo.completedAt && !todo.isProgressSession)
+    .toSorted(compareTodosNewestFirst);
+}
+
+function getProjectTodos(state) {
+  return state.todos
+    .filter(
+      (todo) => parseTodoKind(todo.kind) === 'project' && !todo.completedAt && !todo.isProgressSession,
+    )
     .toSorted(compareTodosNewestFirst);
 }
 
@@ -291,10 +312,13 @@ function compareTodosNewestFirst(first, second) {
 }
 
 function normalizeTodo(todo) {
+  const kind = parseTodoKind(todo.kind);
+
   return {
     ...todo,
-    somedayAt: todo.somedayAt ?? null,
-    dueDate: todo.dueDate ?? null,
+    kind,
+    somedayAt: kind === 'project' ? null : todo.somedayAt ?? null,
+    dueDate: kind === 'project' ? null : todo.dueDate ?? null,
     note: todo.note ?? '',
     source: todo.source ?? 'app',
     notionPageId: todo.notionPageId ?? null,
@@ -349,6 +373,7 @@ function toRemoteRecord(todo, userId) {
     title: todo.title,
     created_at: todo.createdAt,
     completed_at: todo.completedAt,
+    kind: parseTodoKind(todo.kind),
     someday_at: todo.somedayAt ?? null,
     due_date: todo.dueDate ?? null,
     note: todo.note ?? '',
@@ -373,6 +398,7 @@ function fromRemoteRecord(record) {
     title: record.title,
     createdAt: record.created_at,
     completedAt: record.completed_at,
+    kind: parseTodoKind(record.kind),
     somedayAt: record.someday_at ?? null,
     dueDate: record.due_date ?? null,
     note: record.note ?? '',
@@ -765,7 +791,7 @@ const corsHeaders = {
 };
 
 const AGENT_TODO_COLUMNS =
-  'id,title,created_at,completed_at,someday_at,due_date,note,source,notion_page_id,notion_database_id,notion_status,first_started_at,active_started_at,tracked_seconds,time_segments,is_progressive,parent_task_id,is_progress_session,progress_label';
+  'id,title,created_at,completed_at,kind,someday_at,due_date,note,source,notion_page_id,notion_database_id,notion_status,first_started_at,active_started_at,tracked_seconds,time_segments,is_progressive,parent_task_id,is_progress_session,progress_label';
 
 export default async function (req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {

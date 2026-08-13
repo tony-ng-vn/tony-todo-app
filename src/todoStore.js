@@ -16,6 +16,8 @@ import {
   getDayPartLabel,
   getDaySummary,
   getPendingTodos,
+  getProjectTodos,
+  parseTodoKind,
   normalizeTimeSegments,
   normalizeTodo,
   normalizedTrackedSeconds,
@@ -35,6 +37,8 @@ export {
   getDayPartLabel,
   getDaySummary,
   getPendingTodos,
+  getProjectTodos,
+  parseTodoKind,
 };
 
 export const BOARD_COLUMNS = [
@@ -465,7 +469,7 @@ export function setTodoSomeday(state, todoId, somedayAt = new Date()) {
   return {
     ...state,
     todos: state.todos.map((todo) => {
-      if (todo.id !== todoId || todo.isProgressSession) {
+      if (todo.id !== todoId || todo.isProgressSession || parseTodoKind(todo.kind) === 'project') {
         return todo;
       }
 
