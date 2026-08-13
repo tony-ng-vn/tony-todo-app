@@ -91,7 +91,7 @@ describe('parseTodoCommand', () => {
   });
 
   it('keeps the catalog aligned with the parser', () => {
-    expect(AGENT_API_VERSION).toBe(1);
+    expect(AGENT_API_VERSION).toBe(2);
     expect(AGENT_COMMANDS.map((entry) => entry.command)).toEqual([
       'describe',
       'list',
@@ -440,6 +440,25 @@ describe('runTodoCommand appendNote', () => {
         atLocal: formatNoteAtLocal(UTC_EVENING),
         text: 'Left voicemail',
       },
+    ]);
+  });
+
+  it('appends multiple list items as separate stamped notes from one command call', () => {
+    const state = createInitialState([openTodo({ note: '' })]);
+    const result = runTodoCommand(
+      state,
+      { kind: 'appendNote', target: { by: 'id', id: 'task-1' }, text: '- a\n- b' },
+      UTC_EVENING,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.persist.kind).toBe('update');
+    expect(result.persist.todo.note).toBe(
+      `@ ${formatNoteAtLocal(UTC_EVENING)}\n- a\n\n@ ${formatNoteAtLocal(UTC_EVENING)}\n- b`,
+    );
+    expect(result.view.task.notes).toEqual([
+      { at: UTC_EVENING.toISOString(), atLocal: formatNoteAtLocal(UTC_EVENING), text: '- a' },
+      { at: UTC_EVENING.toISOString(), atLocal: formatNoteAtLocal(UTC_EVENING), text: '- b' },
     ]);
   });
 });

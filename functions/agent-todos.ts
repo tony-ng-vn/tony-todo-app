@@ -767,7 +767,7 @@ function toRemoteCompletionFields(todo) {
 }
 
 // Bump this when AGENT_COMMANDS changes so callers can refresh with describe.
-const AGENT_API_VERSION = 1;
+const AGENT_API_VERSION = 2;
 
 const AGENT_COMMANDS = [
   {
@@ -795,7 +795,7 @@ const AGENT_COMMANDS = [
   },
   {
     command: 'appendNote',
-    summary: 'Append a dated note. Blank lines start a new note.',
+    summary: 'Append a note. Each list item is its own dated note.',
     bodies: [
       { command: 'appendNote', id: '...', text: '...' },
       { command: 'appendNote', title: '...', text: '...' },
