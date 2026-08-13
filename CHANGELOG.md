@@ -1,5 +1,20 @@
 # Changelog
 
+## v0.10.1
+
+2026-08-13
+
+**Backend**
+
+- Fixed the agent-key hashing migration so it applies cleanly on a fresh database: the old key-format check is now removed before existing keys are rewritten as hashes.
+- The repo now tracks two migrations that were already live (YouTube watch items and knowledge cards, wider audit-log action types), so a fresh environment matches production.
+
+**Docs**
+
+- Design rules moved out of the tool-managed section of AGENTS.md so automated syncs cannot delete them again.
+
+---
+
 ## v0.10.0
 
 2026-08-13
