@@ -15,11 +15,22 @@ function sectionAfter(heading) {
 }
 
 describe('AGENTS.md commit rule', () => {
+  it('is the first section so agents cannot miss it', () => {
+    const firstHeading = agents.match(/^## .+$/m)?.[0];
+    expect(firstHeading).toBe('## Commits');
+    expect(agents.indexOf('## Commits')).toBeLessThan(
+      agents.indexOf('<!-- INSFORGE:START -->')
+    );
+  });
+
   it('lives outside the InsForge skill-sync block', () => {
+    const insforgeStart = agents.indexOf('<!-- INSFORGE:START -->');
     const insforgeEnd = agents.indexOf('<!-- INSFORGE:END -->');
     const commits = agents.indexOf('## Commits');
-    expect(insforgeEnd).toBeGreaterThan(-1);
-    expect(commits).toBeGreaterThan(insforgeEnd);
+    expect(insforgeStart).toBeGreaterThan(-1);
+    expect(insforgeEnd).toBeGreaterThan(insforgeStart);
+    expect(commits).toBeGreaterThan(-1);
+    expect(commits < insforgeStart || commits > insforgeEnd).toBe(true);
   });
 
   it('forbids squashing a whole PR into one commit', () => {
