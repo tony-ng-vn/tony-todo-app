@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -8,6 +9,18 @@ import {
   stripLiveFunctionSource,
   syncInsforgeFunctions,
 } from '../scripts/insforge-functions-sync.mjs';
+
+const syncScript = readFileSync(
+  new URL('../scripts/insforge-functions-sync.mjs', import.meta.url),
+  'utf8',
+);
+
+describe('InsForge CLI execution', () => {
+  it('uses the exact locked CLI package without network resolution', () => {
+    expect(syncScript).toContain("'@insforge/cli@0.2.6'");
+    expect(syncScript).toContain("'--offline'");
+  });
+});
 
 describe('listDeployableSlugs', () => {
   it('keeps generated function files and skips the agent-todos shell', () => {
