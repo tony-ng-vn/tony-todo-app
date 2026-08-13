@@ -1,3 +1,16 @@
+export function getTextareaCaretRestore(textarea) {
+  const scrollTop = textarea.scrollTop;
+  const scrollHeight = textarea.scrollHeight;
+
+  return (cursor) => {
+    textarea.setSelectionRange(cursor, cursor);
+    textarea.scrollTop =
+      cursor === textarea.value.length
+        ? textarea.scrollHeight
+        : scrollTop + textarea.scrollHeight - scrollHeight;
+  };
+}
+
 export function getTextareaKeyEdit({
   value,
   selectionStart,

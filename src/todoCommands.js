@@ -472,12 +472,72 @@ export function applyTodoNote(previousNote, nextNote, now = new Date()) {
   return serializeNoteEntries(stamped);
 }
 
+// Bump this when AGENT_COMMANDS changes so callers can refresh with describe.
+export const AGENT_API_VERSION = 1;
+
+export const AGENT_COMMANDS = [
+  {
+    command: 'describe',
+    summary: 'Current command list and apiVersion.',
+    bodies: [{ command: 'describe' }],
+  },
+  {
+    command: 'list',
+    summary: 'Open tasks with now, nowLocal, and notes[] (at, atLocal, text).',
+    bodies: [{ command: 'list' }],
+  },
+  {
+    command: 'create',
+    summary: 'Create a task. A duplicate open title returns the existing task.',
+    bodies: [{ command: 'create', title: '...' }],
+  },
+  {
+    command: 'complete',
+    summary: 'Complete by id or title, not both.',
+    bodies: [
+      { command: 'complete', id: '...' },
+      { command: 'complete', title: '...' },
+    ],
+  },
+  {
+    command: 'appendNote',
+    summary: 'Append a dated note. Blank lines start a new note.',
+    bodies: [
+      { command: 'appendNote', id: '...', text: '...' },
+      { command: 'appendNote', title: '...', text: '...' },
+    ],
+  },
+  {
+    command: 'daySummary',
+    summary: 'Completed work for a day (default today).',
+    bodies: [
+      { command: 'daySummary' },
+      { command: 'daySummary', day: 'YYYY-MM-DD' },
+    ],
+  },
+];
+
+export function describeCatalog() {
+  return {
+    kind: 'describe',
+    apiVersion: AGENT_API_VERSION,
+    timeZone: SAN_FRANCISCO_TIME_ZONE,
+    commands: AGENT_COMMANDS,
+  };
+}
+
+export function commandNeedsTodos(command) {
+  return command?.kind !== 'describe';
+}
+
 export function parseTodoCommand(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return invalidCommand('Expected a JSON object');
   }
 
   switch (body.command) {
+    case 'describe':
+      return { ok: true, command: { kind: 'describe' } };
     case 'list':
       return { ok: true, command: { kind: 'list' } };
     case 'create':
@@ -492,12 +552,18 @@ export function parseTodoCommand(body) {
     case 'daySummary':
       return parseDaySummaryCommand(body);
     default:
-      return invalidCommand('Unknown command');
+      return unknownCommandResult();
   }
 }
 
 export function runTodoCommand(state, command, now) {
+  return withApiVersion(runTodoCommandBody(state, command, now));
+}
+
+function runTodoCommandBody(state, command, now) {
   switch (command.kind) {
+    case 'describe':
+      return runDescribeCommand();
     case 'list':
       return runListCommand(state, now);
     case 'create':
@@ -509,7 +575,7 @@ export function runTodoCommand(state, command, now) {
     case 'daySummary':
       return runDaySummaryCommand(state, command.day, now);
     default:
-      return { ok: false, error: { code: 'invalid', message: 'Unknown command' } };
+      return unknownCommandResult();
   }
 }
 
@@ -562,6 +628,14 @@ function parseDaySummaryCommand(body) {
   }
 
   return { ok: true, command: { kind: 'daySummary', day: body.day } };
+}
+
+function runDescribeCommand() {
+  return {
+    ok: true,
+    view: describeCatalog(),
+    persist: { kind: 'none' },
+  };
 }
 
 function runListCommand(state, now) {
@@ -744,6 +818,28 @@ function agentDueDateFromCreatedAt(createdAt) {
 
 function invalidCommand(message) {
   return { ok: false, error: { code: 'invalid', message } };
+}
+
+function unknownCommandResult() {
+  return {
+    ok: false,
+    error: {
+      code: 'unknown_command',
+      message: 'Unknown command. Call describe for the current list.',
+    },
+    catalog: describeCatalog(),
+  };
+}
+
+function withApiVersion(result) {
+  if (!result.ok) {
+    return result;
+  }
+
+  return {
+    ...result,
+    view: { ...result.view, apiVersion: AGENT_API_VERSION },
+  };
 }
 
 function normalizeTaskTitle(title) {

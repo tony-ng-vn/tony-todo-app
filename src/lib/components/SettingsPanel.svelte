@@ -178,9 +178,9 @@
   <div class="settings-section">
     <h3 class="section-title">Agents</h3>
     {#if !userId}
-      <p class="empty-note">Sign in to create a personal agent key. Paste the setup into Cursor, Codex, or any tool that can POST JSON.</p>
+      <p class="empty-note">Sign in to create a personal agent key. Paste the setup into Cursor, Codex, or any tool that can POST JSON. The copied setup tells the tool to call describe for the current commands.</p>
     {:else}
-      <p class="empty-note">Name the key, copy it once, then keep only the name here. Treat the secret like a password.</p>
+      <p class="empty-note">Name the key, copy it once, then keep only the name here. Treat the secret like a password. The copied setup tells the tool to call describe for the current commands.</p>
       {#if agentTokenError}
         <p class="empty-note">{agentTokenError}</p>
       {/if}

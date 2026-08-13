@@ -1,17 +1,38 @@
 # Changelog
 
-## v0.10.3
+## v0.11.2
+
+2026-08-13
+
+**Native App**
+
+- Opening a task quick note no longer opens the full Done Log window at the same time.
+
+---
+
+## v0.11.1
+
+2026-08-13
+
+**Web App**
+
+- Pressing Enter at the bottom of a long task note now keeps the caret in view instead of leaving you looking at earlier lines.
+
+---
+
+## v0.11.0
 
 2026-08-13
 
 **Backend**
 
-- Fixed the agent-key hashing migration so it applies cleanly on a fresh database: the old key-format check is now removed before existing keys are rewritten as hashes.
-- The repo now tracks two migrations that were already live (YouTube watch items and knowledge cards, wider audit-log action types), so a fresh environment matches production.
+- The agent HTTP API now has a `describe` command that returns the live command list, timezone, and `apiVersion`.
+- Unknown commands return that catalog instead of a dead error, so a stale paste can recover on the next call.
+- Successful responses include `apiVersion`, so a long-running session can notice when the catalog changed and call `describe` again.
 
-**Docs**
+**Web App**
 
-- Design rules moved out of the tool-managed section of AGENTS.md so automated syncs cannot delete them again.
+- Copied agent setup no longer lists every command. It tells the tool to call `describe` first, so new features show up without recopying setup.
 
 ---
 

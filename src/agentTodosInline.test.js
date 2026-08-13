@@ -22,6 +22,14 @@ describe('agent-todos bundle', () => {
     expect(shell).not.toContain(".eq('token',");
   });
 
+  it('returns the live catalog for describe and unknown commands without loading todos', () => {
+    const shell = readFileSync(join(ROOT, 'functions/agent-todos.shell.ts'), 'utf8');
+    expect(shell).toContain('commandNeedsTodos');
+    expect(shell).toContain('parsed.catalog ? { error: parsed.error, ...parsed.catalog }');
+    expect(shell).toContain("case 'unknown_command':");
+    expect(shell).toContain('body.apiVersion === undefined');
+  });
+
   it('keeps functions/agent-todos.ts generated from the domain module', () => {
     expect(() => inlineAgentTodos({ check: true })).not.toThrow();
   });

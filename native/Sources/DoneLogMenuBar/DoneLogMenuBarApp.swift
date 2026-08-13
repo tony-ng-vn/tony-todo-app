@@ -15,10 +15,11 @@ final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
     menuBarController = controller
 
     let environment = ProcessInfo.processInfo.environment
-    if NativeAppLaunchPolicy.shouldOpenFullApp(
+    let launchIntent = NativeAppLaunchPolicy.initialIntent(
       launchDate: NSRunningApplication.current.launchDate,
       environment: environment
-    ) {
+    )
+    if NativeAppLaunchPolicy.action(for: launchIntent) == .openFullApp {
       controller.showFullApp()
     }
 
@@ -31,7 +32,9 @@ final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
     _ sender: NSApplication,
     hasVisibleWindows flag: Bool
   ) -> Bool {
-    menuBarController?.showFullApp()
+    if NativeAppLaunchPolicy.reopenAction == .openFullApp {
+      menuBarController?.showFullApp()
+    }
     return false
   }
 
