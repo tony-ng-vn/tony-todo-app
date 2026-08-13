@@ -28,7 +28,7 @@ jobs:
        github.event.workflow_run.conclusion == 'success')
 
     env:
-      INSFORGE_PROJECT_ID: 7e77e15d-9e4d-4591-9951-8b99289200cd
+      INSFORGE_API_BASE_URL: https://y26ze9je.us-east.insforge.app
 
     steps:
       - name: Check out repository
@@ -54,22 +54,21 @@ jobs:
             exit 1
           fi
 
-      - name: Require InsForge user API key
+      - name: Require InsForge project API key
         env:
-          INSFORGE_USER_API_KEY: ${{ secrets.INSFORGE_USER_API_KEY }}
+          INSFORGE_API_KEY: ${{ secrets.INSFORGE_API_KEY }}
         run: |
-          if [ -z "$INSFORGE_USER_API_KEY" ]; then
-            echo "Add repository secret INSFORGE_USER_API_KEY from InsForge Profile -> API Keys (a uak_ key)."
+          if [ -z "$INSFORGE_API_KEY" ]; then
+            echo "Add repository secret INSFORGE_API_KEY from the linked Todo App project."
             echo "GitHub, not a laptop or cloud agent, is what deploys functions after CI is green on main."
             exit 1
           fi
 
       - name: Deploy changed functions and verify live source
         env:
-          INSFORGE_USER_API_KEY: ${{ secrets.INSFORGE_USER_API_KEY }}
+          INSFORGE_API_KEY: ${{ secrets.INSFORGE_API_KEY }}
         run: |
-          npx -y --offline @insforge/cli@0.2.6 login --user-api-key "$INSFORGE_USER_API_KEY"
-          npx -y --offline @insforge/cli@0.2.6 link --project-id "$INSFORGE_PROJECT_ID" -y
+          npx -y --offline @insforge/cli@0.2.6 link --api-base-url "$INSFORGE_API_BASE_URL" --api-key "$INSFORGE_API_KEY" -y
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
             npm run sync:insforge-functions -- --deploy-all --check
           else
