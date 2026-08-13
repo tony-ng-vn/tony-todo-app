@@ -89,18 +89,31 @@ struct NativeAppLaunchPolicyTests {
     )
   }
 
-  @Test("Does not open the full window if the status extra never hosts")
-  func doesNotOpenFullAppWhenStatusItemNeverHosts() {
+  @Test("Opens the full window after the extra fails to host")
+  func opensFullAppAfterStatusItemTimeout() {
     #expect(
-      !NativeAppLaunchPolicy.shouldOpenFullAppNow(
+      NativeAppLaunchPolicy.shouldOpenFullAppAfterTimeout(
         action: .openFullApp,
-        statusItemIsReady: false
+        statusItemIsReady: false,
+        elapsed: 1
       )
     )
     #expect(
-      !NativeAppLaunchPolicy.shouldKeepWaitingForStatusItem(
+      !NativeAppLaunchPolicy.shouldOpenFullAppAfterTimeout(
+        action: .keepCurrentWindows,
         statusItemIsReady: false,
-        elapsed: 4
+        elapsed: 1
+      )
+    )
+  }
+
+  @Test("Opens the full window immediately on a user reopen")
+  func opensFullAppImmediatelyOnReopen() {
+    #expect(
+      NativeAppLaunchPolicy.shouldOpenFullAppNow(
+        action: .openFullApp,
+        statusItemIsReady: false,
+        allowUnhosted: true
       )
     )
   }

@@ -38,7 +38,7 @@ enum NativeAppLaunchPolicy {
       : .initial(.launchServices)
   }
 
-  static let statusItemHostTimeout: TimeInterval = 4
+  static let statusItemHostTimeout: TimeInterval = 1
 
   static func action(for intent: Intent) -> Action {
     switch intent {
@@ -52,9 +52,20 @@ enum NativeAppLaunchPolicy {
 
   static func shouldOpenFullAppNow(
     action: Action,
-    statusItemIsReady: Bool
+    statusItemIsReady: Bool,
+    allowUnhosted: Bool = false
   ) -> Bool {
-    action == .openFullApp && statusItemIsReady
+    action == .openFullApp && (statusItemIsReady || allowUnhosted)
+  }
+
+  static func shouldOpenFullAppAfterTimeout(
+    action: Action,
+    statusItemIsReady: Bool,
+    elapsed: TimeInterval
+  ) -> Bool {
+    action == .openFullApp
+      && !statusItemIsReady
+      && elapsed >= statusItemHostTimeout
   }
 
   static func shouldKeepWaitingForStatusItem(
