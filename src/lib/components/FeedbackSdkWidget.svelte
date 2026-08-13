@@ -1,6 +1,8 @@
 <script>
   import { onMount } from 'svelte';
 
+  export let theme = 'auto';
+
   const endpoint = import.meta.env.VITE_FEEDBACK_ENDPOINT;
   const token = import.meta.env.VITE_FEEDBACK_TOKEN;
 
@@ -15,5 +17,5 @@
 </script>
 
 {#if endpoint && token}
-  <feedback-widget {endpoint} {token}></feedback-widget>
+  <feedback-widget {endpoint} {token} {theme}></feedback-widget>
 {/if}

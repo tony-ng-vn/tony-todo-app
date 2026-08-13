@@ -1262,11 +1262,39 @@ h2 {
   animation: cue-enter 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.workspace-feedback {
+  position: absolute;
+  left: 50%;
+  bottom: 16px;
+  z-index: 12;
+  transform: translateX(-50%);
+  pointer-events: none;
+}
+
+.workspace.is-board-view .workspace-feedback {
+  left: 18px;
+  transform: none;
+}
+
+.workspace-feedback feedback-widget {
+  position: relative !important;
+  right: auto !important;
+  bottom: auto !important;
+  pointer-events: auto;
+  --fw-z: 12;
+  --fw-surface: var(--surface-strong);
+  --fw-surface-strong: var(--block-surface);
+  --fw-text: var(--strong);
+  --fw-muted: var(--subtle);
+  --fw-border: var(--border);
+  --fw-accent: var(--button-bg);
+  --fw-accent-ink: var(--button-fg);
+}
+
 .completion-cue {
   position: absolute;
   right: 26px;
-  /* Sits above the feedback widget in the bottom-right corner. */
-  bottom: 72px;
+  bottom: 26px;
   z-index: 40;
   display: flex;
   align-items: center;

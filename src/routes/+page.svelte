@@ -1469,7 +1469,8 @@
     </aside>
   {/if}
 
+  <div class="workspace-feedback">
+    <FeedbackSdkWidget theme={themeMode === 'dark' ? 'dark' : 'light'} />
+  </div>
 </main>
 {/if}
-
-<FeedbackSdkWidget />
