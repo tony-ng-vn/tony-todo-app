@@ -14,11 +14,16 @@ Migrations and `insforge.toml` config apply stay manual.
 - Do not deploy functions from a laptop, a feature branch, a dirty tree, or a cloud agent.
 - Function deploys wait for the required `Verify` job.
   A Backend changelog entry is not live until the `Deploy InsForge functions` job is green.
-- Main-branch CI runs are never cancelled by a later merge, so each green merge gets its own ordered function deployment.
-- An automatic function deploy stops before authentication or production writes when the same merge changes `migrations/` or `insforge.toml`.
+- Main-branch CI runs stay queued instead of being replaced by later merges.
+- The moving `insforge-functions-deployed` tag records the last commit whose repo-managed functions were verified live.
+  Each automatic run checks the full range from that tag to its CI-verified commit, then advances the tag only after deployment and source verification succeed.
+  A stale or reordered run cannot move the tag backward.
+- An automatic function deploy stops before authentication or production writes when the not-yet-deployed range changes `migrations/` or `insforge.toml`.
 - The deploy preflight blocks unexpected live endpoints before writes.
   `claim-preauth-todos` and `extract-video-knowledge` are temporary exceptions owned by unmerged feature branches; this workflow must not alter them.
 - One-time: add GitHub repository secret `INSFORGE_API_KEY` from the linked Todo App project.
+- One-time: initialize `insforge-functions-deployed` to the last main commit whose repo-managed function source already matches production.
+  Do not move this tag by hand after initialization.
 - Migrations always land in the repo before or together with being applied to the live database.
   If an urgent fix must be applied live first, commit and PR it in the same session so the repo never drifts from production.
 - Test risky schema, RLS, or function changes on an InsForge backend branch first (`npx -y @insforge/cli branch create/switch/merge`), not on production.
@@ -30,7 +35,7 @@ Migrations and `insforge.toml` config apply stay manual.
 1. Merge to `main`.
    Vercel ships the web app.
    GitHub `CI` runs `verify:web` and `verify:native`.
-2. When `CI` succeeds on a `main` push without migration or config changes, `InsForge functions` deploys each changed `functions/*.ts` file (not `*.shell.ts`) and fails if live source still does not match the repo.
+2. When `CI` succeeds on a `main` push without migration or config changes, `InsForge functions` deploys each changed `functions/*.ts` file since the last successful deployment (not `*.shell.ts`) and fails if live source still does not match the repo.
    `functions/agent-todos.ts` is generated from its shell file; the job deploys the generated file.
    Never hand-edit it.
    If the merge changes `migrations/` or `insforge.toml`, the automatic job stops before authentication or production writes.
