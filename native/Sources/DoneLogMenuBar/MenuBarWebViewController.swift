@@ -18,18 +18,65 @@ private final class WindowChromeMessageRelay: NSObject, WKScriptMessageHandler {
   }
 }
 
+private final class NativeUpdateMessageRelay: NSObject, WKScriptMessageHandler {
+  weak var controller: MenuBarWebViewController?
+
+  init(controller: MenuBarWebViewController) {
+    self.controller = controller
+  }
+
+  func userContentController(
+    _ userContentController: WKUserContentController,
+    didReceive message: WKScriptMessage
+  ) {
+    Task { @MainActor in
+      self.controller?.handleNativeUpdateMessage(message)
+    }
+  }
+}
+
+@MainActor
+final class InitialLoadResultRelay {
+  private var result: Result<Void, Error>?
+  var observer: ((Result<Void, Error>) -> Void)? {
+    didSet {
+      if let result {
+        observer?(result)
+      }
+    }
+  }
+
+  func finish(with result: Result<Void, Error>) {
+    guard self.result == nil else {
+      return
+    }
+
+    self.result = result
+    observer?(result)
+  }
+}
+
 @MainActor
 final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WKUIDelegate {
   private let homeURL: URL
   private let readySelector: String?
   private let initialSize: NSSize
   private let usesWindowChrome: Bool
+  private(set) weak var updateChecker: (any AppUpdateChecking)?
   private var webView: NativeChromeWebView!
   private var didCompleteInitialLoad = false
   private var isValidatingInitialLoad = false
   private var initialLoadValidationDeadline: Date?
+  private let initialLoadResultRelay = InitialLoadResultRelay()
 
-  var onLoadResult: ((Result<Void, Error>) -> Void)?
+  var onLoadResult: ((Result<Void, Error>) -> Void)? {
+    get {
+      initialLoadResultRelay.observer
+    }
+    set {
+      initialLoadResultRelay.observer = newValue
+    }
+  }
 
   var onOpenFloatingNote: ((URL) -> Void)?
   var onCloseWindow: (() -> Void)?
@@ -38,12 +85,14 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     homeURL: URL,
     preferredSize: NSSize = MenuBarConfiguration.popoverSize,
     readySelector: String? = ".menubar-shell",
-    usesWindowChrome: Bool = false
+    usesWindowChrome: Bool = false,
+    updateChecker: (any AppUpdateChecking)? = nil
   ) {
     self.homeURL = homeURL
     self.readySelector = readySelector
     initialSize = preferredSize
     self.usesWindowChrome = usesWindowChrome
+    self.updateChecker = updateChecker
     super.init(nibName: nil, bundle: nil)
   }
 
@@ -56,7 +105,10 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     let configuration = WKWebViewConfiguration()
     configuration.websiteDataStore = .default()
     let nativeHostScript = WKUserScript(
-      source: Self.nativeHostScriptSource(usesWindowChrome: usesWindowChrome),
+      source: Self.nativeHostScriptSource(
+        usesWindowChrome: usesWindowChrome,
+        hasNativeUpdater: updateChecker != nil
+      ),
       injectionTime: .atDocumentStart,
       forMainFrameOnly: true
     )
@@ -65,6 +117,12 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
       configuration.userContentController.add(
         WindowChromeMessageRelay(controller: self),
         name: NativeWindowPolicy.chromeMessageName
+      )
+    }
+    if updateChecker != nil {
+      configuration.userContentController.add(
+        NativeUpdateMessageRelay(controller: self),
+        name: NativeUpdatePolicy.messageName
       )
     }
 
@@ -172,6 +230,22 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     }
   }
 
+  func handleNativeUpdateMessage(_ message: WKScriptMessage) {
+    guard
+      NativeUpdatePolicy.accepts(
+        messageName: message.name,
+        body: message.body,
+        isMainFrame: message.frameInfo.isMainFrame,
+        sourceURL: message.frameInfo.request.url,
+        homeURL: homeURL
+      )
+    else {
+      return
+    }
+
+    updateChecker?.checkForUpdates(nil)
+  }
+
   func webView(
     _ webView: WKWebView,
     didFail navigation: WKNavigation!,
@@ -204,7 +278,7 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     }
 
     didCompleteInitialLoad = true
-    onLoadResult?(result)
+    initialLoadResultRelay.finish(with: result)
   }
 
   private func validateInitialLoad(in webView: WKWebView) {
@@ -261,11 +335,17 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     }
   }
 
-  static func nativeHostScriptSource(usesWindowChrome: Bool) -> String {
+  static func nativeHostScriptSource(
+    usesWindowChrome: Bool,
+    hasNativeUpdater: Bool = false
+  ) -> String {
     let chromeFlag = usesWindowChrome ? "true" : "false"
+    let updaterFlag = hasNativeUpdater ? "true" : "false"
     return """
     window.__doneLogNativeHost = true;
     window.__doneLogNativeChrome = \(chromeFlag);
+    window.__doneLogNativeUpdater = \(updaterFlag);
+    window.__doneLogNativeUpdaterMessage = '\(NativeUpdatePolicy.messageName)';
     if (\(chromeFlag)) {
       document.documentElement.classList.add('is-native-host');
       document.documentElement.style.setProperty('--native-titlebar-inset', '28px');

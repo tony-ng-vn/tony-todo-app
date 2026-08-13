@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   computeNextVersion,
+  computeNextBuildVersion,
   mergeSections,
   parseFragment,
   renderChangelogEntry,
@@ -71,6 +72,16 @@ describe('computeNextVersion', () => {
 
   it('rejects an unknown bump type', () => {
     expect(() => computeNextVersion('1.2.3', 'nope')).toThrow('Unknown bump type');
+  });
+});
+
+describe('computeNextBuildVersion', () => {
+  it('increments the native build number for Sparkle comparisons', () => {
+    expect(computeNextBuildVersion('18')).toBe('19');
+  });
+
+  it('rejects malformed native build numbers', () => {
+    expect(() => computeNextBuildVersion('1.2.3')).toThrow(/build number/);
   });
 });
 

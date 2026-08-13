@@ -1,0 +1,275 @@
+name: Native release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: native-release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Sign, notarize, and publish
+    runs-on: macos-15
+    timeout-minutes: 30
+    environment: native-release
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@3d3c42e5aac5ba805825a76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version-file: .node-version
+          cache: npm
+
+      - name: Validate release version
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          version="$(node -p "require('./package.json').version")"
+          plist_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' native/App/Info.plist)"
+          build_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' native/App/Info.plist)"
+          if [[ "${GITHUB_REF_NAME}" != "v${version}" || "$plist_version" != "$version" ]]; then
+            echo "tag, package version, and native version must match" >&2
+            exit 1
+          fi
+          if [[ ! "$build_version" =~ ^[0-9]+$ ]]; then
+            echo "native build version must be an integer" >&2
+            exit 1
+          fi
+          git fetch --no-tags origin main
+          if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
+            echo "native releases must be tagged from merged main" >&2
+            exit 1
+          fi
+          previous_appcast="$RUNNER_TEMP/previous-appcast.xml"
+          if curl -fsSL \
+            'https://github.com/tony-ng-vn/tony-todo-app/releases/latest/download/appcast.xml' \
+            -o "$previous_appcast"
+          then
+            previous_build="$(
+              sed -nE 's#.*<sparkle:version>([0-9]+)</sparkle:version>.*#\1#p' \
+                "$previous_appcast" \
+                | head -n 1
+            )"
+            if [[ -z "$previous_build" || "$build_version" -le "$previous_build" ]]; then
+              echo "native build version must exceed the published Sparkle build" >&2
+              exit 1
+            fi
+          fi
+          echo "DONE_LOG_RELEASE_VERSION=$version" >> "$GITHUB_ENV"
+
+      - name: Require release secrets
+        env:
+          MACOS_DEVELOPER_ID_P12: ${{ secrets.MACOS_DEVELOPER_ID_P12 }}
+          MACOS_DEVELOPER_ID_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_PASSWORD }}
+          APPLE_NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          for name in \
+            MACOS_DEVELOPER_ID_P12 \
+            MACOS_DEVELOPER_ID_PASSWORD \
+            APPLE_NOTARY_KEY \
+            APPLE_NOTARY_KEY_ID \
+            APPLE_NOTARY_ISSUER_ID \
+            SPARKLE_PRIVATE_KEY
+          do
+            if [[ -z "${!name}" ]]; then
+              echo "missing required GitHub Actions secret: $name" >&2
+              exit 1
+            fi
+          done
+
+      - name: Import Developer ID certificate
+        env:
+          MACOS_DEVELOPER_ID_P12: ${{ secrets.MACOS_DEVELOPER_ID_P12 }}
+          MACOS_DEVELOPER_ID_PASSWORD: ${{ secrets.MACOS_DEVELOPER_ID_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          keychain="$RUNNER_TEMP/done-log-signing.keychain-db"
+          certificate="$RUNNER_TEMP/developer-id.p12"
+          keychain_password="$(openssl rand -hex 24)"
+          printf '%s' "$MACOS_DEVELOPER_ID_P12" | base64 --decode > "$certificate"
+          security create-keychain -p "$keychain_password" "$keychain"
+          security set-keychain-settings -lut 21600 "$keychain"
+          security unlock-keychain -p "$keychain_password" "$keychain"
+          security import "$certificate" \
+            -k "$keychain" \
+            -P "$MACOS_DEVELOPER_ID_PASSWORD" \
+            -T /usr/bin/codesign \
+            -T /usr/bin/security
+          security list-keychains -d user -s "$keychain"
+          security set-key-partition-list \
+            -S apple-tool:,apple:,codesign: \
+            -s \
+            -k "$keychain_password" \
+            "$keychain"
+          identity="$(security find-identity -v -p codesigning "$keychain" | awk -F '"' '/Developer ID Application/ { print $2; exit }')"
+          if [[ -z "$identity" ]]; then
+            echo "Developer ID Application identity was not imported" >&2
+            exit 1
+          fi
+          echo "DONE_LOG_CODESIGN_IDENTITY=$identity" >> "$GITHUB_ENV"
+
+      - name: Verify and build native app
+        run: |
+          npm ci
+          npm run verify:native
+
+      - name: Notarize and staple application
+        env:
+          APPLE_NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          app='.build/app-bundle/Done Log.app'
+          notary_zip="$RUNNER_TEMP/Done-Log-notary.zip"
+          notary_key="$RUNNER_TEMP/AuthKey_${APPLE_NOTARY_KEY_ID}.p8"
+          printf '%s' "$APPLE_NOTARY_KEY" > "$notary_key"
+          ditto -c -k --sequesterRsrc --keepParent "$app" "$notary_zip"
+          xcrun notarytool submit "$notary_zip" \
+            --key "$notary_key" \
+            --key-id "$APPLE_NOTARY_KEY_ID" \
+            --issuer "$APPLE_NOTARY_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "$app"
+          xcrun stapler validate "$app"
+          codesign --verify --deep --strict --verbose=2 "$app"
+          spctl --assess --type execute --verbose=2 "$app"
+
+      - name: Build release archives and signed appcast
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          umask 077
+          release_dir="$RUNNER_TEMP/native-release"
+          sparkle_dir="$RUNNER_TEMP/sparkle"
+          app='.build/app-bundle/Done Log.app'
+          archive="$release_dir/Done-Log-${DONE_LOG_RELEASE_VERSION}.zip"
+          disk_image="$RUNNER_TEMP/Done-Log.dmg"
+          mkdir -p "$release_dir" "$sparkle_dir"
+          ditto -c -k --sequesterRsrc --keepParent "$app" "$archive"
+
+          dmg_root="$RUNNER_TEMP/dmg-root"
+          mkdir -p "$dmg_root"
+          ditto "$app" "$dmg_root/Done Log.app"
+          ln -s /Applications "$dmg_root/Applications"
+          hdiutil create \
+            -volname 'Done Log' \
+            -srcfolder "$dmg_root" \
+            -format UDZO \
+            -ov \
+            "$disk_image"
+
+          curl -fsSL \
+            'https://github.com/sparkle-project/Sparkle/releases/download/2.9.5/Sparkle-2.9.5.tar.xz' \
+            -o "$sparkle_dir/Sparkle-2.9.5.tar.xz"
+          echo '015336b601493e05c237964954bff6191370003d94edefe663724c88840d73cc  '"$sparkle_dir/Sparkle-2.9.5.tar.xz" \
+            | shasum -a 256 -c -
+          tar -xf "$sparkle_dir/Sparkle-2.9.5.tar.xz" -C "$sparkle_dir"
+          private_key="$RUNNER_TEMP/sparkle-private-key"
+          printf '%s' "$SPARKLE_PRIVATE_KEY" > "$private_key"
+          embedded_public_key="$(
+            /usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' native/App/Info.plist
+          )"
+          derived_public_key="$(
+            swift -e '
+              import CryptoKit
+              import Foundation
+              let encoded = try String(
+                contentsOfFile: CommandLine.arguments[1],
+                encoding: .utf8
+              ).trimmingCharacters(in: .whitespacesAndNewlines)
+              guard let seed = Data(base64Encoded: encoded) else {
+                throw CocoaError(.fileReadCorruptFile)
+              }
+              let key = try Curve25519.Signing.PrivateKey(rawRepresentation: seed)
+              print(key.publicKey.rawRepresentation.base64EncodedString())
+            ' "$private_key"
+          )"
+          if [[ "$derived_public_key" != "$embedded_public_key" ]]; then
+            echo 'embedded Sparkle public key does not match the release secret' >&2
+            exit 1
+          fi
+          "$sparkle_dir/bin/generate_appcast" \
+            --ed-key-file "$private_key" \
+            --download-url-prefix "https://github.com/tony-ng-vn/tony-todo-app/releases/download/${GITHUB_REF_NAME}/" \
+            --link 'https://github.com/tony-ng-vn/tony-todo-app' \
+            --maximum-versions 1 \
+            "$release_dir"
+          "$sparkle_dir/bin/sign_update" \
+            --verify \
+            --ed-key-file "$private_key" \
+            "$release_dir/appcast.xml"
+          grep -q '<!-- sparkle-signatures:' "$release_dir/appcast.xml"
+          archive_signature="$(
+            sed -nE 's/.*sparkle:edSignature="([^"]+)".*/\1/p' \
+              "$release_dir/appcast.xml" \
+              | head -n 1
+          )"
+          if [[ -z "$archive_signature" ]]; then
+            echo 'generated appcast is missing the archive signature' >&2
+            exit 1
+          fi
+          "$sparkle_dir/bin/sign_update" \
+            --verify \
+            --ed-key-file "$private_key" \
+            "$archive" \
+            "$archive_signature"
+          echo "DONE_LOG_RELEASE_DIR=$release_dir" >> "$GITHUB_ENV"
+          echo "DONE_LOG_BOOTSTRAP_DMG=$disk_image" >> "$GITHUB_ENV"
+
+      - name: Notarize and staple bootstrap disk image
+        env:
+          APPLE_NOTARY_KEY: ${{ secrets.APPLE_NOTARY_KEY }}
+          APPLE_NOTARY_KEY_ID: ${{ secrets.APPLE_NOTARY_KEY_ID }}
+          APPLE_NOTARY_ISSUER_ID: ${{ secrets.APPLE_NOTARY_ISSUER_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          disk_image="$DONE_LOG_BOOTSTRAP_DMG"
+          notary_key="$RUNNER_TEMP/AuthKey_${APPLE_NOTARY_KEY_ID}.p8"
+          xcrun notarytool submit "$disk_image" \
+            --key "$notary_key" \
+            --key-id "$APPLE_NOTARY_KEY_ID" \
+            --issuer "$APPLE_NOTARY_ISSUER_ID" \
+            --wait
+          xcrun stapler staple "$disk_image"
+          xcrun stapler validate "$disk_image"
+
+      - name: Publish GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh release create "$GITHUB_REF_NAME" \
+            "$DONE_LOG_RELEASE_DIR/Done-Log-${DONE_LOG_RELEASE_VERSION}.zip" \
+            "$DONE_LOG_BOOTSTRAP_DMG" \
+            "$DONE_LOG_RELEASE_DIR/appcast.xml" \
+            --repo "$GITHUB_REPOSITORY" \
+            --title "Done Log ${DONE_LOG_RELEASE_VERSION}" \
+            --generate-notes \
+            --verify-tag
