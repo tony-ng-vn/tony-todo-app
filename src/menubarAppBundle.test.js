@@ -224,6 +224,7 @@ describe('menu bar app bundle', () => {
     expect(controller).toContain('.moveToActiveSpace');
     expect(controller).toContain('windowWillUseStandardFrame');
     expect(controller).toContain('screen?.visibleFrame');
+    expect(webViewController).toContain("document.addEventListener('mousedown'");
     expect(webViewController).toContain('window.performDrag(with: event)');
     expect(app).toContain('NativeAppLaunchPolicy.action(for: launchIntent)');
   });
