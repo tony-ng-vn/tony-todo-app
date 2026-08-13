@@ -52,7 +52,9 @@ final class FloatingNoteWindowController: NSWindowController, NSWindowDelegate {
       hasBeenShown = true
     }
     window?.makeKeyAndOrderFront(nil)
-    NSApp.activate(ignoringOtherApps: true)
+    NativeAppLaunchPolicy.withReopenIntent(.floatingNoteActivation) {
+      NSApp.activate(ignoringOtherApps: true)
+    }
   }
 
   func windowDidResize(_ notification: Notification) {
