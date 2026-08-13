@@ -73,14 +73,17 @@
     updateRemoteTodoTitle,
     updateRemoteTodoWorkflow,
   } from '../todoRemote.js';
-  import { loadLocalState, reconcileRemoteState, saveLocalState } from '../todoPersistence.js';
+  import { loadLocalState, reconcileRemoteState, saveLocalState, TODO_STORAGE_KEY } from '../todoPersistence.js';
   import {
+    clearNoteEdits,
     createDebouncedSaveQueue,
     getPendingNoteEdits,
+    loadRemoteAfterNoteFlush,
     markNoteEditSynced,
     preservePendingNotesDuringLoad,
     readNoteEdit,
     recordNoteEdit,
+    resolveSelectedNoteDraft,
     snapshotNoteEdits,
     withNoteSaveLock,
   } from '../noteAutosave.js';
@@ -152,6 +155,7 @@
   let checkingForLoops = false;
   let checkStatus = '';
   let currentDayKey = formatDayKey(new Date());
+  let refreshInFlight = false;
   const noteAutosave = createDebouncedSaveQueue(saveNoteToRemote);
 
   $: pendingTodos = getActiveTodos(state);
@@ -190,8 +194,8 @@
     themeMode = loadThemeMode();
     viewMode = loadViewMode();
     applyThemeMode(themeMode);
-    window.addEventListener('focus', syncSelectedDayToToday);
-    window.addEventListener('storage', handleThemeStorageChange);
+    window.addEventListener('focus', handleWindowFocus);
+    window.addEventListener('storage', handleStorageChange);
     document.addEventListener('visibilitychange', handleVisibilityChange);
     scheduleSelectedDayRefresh();
     initializeAuth();
@@ -204,8 +208,8 @@
     window.clearTimeout(titleSaveTimer);
     window.clearTimeout(completionCueTimer);
     void noteAutosave.flushAll().catch(() => {});
-    window.removeEventListener('focus', syncSelectedDayToToday);
-    window.removeEventListener('storage', handleThemeStorageChange);
+    window.removeEventListener('focus', handleWindowFocus);
+    window.removeEventListener('storage', handleStorageChange);
     document.removeEventListener('visibilitychange', handleVisibilityChange);
   });
 
@@ -219,10 +223,14 @@
   }
 
   $: {
-    if (selectedTask?.id !== noteDraftTaskId) {
-      noteDraftTaskId = selectedTask?.id ?? null;
-      noteDraft = selectedTask?.note ?? '';
-    }
+    const nextDraft = resolveSelectedNoteDraft({
+      task: selectedTask,
+      noteDraftTaskId,
+      noteDraft,
+      edit: selectedTaskId ? readNoteEdit(selectedTaskId) : null,
+    });
+    noteDraftTaskId = nextDraft.noteDraftTaskId;
+    noteDraft = nextDraft.noteDraft;
   }
 
   // A due date is a calendar day, so anchor the picked YYYY-MM-DD to local
@@ -453,13 +461,45 @@
     applyThemeMode(themeMode);
   }
 
-  function handleThemeStorageChange(event) {
-    if (event.key !== THEME_STORAGE_KEY) {
+  function handleStorageChange(event) {
+    if (event.key === THEME_STORAGE_KEY) {
+      themeMode = loadThemeMode();
+      applyThemeMode(themeMode);
       return;
     }
 
-    themeMode = loadThemeMode();
-    applyThemeMode(themeMode);
+    if (event.key !== TODO_STORAGE_KEY) {
+      return;
+    }
+
+    state = loadLocalState();
+  }
+
+  function handleWindowFocus() {
+    syncSelectedDayToToday();
+    void refreshFromSource();
+  }
+
+  function handleVisibilityChange() {
+    if (document.visibilityState === 'visible') {
+      syncSelectedDayToToday();
+      void refreshFromSource();
+    }
+  }
+
+  async function refreshFromSource() {
+    if (refreshInFlight) {
+      return;
+    }
+
+    refreshInFlight = true;
+    try {
+      if (useRemote && authUser) {
+        await hydrateRemoteTodos();
+      }
+    } finally {
+      refreshInFlight = false;
+    }
   }
 
   function setViewMode(nextViewMode) {
@@ -620,12 +660,6 @@
     return true;
   }
 
-  function handleVisibilityChange() {
-    if (document.visibilityState === 'visible') {
-      syncSelectedDayToToday();
-    }
-  }
-
   function syncSelectedDayToToday() {
     const today = formatDayKey(new Date());
     currentDayKey = today;
@@ -673,9 +707,14 @@
   }
 
   async function saveNoteToRemote(todoId, edit) {
-    if (!useRemote || !authUser) {
+    if (!useRemote) {
+      markNoteEditSynced(todoId, edit.revision);
       setNoteSaveStatus(todoId, 'saved');
       return;
+    }
+
+    if (!authUser) {
+      throw new Error('Not signed in');
     }
 
     await withNoteSaveLock(todoId, async () => {
@@ -1050,22 +1089,22 @@
     }
 
     queuePendingNoteSaves();
-    try {
-      await noteAutosave.flushAll();
-    } catch {
-      return;
-    }
     syncMessage = 'Loading cloud';
     const noteEditsAtLoad = snapshotNoteEdits(state.todos.map((todo) => todo.id));
 
     try {
-      const remoteTodos = await loadRemoteTodos(insforge, authUser.id);
+      const remoteTodos = await loadRemoteAfterNoteFlush(
+        () => noteAutosave.flushAll(),
+        () => loadRemoteTodos(insforge, authUser.id),
+      );
       const todoIds = new Set([...state.todos, ...remoteTodos].map((todo) => todo.id));
-      state = preservePendingNotesDuringLoad(
+      const merged = preservePendingNotesDuringLoad(
         reconcileRemoteState(state, remoteTodos),
         noteEditsAtLoad,
         snapshotNoteEdits([...todoIds]),
       );
+      clearNoteEdits(merged.staleEditIds ?? []);
+      state = { todos: merged.todos };
       saveLocalState(state);
       renderRemoteStatus(remoteTodos.length);
     } catch (error) {
