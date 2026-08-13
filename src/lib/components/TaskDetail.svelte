@@ -295,10 +295,19 @@
       />
     {:else}
       <!-- svelte-ignore a11y_no_static_element_interactions -->
+      <!-- svelte-ignore a11y_click_events_have_key_events -->
       <div
         class="detail-title-display"
         title="Double-click to rename"
+        role="button"
+        tabindex="0"
+        on:click={() => {
+          if (window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 900) {
+            startDetailTitleEdit();
+          }
+        }}
         on:dblclick={startDetailTitleEdit}
+        on:keydown={(event) => event.key === 'Enter' && startDetailTitleEdit()}
       >
         {@html linkifyText(selectedTask.title)}
       </div>
