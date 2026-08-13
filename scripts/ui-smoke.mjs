@@ -151,7 +151,7 @@ async function inspectMobileTaskDetail(viewport) {
       href: await notePreview.locator('[data-note-link]').getAttribute('href'),
       raw: await page.locator('#detail-note').inputValue(),
     };
-    await notePreview.press('Enter');
+    await notePreview.locator('[data-note-link-edit]').press('Enter');
     noteLinkPresentation.keyboardEdit = await page.evaluate(
       () => document.activeElement?.id === 'detail-note',
     );

@@ -24,18 +24,8 @@
     textarea?.focus();
   }
 
-  async function beginEditing(event) {
-    if (event?.target?.closest?.('a')) {
-      return;
-    }
-    event?.preventDefault?.();
+  async function beginEditing() {
     await focus();
-  }
-
-  function handlePreviewKeydown(event) {
-    if ((event.key === 'Enter' || event.key === ' ') && !event.target.closest('a')) {
-      beginEditing(event);
-    }
   }
 </script>
 
@@ -58,22 +48,26 @@
     <div
       class="rich-note-preview"
       data-note-link-preview
-      role="group"
-      aria-label={ariaLabel ?? 'Task note'}
-      tabindex="0"
-      on:mousedown={beginEditing}
-      on:keydown={handlePreviewKeydown}
     >
-      {#each tokens as token}
-        {#if token.type === 'link'}
-          <a data-note-link href={token.href} target="_blank" rel="noreferrer noopener">
-            <svg viewBox="0 0 16 16" aria-hidden="true">
-              <circle cx="8" cy="8" r="6.25"></circle>
-              <path d="M1.75 8h12.5M8 1.75c1.65 1.7 2.5 3.78 2.5 6.25S9.65 12.55 8 14.25C6.35 12.55 5.5 10.47 5.5 8S6.35 3.45 8 1.75Z"></path>
-            </svg><span>{token.label}</span>
-          </a>
-        {:else}{token.value}{/if}
-      {/each}
+      <button
+        class="rich-note-edit"
+        data-note-link-edit
+        type="button"
+        aria-label={ariaLabel ? `Edit ${ariaLabel}` : 'Edit task note'}
+        on:click={beginEditing}
+      ></button>
+      <div class="rich-note-content">
+        {#each tokens as token}
+          {#if token.type === 'link'}
+            <a data-note-link href={token.href} target="_blank" rel="noreferrer noopener">
+              <svg viewBox="0 0 16 16" aria-hidden="true">
+                <circle cx="8" cy="8" r="6.25"></circle>
+                <path d="M1.75 8h12.5M8 1.75c1.65 1.7 2.5 3.78 2.5 6.25S9.65 12.55 8 14.25C6.35 12.55 5.5 10.47 5.5 8S6.35 3.45 8 1.75Z"></path>
+              </svg><span>{token.label}</span>
+            </a>
+          {:else}{token.value}{/if}
+        {/each}
+      </div>
     </div>
   {/if}
 </div>
@@ -123,18 +117,42 @@
   }
 
   .rich-note-preview {
+    position: relative;
     overflow: auto;
     overflow-wrap: anywhere;
     cursor: text;
   }
 
-  .rich-note-preview:focus-visible,
   textarea:focus-visible {
     outline: 2px solid var(--focus-ring);
     outline-offset: 1px;
   }
 
+  .rich-note-edit {
+    position: absolute;
+    inset: 0;
+    z-index: 0;
+    width: 100%;
+    border: 0;
+    border-radius: inherit;
+    padding: 0;
+    background: transparent;
+    cursor: text;
+  }
+
+  .rich-note-edit:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
+  }
+
+  .rich-note-content {
+    position: relative;
+    z-index: 1;
+    pointer-events: none;
+  }
+
   .rich-note-preview a {
+    pointer-events: auto;
     color: color-mix(in srgb, #e43c91 72%, var(--strong));
     font-weight: 500;
     text-decoration: none;
