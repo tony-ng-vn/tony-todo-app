@@ -26,14 +26,26 @@ export function createInitialState(todos = []) {
   return { todos: todos.map(normalizeTodo) };
 }
 
-export function addTodo(state, title, createdAt = new Date(), { dueDate = null, source = 'app' } = {}) {
+export const TODO_KINDS = ['task', 'project'];
+
+export function parseTodoKind(value) {
+  return value === 'project' ? 'project' : 'task';
+}
+
+export function addTodo(
+  state,
+  title,
+  createdAt = new Date(),
+  { dueDate = null, source = 'app', kind = 'task' } = {},
+) {
   const cleanTitle = title.trim();
 
   if (!cleanTitle || findDuplicateTodo(state, cleanTitle)) {
     return state;
   }
 
-  const assignedDate = normalizeAssignedDate(dueDate, createdAt);
+  const todoKind = parseTodoKind(kind);
+  const assignedDate = todoKind === 'project' ? null : normalizeAssignedDate(dueDate, createdAt);
 
   return {
     ...state,
@@ -44,6 +56,7 @@ export function addTodo(state, title, createdAt = new Date(), { dueDate = null, 
         title: cleanTitle,
         createdAt: createdAt.toISOString(),
         completedAt: null,
+        kind: todoKind,
         somedayAt: null,
         dueDate: assignedDate,
         note: '',
@@ -92,7 +105,15 @@ export function completeTodo(state, todoId, completedAt = new Date()) {
 
 export function getPendingTodos(state) {
   return state.todos
-    .filter((todo) => !todo.completedAt && !todo.isProgressSession)
+    .filter((todo) => parseTodoKind(todo.kind) === 'task' && !todo.completedAt && !todo.isProgressSession)
+    .toSorted(compareTodosNewestFirst);
+}
+
+export function getProjectTodos(state) {
+  return state.todos
+    .filter(
+      (todo) => parseTodoKind(todo.kind) === 'project' && !todo.completedAt && !todo.isProgressSession,
+    )
     .toSorted(compareTodosNewestFirst);
 }
 
@@ -289,10 +310,13 @@ export function compareTodosNewestFirst(first, second) {
 }
 
 export function normalizeTodo(todo) {
+  const kind = parseTodoKind(todo.kind);
+
   return {
     ...todo,
-    somedayAt: todo.somedayAt ?? null,
-    dueDate: todo.dueDate ?? null,
+    kind,
+    somedayAt: kind === 'project' ? null : todo.somedayAt ?? null,
+    dueDate: kind === 'project' ? null : todo.dueDate ?? null,
     note: todo.note ?? '',
     source: todo.source ?? 'app',
     notionPageId: todo.notionPageId ?? null,

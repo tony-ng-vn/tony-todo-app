@@ -20,6 +20,7 @@ import {
   getMillisecondsUntilNextDay,
   getPendingTodos,
   getProgressSessions,
+  getProjectTodos,
   getSomedayTodos,
   getTaskTimeSegments,
   formatDuration,
@@ -1610,5 +1611,52 @@ describe('board due-date filter', () => {
     const columns = getBoardColumns(state, { dueFilter: 'overdue', now });
     const notStarted = columns.find((column) => column.id === 'not_started');
     expect(notStarted.items.map((item) => item.id)).toEqual(['a']);
+  });
+});
+
+describe('project kind', () => {
+  it('defaults new todos to task and keeps projects off the board', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Ship the landing page', new Date('2026-06-08T08:00:00.000Z'));
+    state = addTodo(state, 'Garden studio', new Date('2026-06-08T08:05:00.000Z'), {
+      kind: 'project',
+      dueDate: '2026-06-09T00:00:00.000Z',
+    });
+
+    expect(state.todos.map((todo) => todo.kind)).toEqual(['task', 'project']);
+    expect(state.todos[1].dueDate).toBeNull();
+    expect(getPendingTodos(state).map((todo) => todo.title)).toEqual(['Ship the landing page']);
+    expect(getProjectTodos(state).map((todo) => todo.title)).toEqual(['Garden studio']);
+    expect(
+      getBoardColumns(state, { dayKey: '2026-06-08' }).flatMap((column) =>
+        column.items.map((item) => item.title),
+      ),
+    ).toEqual(['Ship the landing page']);
+  });
+
+  it('treats a missing kind as a task', () => {
+    const state = createInitialState([
+      {
+        id: 'legacy',
+        title: 'Old row',
+        createdAt: '2026-06-08T08:00:00.000Z',
+        completedAt: null,
+      },
+    ]);
+
+    expect(state.todos[0].kind).toBe('task');
+    expect(getPendingTodos(state).map((todo) => todo.id)).toEqual(['legacy']);
+  });
+
+  it('refuses to park a project in someday', () => {
+    let state = addTodo(createInitialState(), 'Cabin rebuild', new Date('2026-06-08T08:00:00.000Z'), {
+      kind: 'project',
+    });
+    const todoId = state.todos[0].id;
+
+    state = setTodoSomeday(state, todoId, new Date('2026-06-08T09:00:00.000Z'));
+
+    expect(state.todos[0].somedayAt).toBeNull();
+    expect(getProjectTodos(state).map((todo) => todo.id)).toEqual([todoId]);
   });
 });
