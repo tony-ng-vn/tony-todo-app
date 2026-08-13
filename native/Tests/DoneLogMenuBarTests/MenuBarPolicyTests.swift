@@ -81,6 +81,57 @@ struct MenuBarPolicyTests {
     #expect(source.contains(NativeUpdatePolicy.messageName))
   }
 
+  @Test("Accepts only the quick note return command from the menu bar page")
+  func validatesMenuBarReturnCommands() throws {
+    let noteURL = try #require(
+      URL(string: "https://tony-todo-app.vercel.app/menubar?note=task-123")
+    )
+
+    #expect(
+      NativeMenuBarReturnPolicy.accepts(
+        messageName: NativeMenuBarReturnPolicy.messageName,
+        body: ["command": "show"],
+        isMainFrame: true,
+        sourceURL: noteURL,
+        homeURL: homeURL
+      )
+    )
+    #expect(
+      !NativeMenuBarReturnPolicy.accepts(
+        messageName: NativeMenuBarReturnPolicy.messageName,
+        body: ["command": "close"],
+        isMainFrame: true,
+        sourceURL: noteURL,
+        homeURL: homeURL
+      )
+    )
+    #expect(
+      !NativeMenuBarReturnPolicy.accepts(
+        messageName: NativeMenuBarReturnPolicy.messageName,
+        body: ["command": "show"],
+        isMainFrame: false,
+        sourceURL: noteURL,
+        homeURL: homeURL
+      )
+    )
+  }
+
+  @Test("Advertises menu bar return only to supported quick notes")
+  @MainActor
+  func advertisesMenuBarReturnCapability() {
+    let supportedSource = MenuBarWebViewController.nativeHostScriptSource(
+      usesWindowChrome: true,
+      canShowMenuBar: true
+    )
+    let unsupportedSource = MenuBarWebViewController.nativeHostScriptSource(
+      usesWindowChrome: true
+    )
+
+    #expect(supportedSource.contains("window.__doneLogCanShowMenuBar = true"))
+    #expect(supportedSource.contains(NativeMenuBarReturnPolicy.messageName))
+    #expect(unsupportedSource.contains("window.__doneLogCanShowMenuBar = false"))
+  }
+
   @Test("Reports a completed initial load to a late observer")
   @MainActor
   func reportsCompletedLoadToLateObserver() {

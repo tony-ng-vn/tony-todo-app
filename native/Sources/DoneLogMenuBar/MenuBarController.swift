@@ -83,7 +83,10 @@ final class MenuBarController: NSObject {
 
     let controller = FloatingNoteWindowController(
       url: url,
-      updateChecker: updateChecker
+      updateChecker: updateChecker,
+      onShowMenuBar: { [weak self] in
+        self?.showPopover()
+      }
     ) { [weak self] in
       self?.floatingNoteWindows[key] = nil
     }

@@ -123,13 +123,25 @@ describe('menu bar app bundle', () => {
       path.join(repoRoot, 'native/Sources/DoneLogMenuBar/FloatingNoteWindowController.swift'),
       'utf8',
     );
+    const menuBarController = readFileSync(
+      path.join(repoRoot, 'native/Sources/DoneLogMenuBar/MenuBarController.swift'),
+      'utf8',
+    );
+    const note = readFileSync(
+      path.join(repoRoot, 'src/lib/components/FloatingTaskNote.svelte'),
+      'utf8',
+    );
 
     expect(controller).toContain('NSPanel');
     expect(controller).toContain('window.level = .floating');
+    expect(controller).toContain('window.hidesOnDeactivate = false');
     expect(controller).toContain('NativeWindowPolicy.applyChrome');
     expect(controller).toContain('usesWindowChrome: true');
     expect(controller).toContain('window.contentMinSize');
     expect(controller).toContain('contentController.onCloseWindow');
+    expect(menuBarController).toContain('onShowMenuBar:');
+    expect(note).toContain('requestNativeMenuBar(window)');
+    expect(note).toContain('Mini todos');
   });
 
   it('keeps floating-note activation from opening the full app', () => {
