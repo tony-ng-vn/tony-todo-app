@@ -209,6 +209,13 @@ describe('menu bar app bundle', () => {
       path.join(repoRoot, 'native/Sources/DoneLogMenuBar/DoneLogMenuBarApp.swift'),
       'utf8',
     );
+    const webViewController = readFileSync(
+      path.join(
+        repoRoot,
+        'native/Sources/DoneLogMenuBar/MenuBarWebViewController.swift',
+      ),
+      'utf8',
+    );
 
     expect(controller).toContain('MenuBarConfiguration.fullAppSize');
     expect(controller).toContain('application.setActivationPolicy(.accessory)');
@@ -217,6 +224,7 @@ describe('menu bar app bundle', () => {
     expect(controller).toContain('.moveToActiveSpace');
     expect(controller).toContain('windowWillUseStandardFrame');
     expect(controller).toContain('screen?.visibleFrame');
+    expect(webViewController).toContain('window.performDrag(with: event)');
     expect(app).toContain('NativeAppLaunchPolicy.action(for: launchIntent)');
   });
 
