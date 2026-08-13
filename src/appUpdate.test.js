@@ -23,6 +23,7 @@ describe('resolveUpdateAction', () => {
         isNativeHost: false,
         isLegacyNativeHost: true,
         hasNativeUpdater: false,
+        bootstrapAvailable: true,
         webUpdateAvailable: false,
       }),
     ).toMatchObject({ kind: 'legacy-bootstrap', label: 'Install desktop update' });
@@ -35,9 +36,22 @@ describe('resolveUpdateAction', () => {
         isNativeHost: true,
         isLegacyNativeHost: false,
         hasNativeUpdater: false,
+        bootstrapAvailable: true,
         webUpdateAvailable: true,
       }),
     ).toMatchObject({ kind: 'legacy-bootstrap', label: 'Install desktop update' });
+  });
+
+  it('keeps legacy hosts on web reload until the signed installer exists', () => {
+    expect(
+      resolveUpdateAction({
+        isNativeHost: true,
+        isLegacyNativeHost: false,
+        hasNativeUpdater: false,
+        bootstrapAvailable: false,
+        webUpdateAvailable: true,
+      }),
+    ).toMatchObject({ kind: 'web-reload', label: 'Reload latest' });
   });
 
   it('keeps website reloads separate from desktop updates', () => {
