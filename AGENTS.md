@@ -68,8 +68,10 @@ Several agents work this repo concurrently; these rules keep them from colliding
 ## Changelog
 
 - CHANGELOG.md entries use these categories, matching the project's architecture: `Web App` (SvelteKit frontend), `Backend` (InsForge functions, migrations, auth config), `Native App` (macOS menu bar companion), `CI & Tooling` (hooks, scripts, verification), `Docs`.
-- Only include the categories a release actually touched.
-- Keep the newest entry first, keep `package.json` version in sync with the newest entry, and update the changelog in the same commit as the change that prompted it.
+- Feature PRs never edit `CHANGELOG.md` or a version field directly. Instead, each PR adds one fragment file to `changelog.d/` describing its own change; see `changelog.d/README.md` for the exact format.
+- Only include the categories a fragment's change actually touched.
+- At release time, run `npm run release:changelog -- <patch|minor|major>` to compile every fragment into a new CHANGELOG.md entry, bump the version in `package.json` and `native/App/Info.plist`, refresh the lockfile, and delete the consumed fragments.
+- This keeps concurrent PRs from conflicting on a shared changelog or version line.
 
 ## Live backend ops truth
 
