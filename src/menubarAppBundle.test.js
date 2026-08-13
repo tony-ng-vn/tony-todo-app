@@ -164,6 +164,8 @@ describe('menu bar app bundle', () => {
     expect(controller).toContain('injectionTime: .atDocumentStart');
     expect(controller).not.toContain("createElement('style')");
     expect(styles).toContain('html.is-native-host .view-toggle');
+    expect(styles).toContain('--native-traffic-lights-inset');
+    expect(styles).not.toContain('padding: var(--native-titlebar-inset) 0 0');
     expect(styles).toContain('flex-wrap: wrap;');
   });
 });

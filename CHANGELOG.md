@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.10.1
+
+2026-08-13
+
+**Native App**
+
+- The full app window now uses unified macOS chrome: the workspace draws under the traffic lights instead of sitting below a separate title-bar strip, and empty header space still double-click zooms.
+
+**Web App**
+
+- Native-host layout no longer reserves a blank bar above the panels; left headers indent past the window controls.
+
+**Docs**
+
+- The menu bar companion notes now describe drag and zoom on the traffic-light area and empty headers.
+
 ## v0.10.0
 
 2026-08-13

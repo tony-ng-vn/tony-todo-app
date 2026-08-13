@@ -68,7 +68,7 @@ DONE_LOG_MENUBAR_URL=https://example.com/menubar npm run menubar
 - Click outside the popover to hide it.
 - Open Done Log from Spotlight, Applications, or the menu-bar context menu to show the root app in a resizable native window.
 - Use the standard Mac window controls to move, resize, minimize, zoom, and enter full screen.
-- Double-click the title bar to fill the usable screen, subject to the macOS Desktop & Dock title-bar preference.
+- Double-click the traffic-light area or an empty header to fill the usable screen, subject to the macOS Desktop & Dock title-bar preference.
 - Use the standard File, Edit, View, and Window menus and their usual keyboard shortcuts.
 - Close the full window to return to menu-bar-only mode.
 - Right-click the tray icon to control launch at login, open the full app, or quit the shell.
