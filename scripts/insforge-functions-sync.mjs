@@ -68,11 +68,12 @@ export function parseLiveFunctionSlugs(output) {
     throw new Error('InsForge function inventory was not valid JSON');
   }
 
-  if (!Array.isArray(parsed?.functions)) {
+  const functions = Array.isArray(parsed) ? parsed : parsed?.functions;
+  if (!Array.isArray(functions)) {
     throw new Error('InsForge function inventory did not include functions[]');
   }
 
-  return parsed.functions
+  return functions
     .map((entry) => entry?.slug)
     .filter((slug) => typeof slug === 'string' && slug.length > 0)
     .sort();
