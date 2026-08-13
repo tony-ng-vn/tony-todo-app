@@ -66,7 +66,6 @@
 >
   <div class="brand-row">
     <div>
-      <p class="eyebrow">Done Log</p>
       <h1 id="task-heading">Today</h1>
     </div>
     <div class="header-actions">

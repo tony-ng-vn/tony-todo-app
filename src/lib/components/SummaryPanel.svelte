@@ -76,7 +76,6 @@
 <aside class="summary-panel" aria-labelledby="summary-heading">
   <div class="summary-top">
     <div>
-      <p class="eyebrow">Daily ledger</p>
       <h2 id="summary-heading">Today recap</h2>
     </div>
     <div class="summary-date-navigation" aria-label="Recap day navigation">
