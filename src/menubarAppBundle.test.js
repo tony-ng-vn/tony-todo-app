@@ -90,7 +90,7 @@ describe('menu bar app bundle', () => {
     expect(buildScript).toContain('--sign "$CODE_SIGN_IDENTITY"');
     expect(buildScript).toContain('Contents/Frameworks/Sparkle.framework');
     expect(buildScript).toContain('@executable_path/../Frameworks');
-    expect(buildScript).not.toContain('--deep');
+    expect(buildScript).not.toMatch(/codesign\s+\\\n\s+--force\s+\\\n\s+--deep/);
   });
 
   it('publishes notarized and signed native releases', () => {
@@ -105,6 +105,8 @@ describe('menu bar app bundle', () => {
     expect(workflow).toContain('SPARKLE_PRIVATE_KEY');
     expect(workflow).toContain('Done-Log.dmg');
     expect(workflow).toContain('appcast.xml');
+    expect(workflow).toContain('fetch-depth: 0');
+    expect(workflow).toContain('git merge-base --is-ancestor "$GITHUB_SHA" origin/main');
   });
 
   it('keeps task notes in a draggable native window', () => {
@@ -193,6 +195,7 @@ describe('menu bar app bundle', () => {
     expect(installer).not.toContain('"$INSTALLED_BINARY" --register-login-item');
     expect(installer).not.toContain('/usr/bin/open -n');
     expect(installer).toContain('Open it from Applications when you are ready');
+    expect(installer).toContain('com.tonynguyen.donelog.macos');
   });
 
   it('refuses to replace a newer installed app with an older build', () => {

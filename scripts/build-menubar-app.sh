@@ -18,9 +18,14 @@ BIN_DIRECTORY="$(
     --show-bin-path
 )"
 BINARY="$BIN_DIRECTORY/done-log-menubar"
+SPARKLE_SOURCE="$BIN_DIRECTORY/Sparkle.framework"
 
 if [[ ! -x "$BINARY" ]]; then
   echo "release binary is missing: $BINARY" >&2
+  exit 1
+fi
+if [[ ! -d "$SPARKLE_SOURCE" ]]; then
+  echo "Sparkle framework is missing: $SPARKLE_SOURCE" >&2
   exit 1
 fi
 
@@ -38,8 +43,17 @@ fi
 
 mkdir -p "$APP_BUNDLE/Contents/MacOS"
 mkdir -p "$APP_BUNDLE/Contents/Resources"
+mkdir -p "$APP_BUNDLE/Contents/Frameworks"
 /usr/bin/install -m 755 \
   "$BINARY" \
+  "$APP_BUNDLE/Contents/MacOS/done-log-menubar"
+/usr/bin/ditto \
+  "$SPARKLE_SOURCE" \
+  "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
+# Done Log is not sandboxed, so Sparkle does not use its optional XPC services.
+rm -rf "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices"
+/usr/bin/install_name_tool \
+  -add_rpath '@executable_path/../Frameworks' \
   "$APP_BUNDLE/Contents/MacOS/done-log-menubar"
 /usr/bin/install -m 644 \
   "$REPO_ROOT/native/App/Info.plist" \
@@ -89,12 +103,27 @@ if [[ -z "$CODE_SIGN_IDENTITY" ]]; then
 fi
 
 /usr/bin/plutil -lint "$APP_BUNDLE/Contents/Info.plist" >/dev/null
-/usr/bin/codesign \
-  --force \
-  --deep \
-  --sign "$CODE_SIGN_IDENTITY" \
+SIGNING_OPTIONS=(--force --sign "$CODE_SIGN_IDENTITY")
+if [[ "$CODE_SIGN_IDENTITY" != "-" ]]; then
+  SIGNING_OPTIONS+=(--options runtime)
+  if [[ "$CODE_SIGN_IDENTITY" == Developer\ ID\ Application:* ]]; then
+    SIGNING_OPTIONS+=(--timestamp)
+  fi
+fi
+
+SPARKLE_FRAMEWORK="$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
+if [[ "$CODE_SIGN_IDENTITY" != "-" ]]; then
+  /usr/bin/codesign "${SIGNING_OPTIONS[@]}" \
+    "$SPARKLE_FRAMEWORK/Versions/B/Autoupdate"
+  /usr/bin/codesign "${SIGNING_OPTIONS[@]}" \
+    "$SPARKLE_FRAMEWORK/Versions/B/Updater.app"
+  /usr/bin/codesign "${SIGNING_OPTIONS[@]}" "$SPARKLE_FRAMEWORK"
+fi
+/usr/bin/codesign "${SIGNING_OPTIONS[@]}" \
   --identifier "$BUNDLE_IDENTIFIER" \
   "$APP_BUNDLE"
 /usr/bin/codesign --verify --deep --strict "$APP_BUNDLE"
+/usr/bin/otool -l "$APP_BUNDLE/Contents/MacOS/done-log-menubar" \
+  | grep -q '@executable_path/../Frameworks'
 
 echo "$APP_BUNDLE"

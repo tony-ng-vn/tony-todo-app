@@ -81,6 +81,22 @@ struct MenuBarPolicyTests {
     #expect(source.contains(NativeUpdatePolicy.messageName))
   }
 
+  @Test("Reports a completed initial load to a late observer")
+  @MainActor
+  func reportsCompletedLoadToLateObserver() {
+    let relay = InitialLoadResultRelay()
+    relay.finish(with: .success(()))
+    var didReceiveSuccess = false
+
+    relay.observer = { result in
+      if case .success = result {
+        didReceiveSuccess = true
+      }
+    }
+
+    #expect(didReceiveSuccess)
+  }
+
   @Test("Requires the expected menu bar shell before reporting ready")
   func requiresExpectedShell() throws {
     let finalURL = try #require(

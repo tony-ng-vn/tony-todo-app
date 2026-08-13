@@ -3,7 +3,8 @@ import AppKit
 enum ApplicationMenuFactory {
   @MainActor
   static func makeMainMenu(
-    windowCommands: NativeWindowCommandHandler
+    windowCommands: NativeWindowCommandHandler,
+    updateChecker: (any AppUpdateChecking)? = nil
   ) -> NSMenu {
     let mainMenu = NSMenu()
 
@@ -15,6 +16,14 @@ enum ApplicationMenuFactory {
       action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
       keyEquivalent: ""
     )
+    if let updateChecker {
+      let updateItem = applicationMenu.addItem(
+        withTitle: "Check for Updates...",
+        action: #selector(AppUpdateChecking.checkForUpdates(_:)),
+        keyEquivalent: ""
+      )
+      updateItem.target = updateChecker
+    }
     applicationMenu.addItem(.separator())
     applicationMenu.addItem(
       withTitle: "Hide Done Log",

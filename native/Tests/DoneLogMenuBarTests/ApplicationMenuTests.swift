@@ -3,14 +3,25 @@ import Testing
 
 @testable import DoneLogMenuBar
 
+@MainActor
+private final class RecordingUpdateChecker: NSObject, AppUpdateChecking {
+  private(set) var checks = 0
+
+  @objc func checkForUpdates(_ sender: Any?) {
+    checks += 1
+  }
+}
+
 @Suite("Application menu")
 struct ApplicationMenuTests {
   @Test("Provides standard editing shortcuts to the web view")
   @MainActor
   func providesEditingShortcuts() throws {
     let windowCommands = NativeWindowCommandHandler()
+    let updateChecker = RecordingUpdateChecker()
     let mainMenu = ApplicationMenuFactory.makeMainMenu(
-      windowCommands: windowCommands
+      windowCommands: windowCommands,
+      updateChecker: updateChecker
     )
     let applicationMenu = try #require(
       mainMenu.items.first { $0.submenu?.title == "Done Log" }?.submenu
@@ -20,6 +31,9 @@ struct ApplicationMenuTests {
     let viewMenu = try #require(mainMenu.items.first { $0.title == "View" }?.submenu)
 
     #expect(applicationMenu.item(withTitle: "About Done Log") != nil)
+    let updateItem = try #require(applicationMenu.item(withTitle: "Check for Updates..."))
+    #expect(updateItem.target === updateChecker)
+    #expect(updateItem.action == #selector(AppUpdateChecking.checkForUpdates(_:)))
     #expect(applicationMenu.item(withTitle: "Hide Done Log")?.keyEquivalent == "h")
     #expect(applicationMenu.item(withTitle: "Quit Done Log")?.keyEquivalent == "q")
     let closeItem = try #require(fileMenu.item(withTitle: "Close Window"))
