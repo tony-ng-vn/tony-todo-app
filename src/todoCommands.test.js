@@ -1,3 +1,7 @@
+import { spawnSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import {
   AGENT_API_VERSION,
@@ -16,6 +20,8 @@ import {
   toRemoteRecord,
 } from './todoCommands.js';
 
+const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
+const TODO_COMMANDS_PATH = join(ROOT, 'src/todoCommands.js');
 const UTC_EVENING = new Date('2026-01-15T20:00:00.000Z');
 
 function openTodo(overrides = {}) {
@@ -85,6 +91,7 @@ describe('parseTodoCommand', () => {
   });
 
   it('keeps the catalog aligned with the parser', () => {
+    expect(AGENT_API_VERSION).toBe(1);
     expect(AGENT_COMMANDS.map((entry) => entry.command)).toEqual([
       'describe',
       'list',
@@ -99,6 +106,37 @@ describe('parseTodoCommand', () => {
       expect(parsed.ok).toBe(true);
       expect(parsed.command.kind).toBe(entry.command);
     }
+  });
+
+  it('bumps AGENT_API_VERSION when the catalog changes from origin/main', () => {
+    const source = readFileSync(TODO_COMMANDS_PATH, 'utf8');
+    expect(extractExportedNumber(source, 'AGENT_API_VERSION')).toBe(AGENT_API_VERSION);
+    expect(normalizeLiteral(extractExportedArrayLiteral(source, 'AGENT_COMMANDS'))).toContain(
+      "command: 'describe'",
+    );
+
+    const mergeBase = git(['merge-base', 'HEAD', 'refs/remotes/origin/main']);
+    if (!mergeBase) {
+      return;
+    }
+
+    const baseSource = git(['show', `${mergeBase}:src/todoCommands.js`]);
+    if (!baseSource) {
+      return;
+    }
+
+    const baseVersion = extractExportedNumber(baseSource, 'AGENT_API_VERSION');
+    const baseCatalog = extractExportedArrayLiteral(baseSource, 'AGENT_COMMANDS');
+    if (baseVersion === null || !baseCatalog) {
+      return;
+    }
+
+    const currentCatalog = extractExportedArrayLiteral(source, 'AGENT_COMMANDS');
+    if (normalizeLiteral(baseCatalog) === normalizeLiteral(currentCatalog)) {
+      return;
+    }
+
+    expect(AGENT_API_VERSION).toBeGreaterThan(baseVersion);
   });
 });
 
@@ -421,3 +459,47 @@ describe('runTodoCommand describe', () => {
     expect(result.view.timeZone).toBe('America/Los_Angeles');
   });
 });
+
+function git(args) {
+  const result = spawnSync('git', args, { cwd: ROOT, encoding: 'utf8' });
+  return result.status === 0 ? result.stdout.trim() : null;
+}
+
+function extractExportedNumber(source, name) {
+  const match = String(source ?? '').match(new RegExp(`export const ${name} = (\\d+);`));
+  return match ? Number(match[1]) : null;
+}
+
+function extractExportedArrayLiteral(source, name) {
+  const marker = `export const ${name} = `;
+  const start = String(source ?? '').indexOf(marker);
+  if (start < 0) {
+    return null;
+  }
+
+  const begin = source.indexOf('[', start);
+  if (begin < 0) {
+    return null;
+  }
+
+  let depth = 0;
+  for (let index = begin; index < source.length; index += 1) {
+    const character = source[index];
+    if (character === '[') {
+      depth += 1;
+    } else if (character === ']') {
+      depth -= 1;
+      if (depth === 0) {
+        return source.slice(begin, index + 1);
+      }
+    }
+  }
+
+  return null;
+}
+
+function normalizeLiteral(value) {
+  return String(value ?? '')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
