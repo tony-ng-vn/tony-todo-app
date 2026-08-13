@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.11.1
+
+2026-08-13
+
+**Web App**
+
+- Pressing Enter at the bottom of a long task note now keeps the caret in view instead of leaving you looking at earlier lines.
+
+---
+
 ## v0.11.0
 
 2026-08-13
@@ -13,10 +23,6 @@
 **Web App**
 
 - Copied agent setup no longer lists every command. It tells the tool to call `describe` first, so new features show up without recopying setup.
-
-**Web App**
-
-- Pressing Enter at the bottom of a long task note now keeps the caret in view instead of leaving you looking at earlier lines.
 
 ---
 
