@@ -10,6 +10,7 @@ const browser = await chromium.launch({
 
 try {
   const mobile = await inspectViewport({ width: 390, height: 844 }, true);
+  const mobileTaskDetail = await inspectMobileTaskDetail({ width: 390, height: 844 });
   const desktop = await inspectViewport({ width: 1366, height: 900 }, false);
   const draftCue = await inspectDraftInsertionCue({ width: 1366, height: 900 });
   const boardCardLayout = await inspectBoardCardLayout({ width: 1366, height: 900 });
@@ -22,6 +23,7 @@ try {
   const failures = [
     ...assertNoOverflow(mobile),
     ...assertNoOverflow(desktop),
+    ...assertMobileTaskDetail(mobileTaskDetail),
     ...assertMinimumTarget(mobile, '#todo-title', 44, 'mobile task input'),
     ...assertMinimumTarget(mobile, '#summary-date', 44, 'mobile date picker'),
     ...assertMinimumTarget(mobile, '#summary-previous-day', 44, 'mobile previous-day button'),
@@ -68,6 +70,130 @@ try {
   }
 } finally {
   await browser.close();
+}
+
+async function inspectMobileTaskDetail(viewport) {
+  const page = await browser.newPage({
+    viewport,
+    isMobile: true,
+    hasTouch: true,
+  });
+  await page.addInitScript(() => {
+    localStorage.setItem('done-log-client-id', 'ui-smoke-mobile-detail');
+    localStorage.setItem(
+      'done-log-state',
+      JSON.stringify({
+        todos: [
+          {
+            id: 'ui-smoke-mobile-detail-task',
+            title: 'Write the iPhone task note',
+            createdAt: '2026-08-13T08:00:00.000Z',
+            completedAt: null,
+            firstStartedAt: '2026-08-13T09:15:00.000Z',
+            activeStartedAt: null,
+            trackedSeconds: 10 * 60,
+            timeSegments: [
+              {
+                startedAt: '2026-08-13T09:15:00.000Z',
+                endedAt: '2026-08-13T09:25:00.000Z',
+                durationSeconds: 10 * 60,
+              },
+            ],
+            note: '',
+          },
+        ],
+      }),
+    );
+  });
+  await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
+  await page.locator('[data-todo-id="ui-smoke-mobile-detail-task"] .open-task-button').tap();
+  await page.waitForSelector('#task-detail');
+
+  const layout = await page.evaluate(() => {
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    function box(selector) {
+      const element = document.querySelector(selector);
+      if (!element) {
+        return null;
+      }
+      const rect = element.getBoundingClientRect();
+      const visibleHeight = Math.max(0, Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0));
+      const visibleWidth = Math.max(0, Math.min(rect.right, viewportWidth) - Math.max(rect.left, 0));
+      return {
+        top: Math.round(rect.top),
+        bottom: Math.round(rect.bottom),
+        width: Math.round(rect.width),
+        height: Math.round(rect.height),
+        viewportCoverage: Number((visibleHeight / viewportHeight).toFixed(3)),
+        inViewport: visibleHeight > 24 && visibleWidth > 24,
+      };
+    }
+    return {
+      viewportHeight,
+      detail: box('#task-detail'),
+      note: box('#detail-note'),
+    };
+  });
+
+  let noteValue = '';
+  let noteFillError = '';
+  try {
+    await page.locator('#detail-note').tap();
+    await page.locator('#detail-note').fill('iPhone note');
+    noteValue = await page.locator('#detail-note').inputValue();
+  } catch (error) {
+    noteFillError = error instanceof Error ? error.message : String(error);
+  }
+
+  await page.locator('.detail-start-picker').scrollIntoViewIfNeeded();
+  await page.locator('.detail-start-picker').tap();
+  await page.waitForSelector('.calendar-popover');
+  const calendar = await page.evaluate(() => {
+    const popover = document.querySelector('.calendar-popover');
+    const rect = popover?.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    return {
+      exists: Boolean(popover),
+      top: rect ? Math.round(rect.top) : null,
+      bottom: rect ? Math.round(rect.bottom) : null,
+      inViewport: Boolean(
+        rect &&
+          rect.width > 8 &&
+          rect.height > 8 &&
+          rect.bottom > 0 &&
+          rect.top < viewportHeight &&
+          rect.left < viewportWidth &&
+          rect.right > 0,
+      ),
+    };
+  });
+
+  await page.close();
+  return { layout, noteValue, noteFillError, calendar };
+}
+
+function assertMobileTaskDetail(result) {
+  const failures = [];
+  if (!result.layout.detail || result.layout.detail.viewportCoverage < 0.85) {
+    failures.push(
+      `iPhone task details are not on screen after Open: ${JSON.stringify(result.layout.detail)}`,
+    );
+  }
+  if (!result.layout.note?.inViewport) {
+    failures.push(`iPhone task note is not on screen after Open: ${JSON.stringify(result.layout.note)}`);
+  }
+  if (result.noteValue !== 'iPhone note' || result.noteFillError) {
+    failures.push(`iPhone task note could not be edited: ${JSON.stringify({
+      noteValue: result.noteValue,
+      noteFillError: result.noteFillError,
+    })}`);
+  }
+  if (!result.calendar.inViewport) {
+    failures.push(`iPhone time picker opened off screen: ${JSON.stringify(result.calendar)}`);
+  }
+  return failures;
 }
 
 async function inspectNativeWorkspaceLayout(viewport) {

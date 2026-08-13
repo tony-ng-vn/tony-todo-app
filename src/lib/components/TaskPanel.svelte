@@ -46,6 +46,15 @@
 
   $: todayOpenSection = openTodoSections.find((section) => section.isToday);
   $: datedOpenSections = openTodoSections.filter((section) => !section.isToday);
+
+  function handleTaskTitleClick(event, todoId) {
+    if (event.target.closest('a')) {
+      return;
+    }
+    if (window.matchMedia('(pointer: coarse)').matches || window.innerWidth <= 900) {
+      onOpenTask(todoId);
+    }
+  }
 </script>
 
 <section
@@ -221,6 +230,7 @@
           title="Double-click to rename"
           role="button"
           tabindex="0"
+          on:click={(event) => handleTaskTitleClick(event, todo.id)}
           on:dblclick={() => onStartTitleEdit(todo.id)}
           on:keydown={(event) => event.key === 'Enter' && onStartTitleEdit(todo.id)}
         >
