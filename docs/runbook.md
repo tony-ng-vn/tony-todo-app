@@ -14,7 +14,10 @@ Migrations and `insforge.toml` config apply stay manual.
 - Do not deploy functions from a laptop, a feature branch, a dirty tree, or a cloud agent.
 - Function deploys wait for the required `Verify` job.
   A Backend changelog entry is not live until the `Deploy InsForge functions` job is green.
+- Main-branch CI runs are never cancelled by a later merge, so each green merge gets its own ordered function deployment.
 - An automatic function deploy stops before authentication or production writes when the same merge changes `migrations/` or `insforge.toml`.
+- The deploy preflight blocks unexpected live endpoints before writes.
+  `claim-preauth-todos` and `extract-video-knowledge` are temporary exceptions owned by unmerged feature branches; this workflow must not alter them.
 - One-time: add GitHub repository secret `INSFORGE_API_KEY` from the linked Todo App project.
 - Migrations always land in the repo before or together with being applied to the live database.
   If an urgent fix must be applied live first, commit and PR it in the same session so the repo never drifts from production.
@@ -31,6 +34,7 @@ Migrations and `insforge.toml` config apply stay manual.
    `functions/agent-todos.ts` is generated from its shell file; the job deploys the generated file.
    Never hand-edit it.
    If the merge changes `migrations/` or `insforge.toml`, the automatic job stops before authentication or production writes.
+   A deleted or renamed function file also stops before writes until its live endpoint is explicitly removed.
 3. For a merge with backend state changes, sync and verify first: `git checkout main && git pull`, then `npm ci && npm test`.
 4. Preflight: `npx -y @insforge/cli current --json` confirms the linked project and auth.
    Compare `npx -y @insforge/cli db migrations list --json` against `migrations/` in both directions; stop and reconcile if either side has entries the other lacks.
