@@ -205,7 +205,7 @@ describe('CI workflow', () => {
   it('limits permissions and pins actions to immutable revisions', () => {
     expect(workflow.permissions.contents).toBe('read');
     expect(dependencyWorkflow.permissions.contents).toBe('read');
-    expect(functionsWorkflow.permissions.contents).toBe('read');
+    expect(functionsWorkflow.permissions.contents).toBe('write');
 
     const actionReferences = [workflow, dependencyWorkflow, functionsWorkflow].flatMap(
       (currentWorkflow) =>
@@ -222,7 +222,7 @@ describe('CI workflow', () => {
 
   it('preserves redacted failure packets from both CI environments', () => {
     for (const job of [workflow.jobs.verify, workflow.jobs['native-menubar']]) {
-      const upload = job.steps.find((step) => step.name.startsWith('Preserve '));
+      const upload = job.steps.find((step) => step.name.includes('failure packet'));
       expect(upload.if).toBe('failure()');
       expect(upload.uses).toMatch(/^actions\/upload-artifact@[0-9a-f]{40}$/);
       expect(upload.with.path).toBe('.ci-learning/latest-failure.json');
@@ -253,22 +253,19 @@ describe('CI workflow', () => {
 
     const stepsByName = Object.fromEntries(deploy.steps.map((step) => [step.name, step]));
     expect(stepsByName['Check out repository'].with.ref).toContain('workflow_run.head_sha');
-    expect(stepsByName['Check deployment is still current'].run).toContain('origin/main');
-    expect(stepsByName['Check deployment is still current'].run).toContain('should_run=false');
-    expect(stepsByName['Download verified deployment range'].with['run-id']).toBe(
-      '${{ github.event.workflow_run.id }}',
+    expect(functionsWorkflow.permissions.contents).toBe('write');
+    expect(stepsByName['Resolve undeployed main range'].run).toContain(
+      'refs/tags/insforge-functions-deployed',
     );
-    expect(stepsByName['Validate automatic deployment range'].run).toContain(
-      '.ci-insforge-range.json',
+    expect(stepsByName['Resolve undeployed main range'].run).toContain(
+      'git merge-base --is-ancestor "$deploy_head" "$deploy_base"',
     );
-    expect(stepsByName['Validate automatic deployment range'].run).toContain(
-      'steps.current.outputs.should_run',
-    );
+    expect(stepsByName['Resolve undeployed main range'].run).toContain('should_run=false');
     expect(stepsByName['Install dependencies'].if).toBe(
-      "steps.current.outputs.should_run == 'true'",
+      "steps.range.outputs.should_run == 'true'",
     );
     expect(stepsByName['Block automatic deploy for backend state changes'].if).toBe(
-      "github.event_name != 'workflow_dispatch' && steps.current.outputs.should_run == 'true'",
+      "github.event_name != 'workflow_dispatch' && steps.range.outputs.should_run == 'true'",
     );
     expect(stepsByName['Block automatic deploy for backend state changes'].run).toContain(
       'git diff --quiet "$DEPLOY_BASE" "$DEPLOY_HEAD" -- migrations insforge.toml',
@@ -290,7 +287,12 @@ describe('CI workflow', () => {
     );
     expect(stepsByName['Deploy changed functions and verify live source'].run).toContain('--check');
     expect(stepsByName['Deploy changed functions and verify live source'].env).toEqual({
+      DEPLOY_BASE: '${{ steps.range.outputs.base }}',
+      DEPLOY_HEAD: '${{ steps.range.outputs.head }}',
       INSFORGE_API_KEY: '${{ secrets.INSFORGE_API_KEY }}',
     });
+    expect(stepsByName['Advance deployment marker'].run).toContain(
+      '--force-with-lease=refs/tags/insforge-functions-deployed:"$DEPLOY_BASE"',
+    );
   });
 });

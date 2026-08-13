@@ -10,10 +10,10 @@ on:
 
 concurrency:
   group: insforge-functions-main
-  cancel-in-progress: false
+  queue: max
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   deploy:
@@ -35,26 +35,77 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-          ref: ${{ github.event.workflow_run.head_sha || github.sha }}
+          fetch-tags: true
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - name: Resolve undeployed main range
+        id: range
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          VERIFIED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          marker_ref=refs/tags/insforge-functions-deployed
+          git fetch --force --tags origin main
+          if ! deploy_base=$(git rev-parse "${marker_ref}^{commit}"); then
+            echo "Missing deployment marker tag $marker_ref. Initialize it to the last safely deployed main commit."
+            exit 1
+          fi
+
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            deploy_head=$(git rev-parse HEAD)
+          else
+            deploy_head=$VERIFIED_SHA
+          fi
+
+          if [ "$deploy_head" != "$(git rev-parse HEAD)" ]; then
+            echo "The CI-verified commit does not match the checked-out commit."
+            exit 1
+          fi
+          if ! git merge-base --is-ancestor "$deploy_head" origin/main; then
+            echo "Skipping a commit that is no longer part of main: $deploy_head."
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "$EVENT_NAME" != "workflow_dispatch" ] && \
+             git merge-base --is-ancestor "$deploy_head" "$deploy_base"; then
+            echo "Deployment marker already includes $deploy_head."
+            echo "should_run=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if ! git merge-base --is-ancestor "$deploy_base" "$deploy_head"; then
+            echo "Deployment marker $deploy_base is not an ancestor of $deploy_head."
+            exit 1
+          fi
+
+          echo "base=$deploy_base" >> "$GITHUB_OUTPUT"
+          echo "head=$deploy_head" >> "$GITHUB_OUTPUT"
+          echo "should_run=true" >> "$GITHUB_OUTPUT"
 
       - name: Set up Node.js
+        if: steps.range.outputs.should_run == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
           node-version-file: .node-version
           cache: npm
 
       - name: Install dependencies
+        if: steps.range.outputs.should_run == 'true'
         run: npm ci
 
       - name: Block automatic deploy for backend state changes
-        if: github.event_name != 'workflow_dispatch'
+        if: github.event_name != 'workflow_dispatch' && steps.range.outputs.should_run == 'true'
+        env:
+          DEPLOY_BASE: ${{ steps.range.outputs.base }}
+          DEPLOY_HEAD: ${{ steps.range.outputs.head }}
         run: |
-          if ! git diff --quiet HEAD^ HEAD -- migrations insforge.toml; then
-            echo "This merge changes migrations or InsForge config. Apply those live changes first, then replay this workflow from main."
+          if ! git diff --quiet "$DEPLOY_BASE" "$DEPLOY_HEAD" -- migrations insforge.toml; then
+            echo "This push changes migrations or InsForge config. Apply those live changes first, then replay this workflow from main."
             exit 1
           fi
 
       - name: Require InsForge project API key
+        if: steps.range.outputs.should_run == 'true'
         env:
           INSFORGE_API_KEY: ${{ secrets.INSFORGE_API_KEY }}
         run: |
@@ -65,12 +116,26 @@ jobs:
           fi
 
       - name: Deploy changed functions and verify live source
+        if: steps.range.outputs.should_run == 'true'
         env:
+          DEPLOY_BASE: ${{ steps.range.outputs.base }}
+          DEPLOY_HEAD: ${{ steps.range.outputs.head }}
           INSFORGE_API_KEY: ${{ secrets.INSFORGE_API_KEY }}
         run: |
           npx -y --offline @insforge/cli@0.2.6 link --api-base-url "$INSFORGE_API_BASE_URL" --api-key "$INSFORGE_API_KEY" -y
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
             npm run sync:insforge-functions -- --deploy-all --check
           else
-            npm run sync:insforge-functions -- --deploy-changed --base HEAD^ --head HEAD --check
+            npm run sync:insforge-functions -- --deploy-changed --base "$DEPLOY_BASE" --head "$DEPLOY_HEAD" --check
           fi
+
+      - name: Advance deployment marker
+        if: steps.range.outputs.should_run == 'true'
+        env:
+          DEPLOY_BASE: ${{ steps.range.outputs.base }}
+          DEPLOY_HEAD: ${{ steps.range.outputs.head }}
+        run: |
+          git tag -f insforge-functions-deployed "$DEPLOY_HEAD"
+          git push \
+            --force-with-lease=refs/tags/insforge-functions-deployed:"$DEPLOY_BASE" \
+            origin refs/tags/insforge-functions-deployed
