@@ -45,7 +45,9 @@ enum MenuBarConfiguration {
     usableAreas: [NSRect]
   ) -> Bool {
     !statusItemFrame.isEmpty && usableAreas.contains { area in
-      !area.isEmpty && area.contains(statusItemFrame)
+      !area.isEmpty
+        && area.contains(statusItemFrame)
+        && statusItemFrame.maxX < area.maxX - 2
     }
   }
 
@@ -90,5 +92,24 @@ enum MenuBarConfiguration {
     image.isTemplate = true
     image.size = NSSize(width: 16, height: 16)
     return image
+  }
+
+  static let statusItemAutosaveName = "DoneLogStatusItem"
+
+  static func statusItemVisibleDefaultsKey(
+    prefix: String
+  ) -> String {
+    "\(prefix) \(statusItemAutosaveName)"
+  }
+
+  static func revealStatusItemInControlCenter(
+    defaults: UserDefaults = .standard
+  ) {
+    defaults.set(true, forKey: statusItemVisibleDefaultsKey(prefix: "NSStatusItem Visible"))
+    defaults.set(true, forKey: statusItemVisibleDefaultsKey(prefix: "NSStatusItem VisibleCC"))
+    defaults.set(
+      450,
+      forKey: statusItemVisibleDefaultsKey(prefix: "NSStatusItem Preferred Position")
+    )
   }
 }
