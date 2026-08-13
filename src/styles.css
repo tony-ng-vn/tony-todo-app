@@ -1208,8 +1208,7 @@ h2 {
 .summary-time-input,
 .detail-timing-controls input,
 .detail-title-input,
-.progress-input,
-.detail-note {
+.progress-input {
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: 11px;
@@ -2157,46 +2156,6 @@ h2 {
   min-height: 0;
 }
 
-.detail-note {
-  width: 100%;
-  field-sizing: content;
-  height: auto;
-  min-height: 96px;
-  max-height: min(36vh, 280px);
-  resize: vertical;
-  overflow: auto;
-  padding: 14px 16px;
-  -webkit-appearance: none;
-  appearance: none;
-  color: var(--strong);
-  font-size: 14px;
-  font-weight: 400;
-  line-height: 1.45;
-  scrollbar-width: none;
-}
-
-.detail-note::-webkit-scrollbar {
-  width: 0;
-  height: 0;
-  display: none;
-}
-
-.detail-note::placeholder {
-  color: var(--subtle);
-  opacity: 1;
-}
-
-.detail-note:focus::placeholder,
-.detail-note:focus-visible::placeholder {
-  color: transparent;
-}
-
-.detail-note:focus,
-.detail-note:focus-visible {
-  outline: none;
-  border-color: var(--focus-ring);
-}
-
 .note-todo-list {
   display: grid;
   flex: 0 0 auto;
@@ -2709,7 +2668,6 @@ h2 {
     padding-bottom: max(24px, env(safe-area-inset-bottom, 0px));
   }
 
-  .detail-note,
   .progress-input,
   .detail-title-input {
     font-size: 16px;

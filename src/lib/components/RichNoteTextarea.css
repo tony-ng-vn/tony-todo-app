@@ -1,0 +1,164 @@
+.rich-note-editor {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.rich-note-editor textarea,
+.rich-note-editor .rich-note-preview {
+  box-sizing: border-box;
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid var(--border);
+  background: var(--field-surface);
+  color: var(--strong);
+  font-family: inherit;
+  font-weight: 400;
+  white-space: pre-wrap;
+}
+
+.rich-note-editor textarea {
+  display: block;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.rich-note-editor textarea::placeholder {
+  color: var(--subtle);
+  opacity: 1;
+}
+
+.rich-note-editor textarea:focus::placeholder,
+.rich-note-editor textarea:focus-visible::placeholder {
+  color: transparent;
+}
+
+.rich-note-editor.showing-preview textarea {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.rich-note-editor .rich-note-preview {
+  position: relative;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  cursor: text;
+}
+
+.rich-note-editor textarea:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.rich-note-editor .rich-note-edit {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  border: 0;
+  border-radius: inherit;
+  padding: 0;
+  background: transparent;
+  cursor: text;
+}
+
+.rich-note-editor .rich-note-edit:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 1px;
+}
+
+.rich-note-editor .rich-note-content {
+  position: relative;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.rich-note-editor .rich-note-preview a {
+  pointer-events: auto;
+  color: color-mix(in srgb, #e43c91 72%, var(--strong));
+  font-weight: 500;
+  text-decoration: none;
+}
+
+.rich-note-editor .rich-note-preview a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.rich-note-editor .rich-note-preview a:focus-visible {
+  border-radius: 4px;
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.rich-note-editor .rich-note-preview svg {
+  display: inline-block;
+  width: 1em;
+  height: 1em;
+  margin-right: 0.35em;
+  overflow: visible;
+  fill: none;
+  stroke: currentcolor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.25;
+  vertical-align: -0.12em;
+}
+
+.rich-note-editor.detail textarea,
+.rich-note-editor.detail .rich-note-preview {
+  min-height: 96px;
+  max-height: min(36vh, 280px);
+  border-radius: 11px;
+  padding: 14px 16px;
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+.rich-note-editor.detail textarea {
+  field-sizing: content;
+  height: auto;
+  resize: vertical;
+}
+
+.rich-note-editor.menubar textarea,
+.rich-note-editor.menubar .rich-note-preview {
+  min-height: 72px;
+  border-radius: 10px;
+  padding: 9px 10px;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.rich-note-editor.menubar textarea {
+  resize: vertical;
+}
+
+.rich-note-editor.floating {
+  height: 100%;
+  min-height: 180px;
+}
+
+.rich-note-editor.floating textarea,
+.rich-note-editor.floating .rich-note-preview {
+  height: 100%;
+  min-height: 180px;
+  border-radius: 14px;
+  padding: 13px;
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+.rich-note-editor.floating textarea {
+  resize: none;
+}
+
+@media (max-width: 900px), (pointer: coarse) {
+  .rich-note-editor.detail textarea,
+  .rich-note-editor.detail .rich-note-preview {
+    font-size: 16px;
+  }
+}
