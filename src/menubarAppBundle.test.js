@@ -20,6 +20,20 @@ describe('menu bar app bundle', () => {
         `<key>CFBundleShortVersionString<\\/key>\\s*<string>${packageJson.version}<\\/string>`,
       ),
     );
+    expect(plist).toContain('<key>SUFeedURL</key>');
+    expect(plist).toContain(
+      '<string>https://github.com/tony-ng-vn/tony-todo-app/releases/latest/download/appcast.xml</string>',
+    );
+    expect(plist).toMatch(/<key>SUPublicEDKey<\/key>\s*<string>[^<]+<\/string>/);
+    expect(plist).toMatch(/<key>SUVerifyUpdateBeforeExtraction<\/key>\s*<true\/>/);
+  });
+
+  it('links the native app to the pinned Sparkle updater', () => {
+    const manifest = readFileSync(path.join(repoRoot, 'native/Package.swift'), 'utf8');
+
+    expect(manifest).toContain('https://github.com/sparkle-project/Sparkle');
+    expect(manifest).toContain('exact: "2.9.5"');
+    expect(manifest).toContain('.product(name: "Sparkle", package: "Sparkle")');
   });
 
   it('exposes bundle and install commands', () => {
@@ -74,6 +88,23 @@ describe('menu bar app bundle', () => {
     expect(buildScript).toContain('DONE_LOG_CODESIGN_IDENTITY');
     expect(buildScript).toContain('security find-identity -v -p codesigning');
     expect(buildScript).toContain('--sign "$CODE_SIGN_IDENTITY"');
+    expect(buildScript).toContain('Contents/Frameworks/Sparkle.framework');
+    expect(buildScript).toContain('@executable_path/../Frameworks');
+    expect(buildScript).not.toContain('--deep');
+  });
+
+  it('publishes notarized and signed native releases', () => {
+    const workflow = readFileSync(
+      path.join(repoRoot, '.github/workflows/native-release.yml'),
+      'utf8',
+    );
+
+    expect(workflow).toContain('xcrun notarytool submit');
+    expect(workflow).toContain('xcrun stapler staple');
+    expect(workflow).toContain('generate_appcast');
+    expect(workflow).toContain('SPARKLE_PRIVATE_KEY');
+    expect(workflow).toContain('Done-Log.dmg');
+    expect(workflow).toContain('appcast.xml');
   });
 
   it('keeps task notes in a draggable native window', () => {

@@ -69,6 +69,18 @@ struct MenuBarPolicyTests {
     #expect(MenuBarPermissionPolicy.mediaCaptureDecision == .deny)
   }
 
+  @Test("Advertises the native updater before the web app loads")
+  @MainActor
+  func advertisesNativeUpdater() {
+    let source = MenuBarWebViewController.nativeHostScriptSource(
+      usesWindowChrome: false,
+      hasNativeUpdater: true
+    )
+
+    #expect(source.contains("window.__doneLogNativeUpdater = true"))
+    #expect(source.contains(NativeUpdatePolicy.messageName))
+  }
+
   @Test("Requires the expected menu bar shell before reporting ready")
   func requiresExpectedShell() throws {
     let finalURL = try #require(
