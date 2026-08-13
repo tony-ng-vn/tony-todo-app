@@ -5,33 +5,60 @@ The frontend deploys itself through Vercel on merge.
 
 ## Backend deploy
 
+The live InsForge backend is project "Todo App", app key `y26ze9je`.
+Edge functions deploy from GitHub Actions after the `CI` workflow is green on `main`.
+Migrations and `insforge.toml` config apply stay manual.
+
 ## Rules
 
-- Deploy only from merged `main`, never from a feature branch or a dirty tree.
+- Do not deploy functions from a laptop, a feature branch, a dirty tree, or a cloud agent.
+- Function deploys wait for the required `Verify` job.
+  A Backend changelog entry is not live until the `Deploy InsForge functions` job is green.
+- Main-branch CI runs stay queued instead of being replaced by later merges.
+- The moving `insforge-functions-deployed` tag records the last commit whose repo-managed functions were verified live.
+  Each automatic run checks the full range from that tag to its CI-verified commit, then advances the tag only after deployment and source verification succeed.
+  A stale or reordered run cannot move the tag backward.
+- An automatic function deploy stops before authentication or production writes when the not-yet-deployed range changes `migrations/` or `insforge.toml`.
+- The deploy preflight blocks unexpected live endpoints before writes.
+  `claim-preauth-todos` and `extract-video-knowledge` are temporary exceptions owned by unmerged feature branches; this workflow must not alter them.
+- One-time: add GitHub repository secret `INSFORGE_API_KEY` from the linked Todo App project.
+- One-time: add GitHub repository secret `INSFORGE_MARKER_TOKEN` from a fine-grained token limited to repository contents write access.
+  The workflow exposes it only to the final deployment-marker update after live source verification.
+- One-time: initialize `insforge-functions-deployed` to the last main commit whose repo-managed function source already matches production.
+  Do not move this tag by hand after initialization.
 - Migrations always land in the repo before or together with being applied to the live database.
   If an urgent fix must be applied live first, commit and PR it in the same session so the repo never drifts from production.
 - Test risky schema, RLS, or function changes on an InsForge backend branch first (`npx -y @insforge/cli branch create/switch/merge`), not on production.
 - Never change the sign-up lock (`disable_signup`) in either direction without an explicit ask from the owner (see "Live backend ops truth" in AGENTS.md).
-- The CLI login is interactive; the owner runs `npx -y @insforge/cli login --device` themselves on headless machines.
+- The CLI login is interactive; the owner runs `npx -y @insforge/cli login --device` themselves on headless machines for SQL and config work.
 
 ## Sequence
 
-1. Sync and verify: `git checkout main && git pull`, then `npm ci && npm test`.
-2. Preflight: `npx -y @insforge/cli current --json` confirms the linked project and auth.
+1. Merge to `main`.
+   Vercel ships the web app.
+   GitHub `CI` runs `verify:web` and `verify:native`.
+2. When `CI` succeeds on a `main` push without migration or config changes, `InsForge functions` deploys each changed `functions/*.ts` file since the last successful deployment (not `*.shell.ts`) and fails if live source still does not match the repo.
+   `functions/agent-todos.ts` is generated from its shell file; the job deploys the generated file.
+   Never hand-edit it.
+   If the merge changes `migrations/` or `insforge.toml`, the automatic job stops before authentication or production writes.
+   A deleted or renamed function file also stops before writes until its live endpoint is explicitly removed.
+3. For a merge with backend state changes, sync and verify first: `git checkout main && git pull`, then `npm ci && npm test`.
+4. Preflight: `npx -y @insforge/cli current --json` confirms the linked project and auth.
    Compare `npx -y @insforge/cli db migrations list --json` against `migrations/` in both directions; stop and reconcile if either side has entries the other lacks.
-3. Apply migrations: `npx -y @insforge/cli db migrations up --all`.
-4. Redeploy changed functions: `npx -y @insforge/cli functions deploy <slug> --file functions/<slug>.ts`.
-   `functions/agent-todos.ts` is generated from its shell file; deploy the generated file and never hand-edit it.
-   When a migration renames or drops a column a function reads, apply the migration and redeploy that function in the same session.
-5. Config: `npx -y @insforge/cli config plan`, then `npx -y @insforge/cli config apply -y` only for changes the owner approved.
-6. Verify: the deployed functions return 401 to unauthenticated calls, `config plan` reports no drift, and `npx -y @insforge/cli logs function.logs --limit 20` shows no new errors.
-7. Record: `npx -y @insforge/cli memory remember` the deploy fact, and cut a release with `npm run release:changelog -- <patch|minor|major>` when the deploy corresponds to one.
+5. Apply migrations: `npx -y @insforge/cli db migrations up --all`.
+6. Config: `npx -y @insforge/cli config plan`, then `npx -y @insforge/cli config apply -y` only for changes the owner approved.
+7. Replay `InsForge functions` from GitHub Actions on `main`.
+   Manual dispatch deploys every repo function and re-checks live source.
+8. Verify: the deployed functions return 401 to unauthenticated calls, `config plan` reports no drift, and `npx -y @insforge/cli logs function.logs --limit 20` shows no new errors.
+9. Record: `npx -y @insforge/cli memory remember` the deploy fact, and cut a release with `npm run release:changelog -- <patch|minor|major>` when the deploy corresponds to one.
 
 ## Lessons already paid for
 
 - Drop an old check constraint before backfilling a renamed column, or the backfill violates it and the migration rolls back.
 - A conflicting PR silently prevents the GitHub Actions workflow from running; if CI seems missing, check mergeability first.
 - The `insforge link` skill sync rewrites the `INSFORGE:START/END` block in AGENTS.md; project-owned content must live outside that block.
+- Merging GitHub is not a function deploy. A successful laptop `functions deploy` can still ship a stale local file.
+- Looking up agent keys on a `token` column after the hashing migration 401s every `dlg_` key; live source must use `token_hash`.
 
 ## Native app release
 
