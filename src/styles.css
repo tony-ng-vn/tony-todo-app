@@ -2947,7 +2947,9 @@ html.is-native-host .task-panel {
 }
 
 html.is-native-host .brand-row {
-  align-items: flex-start;
+  min-height: 44px;
+  padding-inline-start: 0;
+  align-items: center;
   flex-shrink: 0;
 }
 
@@ -2976,5 +2978,6 @@ html.is-native-host .workspace.has-detail .task-detail {
 
 html.is-native-host .summary-top,
 html.is-native-host .detail-header {
-  align-items: flex-start;
+  min-height: 44px;
+  align-items: center;
 }

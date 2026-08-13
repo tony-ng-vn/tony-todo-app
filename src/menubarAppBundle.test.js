@@ -137,9 +137,12 @@ describe('menu bar app bundle', () => {
       path.join(repoRoot, 'native/Sources/DoneLogMenuBar/MenuBarWebViewController.swift'),
       'utf8',
     );
+    const styles = readFileSync(path.join(repoRoot, 'src/styles.css'), 'utf8');
 
     expect(controller).toContain('window.__doneLogNativeHost = true');
     expect(controller).toContain('injectionTime: .atDocumentStart');
-    expect(controller).toContain('flex-wrap: wrap !important');
+    expect(controller).not.toContain("createElement('style')");
+    expect(styles).toContain('html.is-native-host .view-toggle');
+    expect(styles).toContain('flex-wrap: wrap;');
   });
 });

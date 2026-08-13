@@ -8,7 +8,8 @@ final class NativeChromeWebView: WKWebView {
     if NativeWindowPolicy.isTitlebarPassthroughPoint(
       point,
       in: bounds,
-      titlebarInset: titlebarPassthroughHeight
+      titlebarInset: titlebarPassthroughHeight,
+      isFlipped: isFlipped
     ) {
       return nil
     }

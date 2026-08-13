@@ -91,24 +91,17 @@ struct NativeWindowPolicyTests {
     #expect(window.frame == visibleFrame)
   }
 
-  @Test("Leaves the title bar strip for native drag and zoom")
+  @Test("Leaves only the flipped top strip for native drag and zoom")
+  @MainActor
   func passesTitlebarHitsThrough() {
-    let bounds = NSRect(x: 0, y: 0, width: 1_200, height: 800)
+    let webView = NativeChromeWebView(
+      frame: NSRect(x: 0, y: 0, width: 1_200, height: 800)
+    )
+    webView.titlebarPassthroughHeight = 28
 
-    #expect(
-      NativeWindowPolicy.isTitlebarPassthroughPoint(
-        NSPoint(x: 24, y: 790),
-        in: bounds,
-        titlebarInset: 28
-      )
-    )
-    #expect(
-      !NativeWindowPolicy.isTitlebarPassthroughPoint(
-        NSPoint(x: 24, y: 740),
-        in: bounds,
-        titlebarInset: 28
-      )
-    )
+    #expect(webView.isFlipped)
+    #expect(webView.hitTest(NSPoint(x: 24, y: 10)) == nil)
+    #expect(webView.hitTest(NSPoint(x: 24, y: 790)) != nil)
   }
 
   @Test("Measures the real title bar inset after chrome is applied")
@@ -124,9 +117,36 @@ struct NativeWindowPolicyTests {
       display: false
     )
 
+    let layout = contentView.convert(window.contentLayoutRect, from: nil)
+    let expectedInset = layout.minY - contentView.bounds.minY
     let inset = NativeWindowPolicy.titlebarInset(in: contentView, window: window)
 
-    #expect(inset >= 28)
-    #expect(inset < 80)
+    #expect(contentView.isFlipped)
+    #expect(expectedInset > 0)
+    #expect(inset == expectedInset)
+  }
+
+  @Test("Removes the title bar inset in full screen")
+  func measuresZeroInsetInFullScreen() {
+    let bounds = NSRect(x: 0, y: 0, width: 1_200, height: 800)
+    let layout = NSRect(x: 0, y: 32, width: 1_200, height: 768)
+
+    let inset = NativeWindowPolicy.titlebarInset(
+      layoutRect: layout,
+      bounds: bounds,
+      isFlipped: true,
+      isFullScreen: true
+    )
+
+    #expect(inset == 0)
+    #expect(NativeWindowPolicy.titlebarInsetCSSValue(inset) == "0px")
+    #expect(
+      !NativeWindowPolicy.isTitlebarPassthroughPoint(
+        NSPoint(x: 24, y: 10),
+        in: bounds,
+        titlebarInset: inset,
+        isFlipped: true
+      )
+    )
   }
 }

@@ -30,6 +30,7 @@ const verificationPlan = JSON.parse(
 describe('CI workflow', () => {
   it('gates pull requests and main pushes with the deploy-critical checks', () => {
     expect(workflow.on.pull_request.branches).toContain('main');
+    expect(workflow.on.pull_request.types).toContain('edited');
     expect(workflow.on.push.branches).toContain('main');
 
     const stepsByName = Object.fromEntries(
@@ -39,6 +40,7 @@ describe('CI workflow', () => {
     expect(stepsByName['Set up Node.js'].with['node-version-file']).toBe(
       '.node-version',
     );
+    expect(stepsByName['Check out repository'].with['fetch-depth']).toBe(0);
     expect(nodeVersion).toBe('24');
     expect(stepsByName['Run canonical web verification'].run).toBe(
       'npm run verify:web',
@@ -63,6 +65,13 @@ describe('CI workflow', () => {
     expect(packageJson.scripts['check:node-toolchain']).toBe(
       'node scripts/check-node-toolchain.mjs',
     );
+    expect(packageJson.scripts['check:contribution-policy']).toBe(
+      'node scripts/check-contribution-policy.mjs',
+    );
+    expect(verificationPlan.scopes.web[0]).toEqual({
+      phase: 'web.contribution-policy',
+      command: 'npm run check:contribution-policy',
+    });
     expect(packageJson.scripts.verify).toBe(
       'node scripts/ci-verify.mjs --scope all',
     );
