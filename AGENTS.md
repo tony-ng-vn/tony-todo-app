@@ -4,7 +4,9 @@
 
 Hard rule. Beats "keep PRs small". Beats a cloud-agent loop that says implement everything, then commit once.
 
-- One idea per commit. `git show` on that commit must make sense without the rest of the branch.
+A feature is a PR. A commit is one step. If a feature takes five steps across five components, that is five commits, not one. "GitHub deploys functions after CI" is a feature; the workflow file, the sync script, the tests, and the runbook are separate commits.
+
+- One step per commit: one test, one script, one workflow, one docs pass. `git show` on that commit must make sense without the rest of the branch.
 - Commit as you go, in this order when it applies: failing test, then the fix, then docs.
 - Never implement the whole PR and `git add` every changed file into a single commit before opening or updating the PR. That is a rule violation even if tests are green.
 - Run `npm test` before every commit (a narrower vitest path is fine when that is the whole change). The push gate is extra, not a substitute.
@@ -50,7 +52,7 @@ Several agents work this repo at once:
 - Review the branch yourself before marking it ready. Hosted reviewers are rate-limited; do not wait on them.
 - Merge with a merge commit, or enable auto-merge, when green; the head branch deletes itself.
 - `package-lock.json` changes are their own PRs, never bundled with feature work.
-- Keep PRs small and short-lived. A small PR is still many commits (see Commits).
+- Keep PRs small and short-lived. One feature is still one commit per step (see Commits).
 - Feature PRs add one `changelog.d/` fragment. Never edit `CHANGELOG.md` or a version field. Categories: Web App, Backend, Native App, CI & Tooling, Docs. Release compiles fragments with `npm run release:changelog -- <patch|minor|major>`.
 
 ## Native menu bar
