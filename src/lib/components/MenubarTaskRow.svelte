@@ -14,6 +14,7 @@
   import CalendarPicker from './CalendarPicker.svelte';
   import { iconCheck, iconDetails, iconPage, iconPause, iconPlay, iconX } from './icons.js';
   import MenubarLinkTitle from './MenubarLinkTitle.svelte';
+  import RichNoteTextarea from './RichNoteTextarea.svelte';
 
   export let todo;
   export let expanded = false;
@@ -363,13 +364,13 @@
 
       <label>
         <span>Note</span>
-        <textarea
-          class="menubar-note-input"
+        <RichNoteTextarea
+          variant="menubar"
           value={noteDraft}
           rows="3"
-          on:input={handleNoteTextareaInput}
-          on:keydown={(event) => handleTextareaKeydown(event, updateNoteDraft)}
-        ></textarea>
+          onInput={handleNoteTextareaInput}
+          onKeydown={(event) => handleTextareaKeydown(event, updateNoteDraft)}
+        />
       </label>
       {#if noteTodos.length}
         <div class="note-todo-list" aria-label="Note todos">
