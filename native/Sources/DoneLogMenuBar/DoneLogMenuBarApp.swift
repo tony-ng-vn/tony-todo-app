@@ -54,18 +54,22 @@ final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
     controller: MenuBarController,
     startedAt: Date,
     action: NativeAppLaunchPolicy.Action,
-    allowUnhosted: Bool = false
+    allowUnhosted: Bool = false,
+    hasOpenedFullApp: Bool = false
   ) {
     let elapsed = Date().timeIntervalSince(startedAt)
-    if NativeAppLaunchPolicy.shouldOpenFullAppNow(
+    let shouldOpenFullApp = NativeAppLaunchPolicy.shouldOpenFullAppNow(
       action: action,
       statusItemIsReady: controller.isReady,
-      allowUnhosted: allowUnhosted
+      allowUnhosted: allowUnhosted,
+      hasOpenedFullApp: hasOpenedFullApp
     ) || NativeAppLaunchPolicy.shouldOpenFullAppAfterTimeout(
       action: action,
       statusItemIsReady: controller.isReady,
-      elapsed: elapsed
-    ) {
+      elapsed: elapsed,
+      hasOpenedFullApp: hasOpenedFullApp
+    )
+    if shouldOpenFullApp {
       controller.showFullApp()
     }
 
@@ -96,7 +100,8 @@ final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
           controller: controller,
           startedAt: startedAt,
           action: action,
-          allowUnhosted: allowUnhosted
+          allowUnhosted: allowUnhosted,
+          hasOpenedFullApp: hasOpenedFullApp || shouldOpenFullApp
         )
       }
     }

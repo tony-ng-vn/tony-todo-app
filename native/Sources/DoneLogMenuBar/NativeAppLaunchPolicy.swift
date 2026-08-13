@@ -55,17 +55,22 @@ enum NativeAppLaunchPolicy {
   static func shouldOpenFullAppNow(
     action: Action,
     statusItemIsReady: Bool,
-    allowUnhosted: Bool = false
+    allowUnhosted: Bool = false,
+    hasOpenedFullApp: Bool = false
   ) -> Bool {
-    action == .openFullApp && (statusItemIsReady || allowUnhosted)
+    !hasOpenedFullApp
+      && action == .openFullApp
+      && (statusItemIsReady || allowUnhosted)
   }
 
   static func shouldOpenFullAppAfterTimeout(
     action: Action,
     statusItemIsReady: Bool,
-    elapsed: TimeInterval
+    elapsed: TimeInterval,
+    hasOpenedFullApp: Bool = false
   ) -> Bool {
-    action == .openFullApp
+    !hasOpenedFullApp
+      && action == .openFullApp
       && !statusItemIsReady
       && elapsed >= statusItemHostTimeout
   }
