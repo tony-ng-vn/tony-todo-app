@@ -4,6 +4,7 @@
   import FlowRail from '../lib/components/FlowRail.svelte';
   import LottieAnimation from '../lib/components/LottieAnimation.svelte';
   import AuthGate from '../lib/components/AuthGate.svelte';
+  import AgendaPanel from '../lib/components/AgendaPanel.svelte';
   import BoardPanel from '../lib/components/BoardPanel.svelte';
   import CalendarPanel from '../lib/components/CalendarPanel.svelte';
   import InboxPanel from '../lib/components/InboxPanel.svelte';
@@ -33,6 +34,7 @@
     getBoardColumns,
     getCalendarMonth,
     getDaySummary,
+    getDueDateGroups,
     getElapsedSeconds,
     getMillisecondsUntilNextDay,
     getOpenTodoSections,
@@ -161,6 +163,10 @@
   $: openTodos = pendingTodoGroups.scheduled;
   $: openTodoSections = getOpenTodoSections(openTodos, new Date(`${currentDayKey}T00:00:00`));
   $: openCount = openTodos.length;
+  $: agendaGroups = getDueDateGroups(
+    pendingViewTodos,
+    new Date(`${currentDayKey}T00:00:00`),
+  );
   $: summary = getDaySummary(state, selectedDay);
   $: boardColumns = getBoardColumns(state, { dayKey: selectedDay, dueFilter: boardDueFilter });
   $: calendarMonthData = getCalendarMonth(state, { year: calendarYear, month: calendarMonth });
@@ -1299,10 +1305,24 @@
 <main
   class="workspace"
   class:has-detail={selectedTask}
-  class:is-board-view={viewMode === 'board' || viewMode === 'calendar' || viewMode === 'inbox' || viewMode === 'waiting' || viewMode === 'history' || viewMode === 'meetings' || viewMode === 'settings'}
+  class:is-board-view={viewMode === 'agenda' || viewMode === 'board' || viewMode === 'calendar' || viewMode === 'inbox' || viewMode === 'waiting' || viewMode === 'history' || viewMode === 'meetings' || viewMode === 'settings'}
   aria-label="Done Log todo app"
 >
-  {#if viewMode === 'board'}
+  {#if viewMode === 'agenda'}
+    <AgendaPanel
+      {syncMessage}
+      groups={agendaGroups}
+      {themeMode}
+      inboxCount={inboxLoops.length}
+      waitingCount={waitingLoops.length}
+      showSignOut={useRemote && Boolean(authUser)}
+      onSignOut={handleSignOut}
+      onComplete={handleComplete}
+      onOpenTask={openTask}
+      onToggleTheme={toggleThemeMode}
+      onViewChange={setViewMode}
+    />
+  {:else if viewMode === 'board'}
     <BoardPanel
       {syncMessage}
       columns={boardColumns}

@@ -12,6 +12,7 @@ describe('view modes', () => {
   });
 
   it('keeps a known view mode unchanged', () => {
+    expect(normalizeViewMode('agenda')).toBe('agenda');
     expect(normalizeViewMode('board')).toBe('board');
     expect(normalizeViewMode('settings')).toBe('settings');
   });

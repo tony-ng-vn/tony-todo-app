@@ -20,7 +20,9 @@ Earlier in this project's history, Gmail/Calendar integration was described as b
    - Scopes: add the ones actually needed --
      - `https://www.googleapis.com/auth/gmail.readonly` (read email for extraction)
      - `https://www.googleapis.com/auth/gmail.compose` (create drafts only -- **do not** add `gmail.send`; the app should never send mail directly per the PRD's autonomy model)
-     - `https://www.googleapis.com/auth/calendar.readonly` (read meeting context)
+     - `https://www.googleapis.com/auth/calendar.readonly` (read all your calendars: meetings and free/busy, for the proactive/agenda features and to render events on the Calendar tab)
+     - `https://www.googleapis.com/auth/calendar.app.created` (create and manage a dedicated "Todo App" calendar and its time-block events, and nothing else -- this is the least-privilege write scope; it only touches calendars the app itself creates, so app-created time blocks never mix with your real calendars at the permission level)
+   - Note on the dedicated calendar: the app creates its own secondary Google calendar named "Todo App" the first time you book a time block, using `calendar.app.created`. You do not create this calendar by hand. Do **not** add the broad `https://www.googleapis.com/auth/calendar` scope -- it is not needed and grants far more than this app should have.
    - **Publishing status: leave as "Testing."** Do not click "Publish App."
    - **Test users:** add your own Google account's email address here. Only accounts on this list can complete the OAuth flow while in Testing status.
 

@@ -16,6 +16,7 @@ import {
   getCalendarMonth,
   getCompletedTodoSections,
   getDaySummary,
+  getDueDateGroups,
   getMillisecondsUntilNextDay,
   getPendingTodos,
   getProgressSessions,
@@ -1453,6 +1454,80 @@ describe('board view columns', () => {
 });
 
 describe('task due dates', () => {
+  it('builds an urgency-first agenda while keeping task states inside their due date', () => {
+    const now = new Date(2026, 5, 17, 12, 0, 0);
+    const state = createInitialState([
+      {
+        id: 'overdue-ready',
+        title: 'Overdue ready',
+        createdAt: new Date(2026, 5, 15, 8, 0, 0).toISOString(),
+        completedAt: null,
+        dueDate: new Date(2026, 5, 16).toISOString(),
+      },
+      {
+        id: 'today-ready',
+        title: 'Today ready',
+        createdAt: new Date(2026, 5, 17, 8, 0, 0).toISOString(),
+        completedAt: null,
+        dueDate: new Date(2026, 5, 17).toISOString(),
+      },
+      {
+        id: 'today-running',
+        title: 'Today running',
+        createdAt: new Date(2026, 5, 17, 7, 0, 0).toISOString(),
+        completedAt: null,
+        dueDate: new Date(2026, 5, 17).toISOString(),
+        firstStartedAt: new Date(2026, 5, 17, 9, 0, 0).toISOString(),
+        activeStartedAt: new Date(2026, 5, 17, 9, 0, 0).toISOString(),
+      },
+      {
+        id: 'today-paused',
+        title: 'Today paused',
+        createdAt: new Date(2026, 5, 17, 9, 0, 0).toISOString(),
+        completedAt: null,
+        dueDate: new Date(2026, 5, 17).toISOString(),
+        firstStartedAt: new Date(2026, 5, 17, 9, 30, 0).toISOString(),
+        activeStartedAt: null,
+      },
+      {
+        id: 'tomorrow-ready',
+        title: 'Tomorrow ready',
+        createdAt: new Date(2026, 5, 17, 10, 0, 0).toISOString(),
+        completedAt: null,
+        dueDate: new Date(2026, 5, 18).toISOString(),
+      },
+      {
+        id: 'undated',
+        title: 'Undated',
+        createdAt: 'not-a-date',
+        completedAt: null,
+        dueDate: null,
+      },
+      {
+        id: 'finished',
+        title: 'Finished',
+        createdAt: new Date(2026, 5, 17, 11, 0, 0).toISOString(),
+        completedAt: new Date(2026, 5, 17, 11, 30, 0).toISOString(),
+        dueDate: new Date(2026, 5, 17).toISOString(),
+      },
+    ]);
+
+    const groups = getDueDateGroups(state.todos, now);
+
+    expect(groups.map(({ id, relation }) => ({ id, relation }))).toEqual([
+      { id: '2026-06-16', relation: 'overdue' },
+      { id: '2026-06-17', relation: 'today' },
+      { id: '2026-06-18', relation: 'tomorrow' },
+      { id: 'undated', relation: 'unscheduled' },
+    ]);
+    expect(groups[1].items.map(({ id, status }) => ({ id, status }))).toEqual([
+      { id: 'today-running', status: 'running' },
+      { id: 'today-paused', status: 'paused' },
+      { id: 'today-ready', status: 'ready' },
+    ]);
+    expect(groups.flatMap((group) => group.items).some((todo) => todo.id === 'finished')).toBe(false);
+  });
+
   it('assigns a new todo to its creation date when no date is chosen', () => {
     let state = createInitialState();
     state = addTodo(state, 'No deadline', new Date('2026-06-08T08:00:00'));
