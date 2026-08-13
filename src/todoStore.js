@@ -549,55 +549,6 @@ export function getOpenTodoSections(todos, currentDate = new Date()) {
     });
 }
 
-export function getDueDateGroups(todos, currentDate = new Date()) {
-  const currentDayKey = formatDayKey(currentDate);
-  const currentDayOrdinal = dayKeyOrdinal(currentDayKey);
-  const groupsByDate = new Map();
-
-  for (const todo of todos) {
-    if (todo.completedAt || todo.isProgressSession) {
-      continue;
-    }
-
-    const dayKey = getTodoAssignedDayKey(todo);
-    const groupId = dayKey ?? 'undated';
-    if (!groupsByDate.has(groupId)) {
-      const daysFromToday = dayKey ? dayKeyOrdinal(dayKey) - currentDayOrdinal : null;
-      groupsByDate.set(groupId, {
-        id: groupId,
-        dateKey: dayKey,
-        daysFromToday,
-        relation:
-          daysFromToday === null
-            ? 'unscheduled'
-            : daysFromToday < 0
-              ? 'overdue'
-              : daysFromToday === 0
-                ? 'today'
-                : daysFromToday === 1
-                  ? 'tomorrow'
-                  : 'upcoming',
-        items: [],
-      });
-    }
-
-    const columnId = getBoardColumnId(todo);
-    groupsByDate.get(groupId).items.push({
-      ...todo,
-      status:
-        columnId === 'in_progress' ? 'running' : columnId === 'paused' ? 'paused' : 'ready',
-    });
-  }
-
-  return [...groupsByDate.values()]
-    .map((group) => ({ ...group, items: group.items.toSorted(compareAgendaTodos) }))
-    .toSorted((first, second) => {
-      if (!first.dateKey) return 1;
-      if (!second.dateKey) return -1;
-      return first.dateKey.localeCompare(second.dateKey);
-    });
-}
-
 export function getCompletedTodoSections(state, currentDate = new Date()) {
   const currentDayKey = formatDayKey(currentDate);
   const sectionsByDate = new Map();
@@ -939,17 +890,6 @@ export function getElapsedSeconds(todo, now = new Date()) {
   const nowTime = now.getTime();
   const elapsed = Math.floor((nowTime - startedAt) / 1000);
   return baseSeconds + Math.max(0, elapsed);
-}
-
-function compareAgendaTodos(first, second) {
-  const statusOrder = { running: 0, paused: 1, ready: 2 };
-  const statusDifference = statusOrder[first.status] - statusOrder[second.status];
-  return statusDifference || compareTodosNewestFirst(first, second);
-}
-
-function dayKeyOrdinal(dayKey) {
-  const [year, month, day] = dayKey.split('-').map(Number);
-  return Math.round(Date.UTC(year, month - 1, day) / (24 * 60 * 60 * 1000));
 }
 
 function getTodoAssignedDayKey(todo) {
