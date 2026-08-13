@@ -661,6 +661,28 @@ h2 {
   -webkit-backdrop-filter: blur(24px) saturate(1.12);
 }
 
+.inbox-panel,
+.waiting-panel,
+.history-panel,
+.meetings-panel,
+.settings-panel {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.inbox-panel .loop-list,
+.waiting-panel .loop-list,
+.history-panel .loop-list,
+.meetings-panel .meeting-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
 .board-header {
   display: flex;
   align-items: flex-start;
@@ -2586,8 +2608,22 @@ h2 {
 
   .todo-list,
   .summary-list,
-  .board-columns {
+  .board-columns,
+  .inbox-panel .loop-list,
+  .waiting-panel .loop-list,
+  .history-panel .loop-list,
+  .meetings-panel .meeting-list {
     flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .inbox-panel,
+  .waiting-panel,
+  .history-panel,
+  .meetings-panel,
+  .settings-panel {
+    height: auto;
+    min-height: auto;
     overflow: visible;
   }
 
