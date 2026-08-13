@@ -32,6 +32,19 @@ These live outside the INSFORGE block on purpose: a skill sync rewrites that blo
 
 Agents have permission to open PRs, watch CI, fix review comments, and merge when required checks are green and comments are addressed. Do not wait for a second ask.
 
+## Working in parallel
+
+Several agents work this repo concurrently; these rules keep them from colliding.
+
+- Before starting a task, check open PRs' changed paths (`gh pr list` plus `gh pr diff --name-only <n>`) and prefer work that does not overlap an in-flight PR.
+- Open your PR as a draft as soon as the branch exists, before the implementation is done.
+  A draft PR is the visible claim on the files you are touching.
+- Run a code-review pass over the branch before marking the PR ready (in Claude Code use `/code-review`; elsewhere an equivalent reviewer pass), and address what it finds.
+  The hosted reviewers (CodeRabbit, Copilot) are rate limited and must not be relied on.
+- When checks are green and comments addressed, merge, or enable auto-merge (merge commit) and move on; the head branch deletes itself on merge.
+- Dependency changes (`package-lock.json`) go in their own small PRs, never bundled with feature work.
+- Keep PRs small and short-lived; a long-lived branch in this repo will need repeated merges from main because required checks are strict.
+
 ## Native menu bar
 
 - Local `npm run menubar` / `menubar:dev` from a worktree must use the `dev` instance lock and `com.tonynguyen.donelog.dev`. Never share the production lock or `doneLogQuit` notification, or a test run will steal or quit `/Applications/Done Log.app`.
