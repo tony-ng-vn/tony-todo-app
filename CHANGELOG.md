@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.11.2
+
+2026-08-13
+
+**Native App**
+
+- Opening a task quick note no longer opens the full Done Log window at the same time.
+
+---
+
 ## v0.11.1
 
 2026-08-13
