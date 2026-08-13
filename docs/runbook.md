@@ -22,6 +22,8 @@ Migrations and `insforge.toml` config apply stay manual.
 - The deploy preflight blocks unexpected live endpoints before writes.
   `claim-preauth-todos` and `extract-video-knowledge` are temporary exceptions owned by unmerged feature branches; this workflow must not alter them.
 - One-time: add GitHub repository secret `INSFORGE_API_KEY` from the linked Todo App project.
+- One-time: add GitHub repository secret `INSFORGE_MARKER_TOKEN` from a fine-grained token limited to repository contents write access.
+  The workflow exposes it only to the final deployment-marker update after live source verification.
 - One-time: initialize `insforge-functions-deployed` to the last main commit whose repo-managed function source already matches production.
   Do not move this tag by hand after initialization.
 - Migrations always land in the repo before or together with being applied to the live database.
