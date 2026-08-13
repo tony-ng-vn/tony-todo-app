@@ -5,6 +5,9 @@ import { parse } from 'yaml';
 const workflow = parse(
   readFileSync(new URL('../.github/workflows/ci.yml', import.meta.url), 'utf8'),
 );
+const functionsWorkflow = parse(
+  readFileSync(new URL('../.github/workflows/insforge-functions.yml', import.meta.url), 'utf8'),
+);
 const dependencyWorkflow = parse(
   readFileSync(new URL('../.github/workflows/dependency-health.yml', import.meta.url), 'utf8'),
 );
@@ -103,6 +106,9 @@ describe('CI workflow', () => {
     expect(packageJson.scripts['verify:push:web']).toBe(
       'node scripts/ci-verify.mjs --scope web --mode push',
     );
+    expect(packageJson.scripts['sync:insforge-functions']).toBe(
+      'node scripts/insforge-functions-sync.mjs',
+    );
     expect(prePushHook).toContain('npm run verify:push');
     expect(prePushHook).toContain('npm run verify:push:web');
     expect(prePushHook).toContain('SKIP_VERIFY');
@@ -199,8 +205,9 @@ describe('CI workflow', () => {
   it('limits permissions and pins actions to immutable revisions', () => {
     expect(workflow.permissions.contents).toBe('read');
     expect(dependencyWorkflow.permissions.contents).toBe('read');
+    expect(functionsWorkflow.permissions.contents).toBe('read');
 
-    const actionReferences = [workflow, dependencyWorkflow].flatMap(
+    const actionReferences = [workflow, dependencyWorkflow, functionsWorkflow].flatMap(
       (currentWorkflow) =>
         Object.values(currentWorkflow.jobs).flatMap((job) =>
           job.steps.map((step) => step.uses).filter(Boolean),
@@ -221,5 +228,32 @@ describe('CI workflow', () => {
       expect(upload.with.path).toBe('.ci-learning/latest-failure.json');
       expect(upload.with['retention-days']).toBe(30);
     }
+  });
+
+  it('deploys InsForge functions from GitHub after CI is green on main', () => {
+    expect(functionsWorkflow.on.workflow_run.workflows).toEqual(['CI']);
+    expect(functionsWorkflow.on.workflow_run.types).toEqual(['completed']);
+    expect(functionsWorkflow.on).toHaveProperty('workflow_dispatch');
+    expect(functionsWorkflow.on.pull_request).toBeUndefined();
+    expect(functionsWorkflow.concurrency['cancel-in-progress']).toBe(false);
+
+    const deploy = functionsWorkflow.jobs.deploy;
+    expect(deploy.name).toBe('Deploy InsForge functions');
+    expect(deploy.if).toContain("github.event.workflow_run.conclusion == 'success'");
+    expect(deploy.if).toContain("github.event.workflow_run.head_branch == 'main'");
+    expect(deploy.env.INSFORGE_PROJECT_ID).toBe('7e77e15d-9e4d-4591-9951-8b99289200cd');
+
+    const stepsByName = Object.fromEntries(deploy.steps.map((step) => [step.name, step]));
+    expect(stepsByName['Check out repository'].with.ref).toContain('workflow_run.head_sha');
+    expect(stepsByName['Deploy changed functions and verify live source'].run).toContain(
+      'login --user-api-key',
+    );
+    expect(stepsByName['Deploy changed functions and verify live source'].run).toContain(
+      'sync:insforge-functions',
+    );
+    expect(stepsByName['Deploy changed functions and verify live source'].run).toContain('--check');
+    expect(stepsByName['Deploy changed functions and verify live source'].env).toEqual({
+      INSFORGE_USER_API_KEY: '${{ secrets.INSFORGE_USER_API_KEY }}',
+    });
   });
 });
