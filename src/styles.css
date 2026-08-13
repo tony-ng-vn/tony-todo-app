@@ -1250,7 +1250,7 @@ h2 {
   background: var(--board-paused-surface);
 }
 
-.board-column[data-column='someday'] {
+.board-column[data-column='stall'] {
   background: var(--board-someday-surface);
 }
 
@@ -1296,7 +1296,7 @@ h2 {
   background: var(--board-paused);
 }
 
-.board-status-pill[data-status='someday'] {
+.board-status-pill[data-status='stall'] {
   background: var(--board-someday);
   color: #f8f5f0;
 }
@@ -1331,7 +1331,7 @@ h2 {
   color: var(--board-paused);
 }
 
-.board-column-count[data-status='someday'] {
+.board-column-count[data-status='stall'] {
   color: var(--board-someday);
 }
 
@@ -1521,7 +1521,7 @@ h2 {
   color: var(--board-paused);
 }
 
-.board-new-task[data-status='someday'] {
+.board-new-task[data-status='stall'] {
   border-color: var(--board-someday-soft);
   color: var(--board-someday);
 }
@@ -1617,6 +1617,42 @@ h2 {
 
 .new-task-form {
   margin: clamp(28px, 5vw, 52px) 0 26px;
+}
+
+.composer-kind {
+  display: flex;
+  gap: 6px;
+  width: fit-content;
+  margin-top: 10px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--empty-surface);
+}
+
+.composer-kind label {
+  display: flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: var(--subtle);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.composer-kind label.is-active {
+  background: var(--field-surface);
+  color: var(--strong);
+}
+
+.composer-kind input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
 }
 
 .new-task-form label,

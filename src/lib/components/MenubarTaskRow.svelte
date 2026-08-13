@@ -281,7 +281,7 @@
         <span class="menubar-task-title-row">
           <MenubarLinkTitle url={taskUrl} fallbackTitle={shortenLinksText(todo.title)} />
           {#if isPaused}<span class="menubar-paused-badge">Paused</span>{/if}
-          {#if isSomeday}<span class="menubar-someday-badge">Someday</span>{/if}
+          {#if isSomeday}<span class="menubar-someday-badge">Stall</span>{/if}
         </span>
         {@render taskMetadata()}
       </div>
@@ -295,7 +295,7 @@
         <span class="menubar-task-title-row">
           <span class="menubar-task-title">{shortenLinksText(todo.title)}</span>
           {#if isPaused}<span class="menubar-paused-badge">Paused</span>{/if}
-          {#if isSomeday}<span class="menubar-someday-badge">Someday</span>{/if}
+          {#if isSomeday}<span class="menubar-someday-badge">Stall</span>{/if}
         </span>
         {@render taskMetadata()}
       </button>
@@ -430,11 +430,11 @@
       {#if !isCompleted}
         <div class="menubar-someday-state">
           <span>
-            <strong>{isSomeday ? 'Someday' : 'Active task'}</strong>
+            <strong>{isSomeday ? 'Stall' : 'Active task'}</strong>
             <small>{isSomeday ? 'Paused with no return date.' : 'Keep this for a possible future return.'}</small>
           </span>
           <button type="button" on:click={() => onSomedayChange(todo.id, !isSomeday)}>
-            {isSomeday ? 'Return to active' : 'Move to Someday'}
+            {isSomeday ? 'Return to active' : 'Move to Stall'}
           </button>
         </div>
       {/if}

@@ -125,7 +125,7 @@ function getBoardColumnId(todo) {
   }
 
   if (todo.somedayAt) {
-    return 'someday';
+    return 'stall';
   }
 
   if (todo.activeStartedAt) {
