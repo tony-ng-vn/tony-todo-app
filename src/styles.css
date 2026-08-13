@@ -2785,3 +2785,64 @@ h2 {
     animation: reduced-fade var(--motion-hover) ease;
   }
 }
+
+html.is-native-host,
+html.is-native-host body {
+  background: var(--canvas);
+}
+
+html.is-native-host body::before {
+  opacity: 0.45;
+}
+
+html.is-native-host .workspace,
+html.is-native-host .workspace.has-detail,
+html.is-native-host .workspace.is-board-view,
+html.is-native-host .workspace.is-board-view.has-detail {
+  width: 100%;
+  height: 100dvh;
+  margin: 0;
+  padding: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+html.is-native-host .task-panel,
+html.is-native-host .summary-panel,
+html.is-native-host .flow-rail,
+html.is-native-host .task-detail {
+  border-radius: 0;
+  box-shadow: none;
+}
+
+html.is-native-host .task-panel {
+  border-width: 0 1px 0 0;
+  padding-top: 10px;
+}
+
+html.is-native-host .brand-row {
+  min-height: 44px;
+  padding-inline-start: 62px;
+  align-items: center;
+}
+
+html.is-native-host .flow-rail {
+  border: 0;
+  padding-top: 10px;
+}
+
+html.is-native-host .summary-panel,
+html.is-native-host .workspace.has-detail .task-detail {
+  border-width: 0 0 0 1px;
+  border-radius: 0;
+  padding-top: 10px;
+}
+
+html.is-native-host .summary-top,
+html.is-native-host .detail-header {
+  min-height: 44px;
+  align-items: center;
+}

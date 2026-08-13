@@ -6,6 +6,7 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
   private let homeURL: URL
   private let readySelector: String?
   private let initialSize: NSSize
+  private let usesWindowChrome: Bool
   private var webView: WKWebView!
   private var didCompleteInitialLoad = false
   private var isValidatingInitialLoad = false
@@ -19,11 +20,13 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
   init(
     homeURL: URL,
     preferredSize: NSSize = MenuBarConfiguration.popoverSize,
-    readySelector: String? = ".menubar-shell"
+    readySelector: String? = ".menubar-shell",
+    usesWindowChrome: Bool = false
   ) {
     self.homeURL = homeURL
     self.readySelector = readySelector
     initialSize = preferredSize
+    self.usesWindowChrome = usesWindowChrome
     super.init(nibName: nil, bundle: nil)
   }
 
@@ -36,7 +39,7 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     let configuration = WKWebViewConfiguration()
     configuration.websiteDataStore = .default()
     let nativeHostScript = WKUserScript(
-      source: "window.__doneLogNativeHost = true;",
+      source: Self.nativeHostScriptSource(usesWindowChrome: usesWindowChrome),
       injectionTime: .atDocumentStart,
       forMainFrameOnly: true
     )
@@ -49,7 +52,21 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     webView.navigationDelegate = self
     webView.uiDelegate = self
     webView.allowsMagnification = false
-    view = webView
+    webView.underPageBackgroundColor = .clear
+
+    if usesWindowChrome {
+      let effectView = NSVisualEffectView(frame: NSRect(origin: .zero, size: initialSize))
+      effectView.material = .underWindowBackground
+      effectView.blendingMode = .behindWindow
+      effectView.state = .followsWindowActiveState
+      webView.frame = effectView.bounds
+      webView.autoresizingMask = [.width, .height]
+      effectView.addSubview(webView)
+      view = effectView
+    } else {
+      view = webView
+    }
+
     webView.load(MenuBarConfiguration.makeHomeRequest(for: homeURL))
   }
 
@@ -185,6 +202,17 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
         with: .failure(MenuBarLoadError.expectedShellMissing)
       )
     }
+  }
+
+  private static func nativeHostScriptSource(usesWindowChrome: Bool) -> String {
+    let chromeFlag = usesWindowChrome ? "true" : "false"
+    return """
+    window.__doneLogNativeHost = true;
+    window.__doneLogNativeChrome = \(chromeFlag);
+    if (\(chromeFlag)) {
+      document.documentElement.classList.add('is-native-host');
+    }
+    """
   }
 }
 

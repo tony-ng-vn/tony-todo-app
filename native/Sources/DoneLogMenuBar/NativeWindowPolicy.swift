@@ -6,7 +6,18 @@ enum NativeWindowPolicy {
     .closable,
     .miniaturizable,
     .resizable,
+    .fullSizeContentView,
   ]
+
+  @MainActor
+  static func applyChrome(to window: NSWindow) {
+    window.titleVisibility = .hidden
+    window.titlebarAppearsTransparent = true
+    window.titlebarSeparatorStyle = .none
+    window.isOpaque = false
+    window.backgroundColor = .clear
+    window.isMovableByWindowBackground = true
+  }
 
   static func standardFrame(
     defaultFrame: NSRect,
