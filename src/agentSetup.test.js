@@ -44,18 +44,16 @@ describe('normalizeAgentKeyName', () => {
 });
 
 describe('buildAgentSetupPrompt', () => {
-  it('copies a ready-to-paste HTTP setup without ownerUserId', () => {
+  it('copies a ready-to-paste HTTP setup that starts with describe', () => {
     const token = createAgentToken(() => new Uint8Array(32).fill(10));
     const prompt = buildAgentSetupPrompt({ token });
 
     expect(prompt).toContain(`POST ${AGENT_TODOS_URL}`);
     expect(prompt).toContain(`Authorization: Bearer ${token}`);
-    expect(prompt).toContain('{"command":"list"}');
-    expect(prompt).toContain('{"command":"create","title":"..."}');
-    expect(prompt).toContain('{"command":"complete","id":"..."}');
-    expect(prompt).toContain('{"command":"appendNote","id":"...","text":"..."}');
-    expect(prompt).toContain('{"command":"daySummary"}');
-    expect(prompt).toContain('notes[]');
+    expect(prompt).toContain('{"command":"describe"}');
+    expect(prompt).toContain('If a command fails as unknown, call describe again.');
+    expect(prompt).not.toContain('{"command":"list"}');
+    expect(prompt).not.toContain('{"command":"create","title":"..."}');
     expect(prompt).not.toMatch(/"ownerUserId"/);
     expect(prompt).not.toContain('INGEST_FUNCTION_TOKEN');
   });

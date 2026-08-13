@@ -1,5 +1,21 @@
 # Changelog
 
+## v0.11.0
+
+2026-08-13
+
+**Backend**
+
+- The agent HTTP API now has a `describe` command that returns the live command list, timezone, and `apiVersion`.
+- Unknown commands return that catalog instead of a dead error, so a stale paste can recover on the next call.
+- Successful responses include `apiVersion`, so a long-running session can notice when the catalog changed and call `describe` again.
+
+**Web App**
+
+- Copied agent setup no longer lists every command. It tells the tool to call `describe` first, so new features show up without recopying setup.
+
+---
+
 ## v0.10.0
 
 2026-08-13

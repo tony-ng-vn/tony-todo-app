@@ -1,9 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AGENT_API_VERSION,
+  AGENT_COMMANDS,
   applyTodoNote,
+  commandNeedsTodos,
   createInitialState,
   createTodoId,
   dateAtSanFranciscoTime,
+  describeCatalog,
   formatNoteAtLocal,
   formatSummaryDayKey,
   parseNoteEntries,
@@ -33,7 +37,11 @@ function openTodo(overrides = {}) {
 }
 
 describe('parseTodoCommand', () => {
-  it('parses list, create, complete, daySummary, and appendNote', () => {
+  it('parses describe, list, create, complete, daySummary, and appendNote', () => {
+    expect(parseTodoCommand({ command: 'describe' })).toEqual({
+      ok: true,
+      command: { kind: 'describe' },
+    });
     expect(parseTodoCommand({ command: 'list' })).toEqual({
       ok: true,
       command: { kind: 'list' },
@@ -63,7 +71,34 @@ describe('parseTodoCommand', () => {
     expect(parseTodoCommand({ command: 'complete', id: 'task-1', title: 'Call Sam' }).ok).toBe(false);
     expect(parseTodoCommand({ command: 'complete' }).ok).toBe(false);
     expect(parseTodoCommand({ command: 'appendNote', id: 'task-1' }).ok).toBe(false);
-    expect(parseTodoCommand({ command: 'start' }).ok).toBe(false);
+  });
+
+  it('returns the live catalog for an unknown command', () => {
+    const parsed = parseTodoCommand({ command: 'start' });
+
+    expect(parsed.ok).toBe(false);
+    expect(parsed.error.code).toBe('unknown_command');
+    expect(parsed.catalog).toEqual(describeCatalog());
+    expect(parsed.catalog.commands.map((entry) => entry.command)).toEqual(
+      AGENT_COMMANDS.map((entry) => entry.command),
+    );
+  });
+
+  it('keeps the catalog aligned with the parser', () => {
+    expect(AGENT_COMMANDS.map((entry) => entry.command)).toEqual([
+      'describe',
+      'list',
+      'create',
+      'complete',
+      'appendNote',
+      'daySummary',
+    ]);
+
+    for (const entry of AGENT_COMMANDS) {
+      const parsed = parseTodoCommand(entry.bodies[0]);
+      expect(parsed.ok).toBe(true);
+      expect(parsed.command.kind).toBe(entry.command);
+    }
   });
 });
 
@@ -272,6 +307,8 @@ describe('runTodoCommand list and daySummary', () => {
     const result = runTodoCommand(state, { kind: 'list' }, UTC_EVENING);
 
     expect(result.persist).toEqual({ kind: 'none' });
+    expect(result.view.kind).toBe('list');
+    expect(result.view.apiVersion).toBe(AGENT_API_VERSION);
     expect(result.view.now).toBe(UTC_EVENING.toISOString());
     expect(result.view.nowLocal).toBe(formatNoteAtLocal(UTC_EVENING));
     expect(result.view.tasks.map((task) => task.id)).toEqual(['ready', 'running', 'progressive']);
@@ -368,5 +405,19 @@ describe('runTodoCommand daySummary', () => {
       'Night',
     ]);
     expect(result.view.sections.flatMap((section) => section.items).map((item) => item.id)).toEqual(['done']);
+  });
+});
+
+describe('runTodoCommand describe', () => {
+  it('returns the live catalog without touching todos', () => {
+    const result = runTodoCommand(createInitialState([openTodo()]), { kind: 'describe' }, UTC_EVENING);
+
+    expect(result.ok).toBe(true);
+    expect(result.persist).toEqual({ kind: 'none' });
+    expect(commandNeedsTodos({ kind: 'describe' })).toBe(false);
+    expect(commandNeedsTodos({ kind: 'list' })).toBe(true);
+    expect(result.view).toEqual(describeCatalog());
+    expect(result.view.apiVersion).toBe(AGENT_API_VERSION);
+    expect(result.view.timeZone).toBe('America/Los_Angeles');
   });
 });

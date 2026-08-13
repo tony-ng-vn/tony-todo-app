@@ -43,17 +43,8 @@ export function buildAgentSetupPrompt({ token, url = AGENT_TODOS_URL } = {}) {
     '',
     'The key is already tied to my account. Do not send ownerUserId.',
     '',
-    'Commands (JSON body):',
-    '{"command":"list"}',
-    '{"command":"create","title":"..."}',
-    '{"command":"complete","id":"..."}',
-    '{"command":"complete","title":"..."}',
-    '{"command":"appendNote","id":"...","text":"..."}',
-    '{"command":"daySummary"}',
-    '{"command":"daySummary","day":"YYYY-MM-DD"}',
-    '',
-    'list returns now, nowLocal, and each task notes[] with at, atLocal, and text.',
-    'Blank lines start a new dated note. Times are America/Los_Angeles.',
+    'Start with {"command":"describe"} to get the current commands.',
+    'If a command fails as unknown, call describe again.',
   ].join('\n');
 }
 
