@@ -47,6 +47,7 @@ import {
   updateTodoTitle,
   updateTodoNote,
   resetNoteBurstBaselines,
+  hasNoteBurstBaseline,
 } from './todoStore.js';
 import { formatNoteAtLocal } from './todoCommands.js';
 import { parseNoteEntries } from './noteEntries.js';
@@ -1299,6 +1300,33 @@ describe('note editing bursts', () => {
       { at: laterStamp.toISOString(), text: '- Walk the dog' },
       { at: first.toISOString(), text: '- Buy milk' },
     ]);
+  });
+
+  it('does not track a baseline for a todo id that does not exist in state', () => {
+    const state = createInitialState();
+
+    const result = updateTodoNote(state, 'missing-id', 'draft', new Date('2026-07-01T10:00:00.000Z'));
+
+    expect(result).toBe(state);
+    expect(hasNoteBurstBaseline('missing-id')).toBe(false);
+  });
+
+  it('prunes a stale baseline entry after a later call updates a different todo', () => {
+    const t0 = new Date('2026-07-01T10:00:00.000Z');
+    let state = createInitialState();
+    state = addTodo(state, 'First plan', t0);
+    const firstId = state.todos[0].id;
+    state = updateTodoNote(state, firstId, '- first', t0);
+
+    expect(hasNoteBurstBaseline(firstId)).toBe(true);
+
+    state = addTodo(state, 'Second plan', t0);
+    const secondId = state.todos[1].id;
+    const laterCall = new Date(t0.getTime() + NOTE_BURST_GAP_MS);
+    state = updateTodoNote(state, secondId, '- second', laterCall);
+
+    expect(hasNoteBurstBaseline(firstId)).toBe(false);
+    expect(hasNoteBurstBaseline(secondId)).toBe(true);
   });
 });
 
