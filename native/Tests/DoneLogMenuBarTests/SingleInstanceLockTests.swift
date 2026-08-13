@@ -39,4 +39,44 @@ struct SingleInstanceLockTests {
         == nil
     )
   }
+
+  @Test("Keeps local worktree instances off the production lock")
+  func isolatesDevelopmentLockFromProduction() {
+    let productionLock = MenuBarLaunchPolicy.lockURL(environment: [:])
+    let developmentLock = MenuBarLaunchPolicy.lockURL(
+      environment: [
+        "DONE_LOG_INSTANCE": "dev",
+        "DONE_LOG_INSTANCE_ID": "worktreeabc",
+      ]
+    )
+
+    #expect(productionLock == SingleInstanceLock.defaultURL)
+    #expect(developmentLock.lastPathComponent ==
+      "com.tonynguyen.done-log-menubar.dev.worktreeabc.lock")
+    #expect(productionLock != developmentLock)
+  }
+
+  @Test("Local worktree launches do not wake the installed app")
+  func developmentContentionDoesNotNotifyProduction() {
+    #expect(
+      MenuBarLaunchPolicy.lockContentionNotification(environment: [:])
+        == .doneLogShowFullApp
+    )
+    #expect(
+      MenuBarLaunchPolicy.lockContentionNotification(
+        environment: [
+          "DONE_LOG_INSTANCE": "dev",
+          "DONE_LOG_INSTANCE_ID": "worktreeabc",
+        ]
+      ) != .doneLogShowFullApp
+    )
+    #expect(
+      MenuBarLaunchPolicy.quitNotification(
+        environment: [
+          "DONE_LOG_INSTANCE": "dev",
+          "DONE_LOG_INSTANCE_ID": "worktreeabc",
+        ]
+      ) != .doneLogQuit
+    )
+  }
 }
