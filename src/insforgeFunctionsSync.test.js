@@ -86,6 +86,14 @@ describe('parseLiveFunctionSlugs', () => {
       ),
     ).toEqual(['agent-todos', 'draft-follow-up']);
   });
+
+  it('accepts the CLI top-level array response', () => {
+    expect(
+      parseLiveFunctionSlugs(
+        JSON.stringify([{ slug: 'draft-follow-up' }, { slug: 'agent-todos' }]),
+      ),
+    ).toEqual(['agent-todos', 'draft-follow-up']);
+  });
 });
 
 describe('sourcesMatch', () => {

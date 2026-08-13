@@ -231,14 +231,14 @@ describe('CI workflow', () => {
   });
 
   it('deploys InsForge functions from GitHub after CI is green on main', () => {
-    expect(workflow.concurrency['cancel-in-progress']).toBe(
-      "${{ github.event_name == 'pull_request' }}",
-    );
+    expect(workflow.concurrency.queue).toBe('max');
+    expect(workflow.concurrency['cancel-in-progress']).toBeUndefined();
     expect(functionsWorkflow.on.workflow_run.workflows).toEqual(['CI']);
     expect(functionsWorkflow.on.workflow_run.types).toEqual(['completed']);
     expect(functionsWorkflow.on).toHaveProperty('workflow_dispatch');
     expect(functionsWorkflow.on.pull_request).toBeUndefined();
-    expect(functionsWorkflow.concurrency['cancel-in-progress']).toBe(false);
+    expect(functionsWorkflow.concurrency.queue).toBe('max');
+    expect(functionsWorkflow.concurrency['cancel-in-progress']).toBeUndefined();
 
     const deploy = functionsWorkflow.jobs.deploy;
     expect(deploy.name).toBe('Deploy InsForge functions');
@@ -253,12 +253,25 @@ describe('CI workflow', () => {
 
     const stepsByName = Object.fromEntries(deploy.steps.map((step) => [step.name, step]));
     expect(stepsByName['Check out repository'].with.ref).toContain('workflow_run.head_sha');
-    expect(stepsByName['Install dependencies'].run).toBe('npm ci');
+    expect(stepsByName['Check deployment is still current'].run).toContain('origin/main');
+    expect(stepsByName['Check deployment is still current'].run).toContain('should_run=false');
+    expect(stepsByName['Download verified deployment range'].with['run-id']).toBe(
+      '${{ github.event.workflow_run.id }}',
+    );
+    expect(stepsByName['Validate automatic deployment range'].run).toContain(
+      '.ci-insforge-range.json',
+    );
+    expect(stepsByName['Validate automatic deployment range'].run).toContain(
+      'steps.current.outputs.should_run',
+    );
+    expect(stepsByName['Install dependencies'].if).toBe(
+      "steps.current.outputs.should_run == 'true'",
+    );
     expect(stepsByName['Block automatic deploy for backend state changes'].if).toBe(
-      "github.event_name != 'workflow_dispatch'",
+      "github.event_name != 'workflow_dispatch' && steps.current.outputs.should_run == 'true'",
     );
     expect(stepsByName['Block automatic deploy for backend state changes'].run).toContain(
-      'git diff --quiet HEAD^ HEAD -- migrations insforge.toml',
+      'git diff --quiet "$DEPLOY_BASE" "$DEPLOY_HEAD" -- migrations insforge.toml',
     );
     expect(stepsByName['Deploy changed functions and verify live source'].run).toContain(
       'link --api-base-url "$INSFORGE_API_BASE_URL" --api-key "$INSFORGE_API_KEY"',
@@ -268,6 +281,12 @@ describe('CI workflow', () => {
     );
     expect(stepsByName['Deploy changed functions and verify live source'].run).toContain(
       'sync:insforge-functions',
+    );
+    expect(stepsByName['Deploy changed functions and verify live source'].run).toContain(
+      '--base "$DEPLOY_BASE" --head "$DEPLOY_HEAD"',
+    );
+    expect(stepsByName['Deploy changed functions and verify live source'].run).not.toContain(
+      'HEAD^',
     );
     expect(stepsByName['Deploy changed functions and verify live source'].run).toContain('--check');
     expect(stepsByName['Deploy changed functions and verify live source'].env).toEqual({
