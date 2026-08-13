@@ -23,6 +23,11 @@ wait_for_app_exit() {
   return 1
 }
 
+unset DONE_LOG_INSTANCE || true
+unset DONE_LOG_INSTANCE_ID || true
+unset DONE_LOG_BUNDLE_IDENTIFIER || true
+unset DONE_LOG_BUNDLE_DISPLAY_NAME || true
+
 bash "$SCRIPT_DIR/build-menubar-app.sh"
 
 SOURCE_VERSION="$(

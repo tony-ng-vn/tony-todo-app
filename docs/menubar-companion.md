@@ -38,7 +38,10 @@ npm run menubar:dev
 
 The development command opens `http://127.0.0.1:5176/menubar?local=1`.
 Local mode stores data in the native WebKit profile and does not connect to InsForge.
-Development and smoke commands always run the signed `Done Log.app` bundle so macOS keeps one stable app identity instead of registering temporary Swift build executables.
+`npm run menubar` and `menubar:dev` run a separate "Done Log Local" identity.
+They do not quit or replace `/Applications/Done Log.app`.
+Use `npm run menubar:install` only when you intend to update the installed production app.
+Development and smoke commands always run a signed app bundle so macOS keeps a stable identity instead of registering temporary Swift build executables.
 
 ## Run Against the Deployed App
 

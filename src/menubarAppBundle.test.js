@@ -44,6 +44,27 @@ describe('menu bar app bundle', () => {
     expect(packageJson.scripts['menubar:check']).not.toContain('swift run');
   });
 
+  it('keeps local menu bar runs off the installed app identity', () => {
+    const runner = readFileSync(
+      path.join(repoRoot, 'scripts/run-menubar-app.sh'),
+      'utf8',
+    );
+    const installer = readFileSync(
+      path.join(repoRoot, 'scripts/install-menubar-app.sh'),
+      'utf8',
+    );
+    const builder = readFileSync(
+      path.join(repoRoot, 'scripts/build-menubar-app.sh'),
+      'utf8',
+    );
+
+    expect(runner).toContain('DONE_LOG_INSTANCE="${DONE_LOG_INSTANCE:-dev}"');
+    expect(runner).toContain('com.tonynguyen.donelog.dev');
+    expect(runner).not.toContain('menubar:install');
+    expect(installer).toContain('unset DONE_LOG_INSTANCE');
+    expect(builder).toContain('DONE_LOG_BUNDLE_IDENTIFIER');
+  });
+
   it('keeps local app identity stable when a signing certificate is available', () => {
     const buildScript = readFileSync(
       path.join(repoRoot, 'scripts/build-menubar-app.sh'),
