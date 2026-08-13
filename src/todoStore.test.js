@@ -1231,26 +1231,39 @@ describe('note editing bursts', () => {
   const NOTE_BURST_GAP_MS = 5000;
 
   it('mints a new time for a gradual rewrite within one typing burst, even though each step looks similar', () => {
-    // The stamp format only has minute precision, so the burst is timed to
-    // straddle a minute boundary: each gap stays under the 5s burst window,
-    // but the final call lands on a whole minute distinct from startedAt's,
-    // making "kept the original stamp" and "minted a fresh one" distinguishable.
-    const startedAt = new Date('2026-07-01T10:00:57.000Z');
+    // Save the first bullet, then let the burst gap elapse before the
+    // rewrite starts: this is what makes the test meaningful. If the burst
+    // baseline were captured right after an empty note (the old version of
+    // this test), matching would never see "- Getting lunch now" as a
+    // candidate and a fresh stamp would be inevitable regardless of whether
+    // the anti-chaining logic works at all. Starting the burst a full gap
+    // later forces the baseline captured at burst start to actually contain
+    // "- Getting lunch now", so a real similarity comparison is exercised.
+    //
+    // The stamp format only has minute precision, so timestamps are chosen
+    // to straddle a minute boundary: every gap inside the burst stays under
+    // the 5s window, but the final call lands on a whole minute distinct
+    // from savedAt's, making "kept the original stamp" and "minted a fresh
+    // one" distinguishable by exact equality.
+    const savedAt = new Date('2026-07-01T09:59:00.000Z');
     let state = createInitialState();
-    state = addTodo(state, 'Lunch plan', startedAt);
+    state = addTodo(state, 'Lunch plan', savedAt);
     const todoId = state.todos[0].id;
-    state = updateTodoNote(state, todoId, '- Getting lunch now', startedAt);
+    state = updateTodoNote(state, todoId, '- Getting lunch now', savedAt);
 
+    const burstStart = new Date(savedAt.getTime() + NOTE_BURST_GAP_MS + 53000);
     const steps = ['- Not getting lunch now', '- Not getting lunch soon', '- Not getting lunch yet'];
-    let now = startedAt;
+    let callAt = burstStart;
+    let lastCallAt;
     for (const draft of steps) {
-      now = new Date(now.getTime() + 1000);
-      state = updateTodoNote(state, todoId, draft, now);
+      lastCallAt = callAt;
+      state = updateTodoNote(state, todoId, draft, callAt);
+      callAt = new Date(callAt.getTime() + 1000);
     }
 
-    expect(now.toISOString()).not.toBe(startedAt.toISOString());
+    expect(lastCallAt.toISOString()).not.toBe(savedAt.toISOString());
     expect(parseNoteEntries(state.todos[0].note)).toEqual([
-      { at: now.toISOString(), text: '- Not getting lunch yet' },
+      { at: lastCallAt.toISOString(), text: '- Not getting lunch yet' },
     ]);
   });
 
