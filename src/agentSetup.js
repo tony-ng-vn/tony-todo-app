@@ -1,5 +1,7 @@
 export const AGENT_TODOS_URL = 'https://y26ze9je.us-east.insforge.app/functions/agent-todos';
 export const AGENT_TOKEN_PATTERN = /^dlg_[0-9a-f]{64}$/;
+export const AGENT_KEY_NAME_MAX = 40;
+export const DEFAULT_AGENT_KEY_NAME = 'Agent key';
 
 export function createAgentToken(randomBytes = defaultRandomBytes) {
   const bytes = randomBytes(32);
@@ -14,11 +16,17 @@ export function isAgentAccessToken(value) {
   return typeof value === 'string' && AGENT_TOKEN_PATTERN.test(value);
 }
 
-export function maskAgentToken(token) {
-  if (!isAgentAccessToken(token)) {
-    return '';
+export function normalizeAgentKeyName(value) {
+  const name = String(value ?? '')
+    .trim()
+    .replace(/\s+/g, ' ');
+  if (!name) {
+    throw new Error('Name the key so you can tell it apart later.');
   }
-  return `dlg_••••${token.slice(-4)}`;
+  if (name.length > AGENT_KEY_NAME_MAX) {
+    throw new Error(`Keep the name to ${AGENT_KEY_NAME_MAX} characters.`);
+  }
+  return name;
 }
 
 export function buildAgentSetupPrompt({ token, url = AGENT_TODOS_URL } = {}) {

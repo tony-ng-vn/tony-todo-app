@@ -2,9 +2,10 @@
   import { onMount } from 'svelte';
   import WorkspaceTabs from './WorkspaceTabs.svelte';
   import {
+    AGENT_KEY_NAME_MAX,
     buildAgentSetupPrompt,
     createAgentToken,
-    maskAgentToken,
+    normalizeAgentKeyName,
   } from '../../agentSetup.js';
   import { deleteAgentToken, loadAgentToken, saveAgentToken } from '../../agentTokenRemote.js';
 
@@ -19,11 +20,13 @@
   export let insforge = null;
   export let userId = null;
 
-  let agentToken = null;
+  let agentRecord = null;
   let agentTokenError = '';
   let agentBusy = false;
-  let revealAgentKey = false;
-  let copiedSetup = false;
+  let agentPane = 'list';
+  let agentNameDraft = '';
+  let revealedToken = null;
+  let copiedKey = false;
   let copyTimer = null;
 
   onMount(() => {
@@ -35,29 +38,61 @@
 
   async function refreshAgentToken() {
     if (!insforge || !userId) {
-      agentToken = null;
+      agentRecord = null;
       return;
     }
     agentTokenError = '';
     try {
-      agentToken = await loadAgentToken(insforge, userId);
+      agentRecord = await loadAgentToken(insforge, userId);
     } catch (error) {
       agentTokenError = error.message ?? 'Could not load the agent key.';
     }
   }
 
-  async function createOrReplaceAgentKey() {
-    if (!insforge || !userId || agentBusy) return;
-    if (agentToken && !window.confirm('Replace the current agent key? Existing agents will stop working until they use the new one.')) {
+  function startCreateAgentKey() {
+    if (agentBusy) return;
+    agentTokenError = '';
+    agentNameDraft = '';
+    revealedToken = null;
+    agentPane = 'name';
+  }
+
+  function startReplaceAgentKey() {
+    if (agentBusy || !agentRecord) return;
+    if (!window.confirm('Replace this key? Agents using it will stop working until they get the new one.')) {
       return;
     }
+    agentTokenError = '';
+    agentNameDraft = agentRecord.name;
+    revealedToken = null;
+    agentPane = 'name';
+  }
+
+  function cancelAgentName() {
+    if (agentBusy) return;
+    agentPane = 'list';
+    agentNameDraft = '';
+    agentTokenError = '';
+  }
+
+  async function submitAgentName() {
+    if (!insforge || !userId || agentBusy) return;
+    let name;
+    try {
+      name = normalizeAgentKeyName(agentNameDraft);
+    } catch (error) {
+      agentTokenError = error.message ?? 'Name the key so you can tell it apart later.';
+      return;
+    }
+
     agentBusy = true;
     agentTokenError = '';
     try {
       const token = createAgentToken();
-      await saveAgentToken(insforge, userId, token);
-      agentToken = token;
-      revealAgentKey = true;
+      agentRecord = await saveAgentToken(insforge, userId, { token, name });
+      revealedToken = token;
+      agentPane = 'save';
+      agentNameDraft = '';
     } catch (error) {
       agentTokenError = error.message ?? 'Could not create an agent key.';
     } finally {
@@ -65,17 +100,23 @@
     }
   }
 
+  function closeSavedAgentKey() {
+    revealedToken = null;
+    agentPane = 'list';
+  }
+
   async function removeAgentKey() {
-    if (!insforge || !userId || agentBusy || !agentToken) return;
-    if (!window.confirm('Remove the agent key? Agents using it will no longer be able to reach Done Log.')) {
+    if (!insforge || !userId || agentBusy || !agentRecord) return;
+    if (!window.confirm('Remove this key? Agents using it will no longer be able to reach Done Log.')) {
       return;
     }
     agentBusy = true;
     agentTokenError = '';
     try {
       await deleteAgentToken(insforge, userId);
-      agentToken = null;
-      revealAgentKey = false;
+      agentRecord = null;
+      revealedToken = null;
+      agentPane = 'list';
     } catch (error) {
       agentTokenError = error.message ?? 'Could not remove the agent key.';
     } finally {
@@ -83,18 +124,20 @@
     }
   }
 
-  async function copyAgentSetup() {
-    if (!agentToken) return;
+  async function copyAgentKey() {
+    const token = revealedToken ?? agentRecord?.token;
+    if (!token) return;
     try {
-      await navigator.clipboard.writeText(buildAgentSetupPrompt({ token: agentToken }));
-      copiedSetup = true;
+      await navigator.clipboard.writeText(buildAgentSetupPrompt({ token }));
+      copiedKey = true;
       if (copyTimer) clearTimeout(copyTimer);
       copyTimer = setTimeout(() => {
-        copiedSetup = false;
+        copiedKey = false;
       }, 2000);
     } catch {
-      agentTokenError = 'Could not copy. Select the key and copy it manually.';
-      revealAgentKey = true;
+      agentTokenError = revealedToken
+        ? 'Could not copy. Select the key and copy it manually.'
+        : 'Could not copy the key.';
     }
   }
 
@@ -139,33 +182,66 @@
     {#if !userId}
       <p class="empty-note">Sign in to create a personal agent key. Paste the setup into Cursor, Codex, or any tool that can POST JSON.</p>
     {:else}
-      <p class="empty-note">Create a key, then copy the setup. The key only reaches your todos. Treat it like a password.</p>
-      {#if agentToken}
-        <p class="agent-key">{revealAgentKey ? agentToken : maskAgentToken(agentToken)}</p>
-      {/if}
+      <p class="empty-note">Name the key, copy it once, then keep only the name here. Treat the secret like a password.</p>
       {#if agentTokenError}
         <p class="empty-note">{agentTokenError}</p>
       {/if}
-      <div class="agent-actions">
-        {#if !agentToken}
-          <button type="button" class="sign-out-button" disabled={agentBusy} on:click={createOrReplaceAgentKey}>
-            {agentBusy ? 'Creating key' : 'Create agent key'}
+
+      {#if agentPane === 'name'}
+        <form class="agent-name-form" on:submit|preventDefault={submitAgentName}>
+          <label class="agent-field">
+            <span>Key name</span>
+            <input
+              type="text"
+              bind:value={agentNameDraft}
+              maxlength={AGENT_KEY_NAME_MAX}
+              placeholder="Cursor"
+              autocomplete="off"
+              disabled={agentBusy}
+            />
+          </label>
+          <div class="agent-actions">
+            <button type="submit" class="sign-out-button" disabled={agentBusy}>
+              {agentBusy ? 'Creating key' : 'Create key'}
+            </button>
+            <button type="button" class="sign-out-button" disabled={agentBusy} on:click={cancelAgentName}>
+              Cancel
+            </button>
+          </div>
+        </form>
+      {:else if agentPane === 'save' && revealedToken}
+        <p class="empty-note">Copy the key now. After you close this, only the name stays visible.</p>
+        <p class="agent-key">{revealedToken}</p>
+        <div class="agent-actions">
+          <button type="button" class="sign-out-button" on:click={copyAgentKey}>
+            {copiedKey ? 'Copied' : 'Copy key'}
           </button>
-        {:else}
-          <button type="button" class="sign-out-button" disabled={agentBusy} on:click={copyAgentSetup}>
-            {copiedSetup ? 'Copied setup' : 'Copy setup'}
+          <button type="button" class="sign-out-button" on:click={closeSavedAgentKey}>
+            Done
           </button>
-          <button type="button" class="sign-out-button" on:click={() => (revealAgentKey = !revealAgentKey)}>
-            {revealAgentKey ? 'Hide key' : 'Show key'}
+        </div>
+      {:else if agentRecord}
+        <div class="source-row">
+          <span class="source-name">{agentRecord.name}</span>
+          <div class="agent-actions">
+            <button type="button" class="sign-out-button" disabled={agentBusy} on:click={copyAgentKey}>
+              {copiedKey ? 'Copied' : 'Copy key'}
+            </button>
+            <button type="button" class="sign-out-button" disabled={agentBusy} on:click={startReplaceAgentKey}>
+              Replace
+            </button>
+            <button type="button" class="sign-out-button" disabled={agentBusy} on:click={removeAgentKey}>
+              Remove
+            </button>
+          </div>
+        </div>
+      {:else}
+        <div class="agent-actions">
+          <button type="button" class="sign-out-button" disabled={agentBusy} on:click={startCreateAgentKey}>
+            Create agent key
           </button>
-          <button type="button" class="sign-out-button" disabled={agentBusy} on:click={createOrReplaceAgentKey}>
-            Replace key
-          </button>
-          <button type="button" class="sign-out-button" disabled={agentBusy} on:click={removeAgentKey}>
-            Remove key
-          </button>
-        {/if}
-      </div>
+        </div>
+      {/if}
     {/if}
   </div>
 
@@ -253,6 +329,35 @@
     color: var(--subtle);
   }
 
+  .agent-name-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2);
+  }
+
+  .agent-field {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+    font-size: 12px;
+    color: var(--default);
+  }
+
+  .agent-field input {
+    min-height: 40px;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--field-surface);
+    color: var(--strong);
+    font-size: 16px;
+  }
+
+  .agent-field input:focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 1px;
+  }
+
   .agent-key {
     margin: 0;
     padding: var(--space-2) var(--space-3);
@@ -285,6 +390,8 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
+    flex-wrap: wrap;
+    gap: var(--space-2);
     padding: var(--space-2) var(--space-3);
     border: 1px solid var(--border);
     border-radius: 12px;
