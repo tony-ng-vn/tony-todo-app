@@ -69,6 +69,12 @@ describe('sourcesMatch', () => {
     expect(sourcesMatch(local, live)).toBe(true);
   });
 
+  it('ignores the display newline appended by the InsForge CLI', () => {
+    const local = 'export default async function handler() {}\n';
+    const live = 'Function: agent-todos\nStatus:   active\n---\nexport default async function handler() {}\n\n';
+    expect(sourcesMatch(local, live)).toBe(true);
+  });
+
   it('fails when live source drifted', () => {
     expect(sourcesMatch('const a = 1;\n', 'Function: x\n---\nconst a = 2;\n')).toBe(false);
   });
