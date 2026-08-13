@@ -1,5 +1,5 @@
 import { getTimes } from 'suncalc';
-import { applyTodoNote, formatNoteAtLocal, parseNoteEntries } from './noteEntries.js';
+import { applyTodoNote, formatNoteAtLocal, isEmptyNoteUnitText, parseNoteEntries } from './noteEntries.js';
 import { SAN_FRANCISCO_TIME_ZONE, dateAtSanFranciscoTime, getSanFranciscoDateTimeParts } from './sanFranciscoTime.js';
 
 export { applyTodoNote, dateAtSanFranciscoTime, formatNoteAtLocal, parseNoteEntries };
@@ -898,12 +898,14 @@ function getSanFranciscoSunrise(dayKey) {
 }
 
 function toNoteViews(todo) {
-  return parseNoteEntries(todo.note ?? '').map((entry) => {
-    const at = entry.at ?? todo.updatedAt ?? todo.createdAt ?? null;
-    return {
-      at,
-      atLocal: at ? formatNoteAtLocal(at) : null,
-      text: entry.text,
-    };
-  });
+  return parseNoteEntries(todo.note ?? '')
+    .filter((entry) => !isEmptyNoteUnitText(entry.text))
+    .map((entry) => {
+      const at = entry.at ?? todo.updatedAt ?? todo.createdAt ?? null;
+      return {
+        at,
+        atLocal: at ? formatNoteAtLocal(at) : null,
+        text: entry.text,
+      };
+    });
 }

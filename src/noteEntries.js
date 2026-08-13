@@ -16,12 +16,24 @@ export function formatNoteAtLocal(date) {
 }
 
 export function parseNoteEntries(note) {
-  const raw = String(note ?? '').replace(/\s+$/, '');
+  // Trim trailing newlines only, not all trailing whitespace: a note that
+  // ends in an empty structural line ("- ") must keep that line's trailing
+  // space intact, or the reseeded editor draft would no longer match what
+  // the user actually typed.
+  const raw = String(note ?? '').replace(/\n+$/, '');
   if (!raw) {
     return [];
   }
 
   return splitIntoStampedChunks(raw).flatMap((chunk) => splitChunkIntoUnits(chunk.text, chunk.at));
+}
+
+// True for a unit with no visible content once its marker/checkbox is
+// stripped ("- ", "-", "- [ ]"). These are real structural units - kept in
+// parseNoteEntries's output and in storage - but they are never stamped and
+// must stay invisible to anything that only wants real note content.
+export function isEmptyNoteUnitText(text) {
+  return normalizeUnitText(text) === '';
 }
 
 // nextNote is normally plain editor text (no "@ " headers), but existing
@@ -40,6 +52,14 @@ export function applyTodoNote(previousNote, nextNote, now = new Date()) {
     normalized: normalizeUnitText(entry.text),
     used: false,
   }));
+  // Empty units are never eligible to be matched against - they must not
+  // claim or receive a stamp, so they are marked used up front and every
+  // pass below simply skips them like any other already-spoken-for unit.
+  for (const unit of previousUnits) {
+    if (!unit.normalized) {
+      unit.used = true;
+    }
+  }
 
   const resolved = new Array(nextEntries.length).fill(null);
   const pending = [];
@@ -48,7 +68,13 @@ export function applyTodoNote(previousNote, nextNote, now = new Date()) {
       resolved[index] = entry;
       return;
     }
-    pending.push({ entry, index, normalized: normalizeUnitText(entry.text) });
+    const normalized = normalizeUnitText(entry.text);
+    if (!normalized) {
+      // Marker-only unit ("- "): stays a bare unstamped line, never matched.
+      resolved[index] = { at: null, text: entry.text };
+      return;
+    }
+    pending.push({ entry, index, normalized });
   });
 
   reservePassThroughUnits(nextEntries, previousUnits);
@@ -183,6 +209,11 @@ function countNormalized(items) {
 function unitSimilarity(normalizedPrev, normalizedNext) {
   const tokensPrev = normalizedPrev.split(' ').filter(Boolean);
   const tokensNext = normalizedNext.split(' ').filter(Boolean);
+  if (tokensPrev.length === 0 && tokensNext.length === 0) {
+    // Neither side (both empty units, in practice excluded from matching
+    // long before this point) has anything to compare - 0/0 would be NaN.
+    return 0;
+  }
   const paired = pairedTokenCount(tokensPrev, tokensNext);
   return paired / (tokensPrev.length + tokensNext.length - paired);
 }
@@ -292,7 +323,10 @@ function splitIntoStampedChunks(raw) {
 // Within one chunk, blank lines still delimit paragraphs; only the first
 // paragraph inherits the chunk's header stamp (matches legacy behavior for
 // free text). Every non-blank line in a paragraph is its own unit - the fix
-// for bullets that used to share one stamp per chunk.
+// for bullets that used to share one stamp per chunk. A marker-only line
+// ("- ") is still a real unit (kept in document order, e.g. between two
+// stamped bullets) - it just never carries a stamp, regardless of which
+// paragraph it falls in.
 function splitChunkIntoUnits(text, at) {
   const paragraphs = text.split(/\n{2,}/).map((paragraph) => paragraph.replace(/^\n+|\n+$/g, ''));
 
@@ -303,11 +337,8 @@ function splitChunkIntoUnits(text, at) {
       if (!line.trim()) {
         continue;
       }
-      if (!normalizeUnitText(line)) {
-        // marker-only bullet ("- "): never stamped, never persisted
-        continue;
-      }
-      units.push({ at: paragraphAt, text: line });
+      const isEmpty = !normalizeUnitText(line);
+      units.push({ at: isEmpty ? null : paragraphAt, text: line });
     }
   });
 
