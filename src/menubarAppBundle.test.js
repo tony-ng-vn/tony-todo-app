@@ -77,6 +77,8 @@ describe('menu bar app bundle', () => {
     expect(runner).not.toContain('menubar:install');
     expect(installer).toContain('unset DONE_LOG_INSTANCE');
     expect(builder).toContain('DONE_LOG_BUNDLE_IDENTIFIER');
+    expect(installer).toContain('refusing to install a development Done Log');
+    expect(installer).toContain('Sparkle.framework');
   });
 
   it('keeps local app identity stable when a signing certificate is available', () => {
@@ -170,14 +172,21 @@ describe('menu bar app bundle', () => {
       path.join(repoRoot, 'native/Sources/DoneLogMenuBar/MenuBarController.swift'),
       'utf8',
     );
-
-    expect(controller).toContain(
-      'statusItem.autosaveName = "com.tonynguyen.donelog.primary-status-item"',
+    const app = readFileSync(
+      path.join(repoRoot, 'native/Sources/DoneLogMenuBar/DoneLogMenuBarApp.swift'),
+      'utf8',
     );
+
+    expect(controller).not.toContain('autosaveName');
     expect(controller).toContain('statusItem.isVisible = true');
-    expect(controller).toContain('withLength: NSStatusItem.squareLength');
+    expect(controller).toContain('withLength: NSStatusItem.variableLength');
     expect(controller).toContain('statusItemWindow.isVisible');
     expect(controller).toContain('statusItemFrameIsInMenuBar');
+    expect(controller).toContain('func revealStatusItem()');
+    expect(controller).toContain('func recreateStatusItem()');
+    expect(app).toContain('hostStatusItem');
+    expect(app).toContain('shouldKeepWaitingForStatusItem');
+    expect(app).toContain('shouldRecreateStatusItem');
   });
 
   it('opens the browser-sized experience in a native window', () => {
