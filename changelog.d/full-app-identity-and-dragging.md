@@ -6,4 +6,5 @@
 
 - The full Done Log window now appears as a regular macOS app with its own Dock icon and application menu, while the compact menu-bar control stays available.
 - Opening Done Log now activates its full window once, so menu-bar recovery no longer steals focus back from the next app you click.
+- The full window now stays visible behind other apps instead of disappearing when Done Log loses focus.
 - Empty header space now moves the window with a normal macOS drag instead of leaving the window stuck in place.
