@@ -86,7 +86,6 @@
     <div class="board-brand">
       <p class="eyebrow">Done Log</p>
       <h1 id="board-heading">Board</h1>
-      <p class="panel-note">Drag tasks across columns to time work, finish it, or move it to Stall.</p>
     </div>
 
     <div class="board-header-actions">
@@ -105,6 +104,7 @@
       {/if}
     </div>
   </header>
+  <p class="panel-note">Drag tasks across columns to time work, finish it, or move it to Stall.</p>
 
   <WorkspaceTabs currentView="board" {inboxCount} {waitingCount} {onViewChange} />
 
