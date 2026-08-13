@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { createProxyResponse, stripCookieDomain } from './insforgeProxy.js';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  createProxyResponse,
+  proxyUpstreamErrorResponse,
+  stripCookieDomain,
+} from './insforgeProxy.js';
 
 describe('createProxyResponse', () => {
   it('preserves a response body from the backend', async () => {
@@ -30,6 +34,78 @@ describe('createProxyResponse', () => {
       expect(response.headers.get('x-backend')).toBe('insforge');
     },
   );
+
+  it('drops compression metadata after the upstream body is decoded', async () => {
+    const backendResponse = new Response('saved', {
+      status: 200,
+      headers: {
+        'content-type': 'text/plain',
+        'content-encoding': 'gzip',
+        'content-length': '5',
+      },
+    });
+
+    const response = await createProxyResponse(backendResponse);
+
+    expect(response.headers.get('content-encoding')).toBeNull();
+    expect(response.headers.get('content-length')).toBeNull();
+    expect(await response.text()).toBe('saved');
+  });
+});
+
+describe('proxyUpstreamErrorResponse', () => {
+  it('turns a failed upstream fetch into a 502 without leaking diagnostics', async () => {
+    const error = new TypeError('fetch failed');
+    error.cause = new Error('getaddrinfo ENOTFOUND');
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const response = proxyUpstreamErrorResponse(error);
+    const body = await response.json();
+
+    expect(response.status).toBe(502);
+    expect(body).toEqual({
+      error: 'BAD_GATEWAY',
+      message: 'Could not reach the backend',
+    });
+    expect(log).toHaveBeenCalledWith(
+      'InsForge proxy could not reach the backend:',
+      'getaddrinfo ENOTFOUND',
+    );
+    log.mockRestore();
+  });
+});
+
+describe('proxyToInsForge', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.unstubAllEnvs();
+  });
+
+  it('returns a 502 JSON body when the upstream fetch rejects', async () => {
+    vi.stubEnv('VITE_INSFORGE_URL', 'https://backend.example');
+    vi.resetModules();
+    const { proxyToInsForge } = await import('./insforgeProxy.js');
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async () => {
+        throw new TypeError('fetch failed');
+      }),
+    );
+    const log = vi.spyOn(console, 'error').mockImplementation(() => {});
+
+    const response = await proxyToInsForge({
+      request: new Request('https://app.example/api/auth/sessions', { method: 'GET' }),
+      url: new URL('https://app.example/api/auth/sessions'),
+    });
+    const body = await response.json();
+
+    expect(response.status).toBe(502);
+    expect(body).toEqual({
+      error: 'BAD_GATEWAY',
+      message: 'Could not reach the backend',
+    });
+    log.mockRestore();
+  });
 });
 
 describe('stripCookieDomain', () => {

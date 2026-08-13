@@ -26,6 +26,9 @@ const STRIP_REQUEST_HEADERS = new Set([
   'transfer-encoding',
   'upgrade',
   'content-length',
+  // Let undici negotiate compression. Forwarding the browser's Accept-Encoding
+  // can make the upstream fetch fail or return a body the browser cannot decode.
+  'accept-encoding',
 ]);
 
 export function stripCookieDomain(setCookieValue) {
@@ -57,18 +60,40 @@ export async function proxyToInsForge({ request, url }) {
     init.body = await request.arrayBuffer();
   }
 
-  const backendResponse = await fetch(targetUrl, init);
+  try {
+    const backendResponse = await fetch(targetUrl, init);
+    return await createProxyResponse(backendResponse);
+  } catch (error) {
+    return proxyUpstreamErrorResponse(error);
+  }
+}
 
-  return createProxyResponse(backendResponse);
+export function proxyUpstreamErrorResponse(error) {
+  const cause = error?.cause?.message || error?.message || 'network error';
+  console.error('InsForge proxy could not reach the backend:', cause);
+  return new Response(
+    JSON.stringify({
+      error: 'BAD_GATEWAY',
+      message: 'Could not reach the backend',
+    }),
+    {
+      status: 502,
+      headers: { 'content-type': 'application/json' },
+    },
+  );
 }
 
 export async function createProxyResponse(backendResponse) {
   const responseHeaders = new Headers();
   for (const [key, value] of backendResponse.headers) {
+    const header = key.toLowerCase();
     // Set-Cookie is handled separately below so multiple cookies survive.
-    if (key.toLowerCase() !== 'set-cookie') {
-      responseHeaders.set(key, value);
+    // Undici already decoded the body, so forwarding compression metadata
+    // would make the browser try to decode it again.
+    if (header === 'set-cookie' || header === 'content-encoding' || header === 'content-length') {
+      continue;
     }
+    responseHeaders.set(key, value);
   }
 
   // getSetCookie() returns each Set-Cookie header individually (Node 18+/undici).
