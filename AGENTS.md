@@ -67,3 +67,11 @@ This section is durable operational fact, kept outside the INSFORGE block so a s
 - `docs/next-steps.md` describes remaining one-time setup, but treat the live project as the source of truth over any doc or chat history.
 - To check live state: `npx -y @insforge/cli current --json` (project link and auth) and `npx -y @insforge/cli config plan --json` (drift between `insforge.toml` and the live config; empty output means no drift). The CLI login is interactive, so the owner runs `npx -y @insforge/cli login` themselves.
 - Do not print `auth.users` emails into chat or logs unless the owner asks; row existence is enough.
+
+## Cursor Cloud specific instructions
+
+- Only the SvelteKit **web app** is runnable in the Linux cloud VM. The native macOS menu-bar app (`native/`, `npm run menubar*`, `npm run build:native-menubar`, `npm run test:native-menubar`) is macOS/Swift-only and cannot be built or tested here; treat it as out of scope on this VM.
+- **Node.js 24 is required** (`.node-version`) and `scripts/check-node-toolchain.mjs` fails on any other major. The VM's `/exec-daemon/node` default is Node 22 and sits early in `PATH`; a login shell resolves `node` to nvm's Node 24 because `~/.bashrc` prepends it. Run repo commands through a login shell (e.g. `bash -lc '…'`) so `node`/`npm` are 24; a bare non-login shell can silently fall back to Node 22 and fail the toolchain check. This includes `git push`: the `.githooks/pre-push` gate runs `check:node-toolchain`, so push from a login shell (`bash -lc 'git push …'`) or it will be rejected under Node 22.
+- The backend (InsForge) is a **remote hosted BaaS**, not a local service. For local UI/e2e work, run the web app and open it with `?local=1` (e.g. `http://127.0.0.1:5173/?local=1`) to use browser storage with no account — no `.env.local` or backend needed. `.env.local` (from `.env.example`) is only needed for real cloud sync/auth.
+- Standard commands live in `package.json`: dev server `npm run dev` (serves `http://127.0.0.1:5173`), unit tests `npm test` (Vitest), build `npm run build`. There is no JS linter/formatter; the "lint-like" gates are `npm run check:node-toolchain` and `npm run check:contribution-policy`.
+- In the task-row controls, the checkmark completes a task; the rightmost `X` marks it **Failed**. Click the checkmark (not the `X`) when verifying the complete-a-task flow.
