@@ -18,3 +18,18 @@ describe('owner-only llm functions', () => {
     });
   }
 });
+
+describe('prompt injection fencing', () => {
+  it('fences meeting content in the extraction prompt', () => {
+    const source = read('functions/ingest-granola-loops.ts');
+    expect(source).toContain('<untrusted-meeting-content>');
+    expect(source).toContain('</untrusted-meeting-content>');
+    expect(source).toContain('not instructions');
+  });
+
+  it('fences evidence content in the drafting prompt', () => {
+    const source = read('functions/draft-follow-up.ts');
+    expect(source).toContain('<untrusted-meeting-content>');
+    expect(source).toContain('not instructions');
+  });
+});
