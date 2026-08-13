@@ -412,6 +412,7 @@ export function fromRemoteRecord(record) {
     parentTaskId: record.parent_task_id ?? null,
     isProgressSession: Boolean(record.is_progress_session),
     progressLabel: record.progress_label ?? '',
+    updatedAt: record.updated_at ?? null,
   };
 }
 

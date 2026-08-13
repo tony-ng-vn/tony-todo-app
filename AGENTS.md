@@ -26,6 +26,11 @@ Design rules:
 - Never ship visible scrollbars. Scrollable regions should remain scrollable but hide native scrollbar rails/thumbs.
 <!-- INSFORGE:END -->
 
+## Native menu bar
+
+- Local `npm run menubar` / `menubar:dev` from a worktree must use the `dev` instance lock and `com.tonynguyen.donelog.dev`. Never share the production lock or `doneLogQuit` notification, or a test run will steal or quit `/Applications/Done Log.app`.
+- Use `npm run menubar:install` only when you intend to replace the installed production app.
+
 ## CI verification
 
 - Run `npm run setup:hooks` once after cloning. `npm install` and `npm ci` also install the repository pre-push hook automatically.

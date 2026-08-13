@@ -108,20 +108,16 @@ enum DoneLogMenuBarApp {
     }
 
     let environment = ProcessInfo.processInfo.environment
-    let isSmokeCheck = environment["MENUBAR_NATIVE_SMOKE"] == "1"
-    let lockURL =
-      isSmokeCheck
-      ? SingleInstanceLock.smokeURL
-      : SingleInstanceLock.defaultURL
+    let lockURL = MenuBarLaunchPolicy.lockURL(environment: environment)
 
     guard let instanceLock = SingleInstanceLock.acquire(at: lockURL) else {
-      if isSmokeCheck {
+      if MenuBarLaunchPolicy.instanceKind(environment: environment) == .smoke {
         FileHandle.standardError.write(
           Data("MENUBAR_NATIVE_FAILED another smoke check is running\n".utf8)
         )
       } else {
         if let notificationName = MenuBarLaunchPolicy.lockContentionNotification(
-          isSmokeCheck: false
+          environment: environment
         ) {
           DistributedNotificationCenter.default().postNotificationName(
             notificationName,
@@ -136,7 +132,7 @@ enum DoneLogMenuBarApp {
       }
 
       let exitCode = MenuBarLaunchPolicy.lockContentionExitCode(
-        isSmokeCheck: isSmokeCheck
+        environment: environment
       )
       if exitCode != 0 {
         exit(exitCode)
@@ -169,7 +165,7 @@ enum DoneLogMenuBarApp {
 
     if command == .quitRunning {
       DistributedNotificationCenter.default().postNotificationName(
-        .doneLogQuit,
+        MenuBarLaunchPolicy.quitNotification(),
         object: nil,
         userInfo: nil,
         deliverImmediately: true

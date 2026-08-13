@@ -44,8 +44,10 @@
     TODO_STORAGE_KEY,
   } from '../../todoPersistence.js';
   import {
+    clearNoteEdits,
     createDebouncedSaveQueue,
     getPendingNoteEdits,
+    loadRemoteAfterNoteFlush,
     markNoteEditSynced,
     preservePendingNotesDuringLoad,
     readNoteEdit,
@@ -302,23 +304,22 @@
 
   async function hydrateRemoteTodos() {
     queuePendingNoteSaves();
-    try {
-      await noteAutosave.flushAll();
-    } catch {
-      return;
-    }
-
     syncMessage = 'Loading cloud';
     const noteEditsAtLoad = snapshotNoteEdits(state.todos.map((todo) => todo.id));
 
     try {
-      const remoteTodos = await loadRemoteTodos(insforge, authUser.id);
+      const remoteTodos = await loadRemoteAfterNoteFlush(
+        () => noteAutosave.flushAll(),
+        () => loadRemoteTodos(insforge, authUser.id),
+      );
       const todoIds = new Set([...state.todos, ...remoteTodos].map((todo) => todo.id));
-      state = preservePendingNotesDuringLoad(
+      const merged = preservePendingNotesDuringLoad(
         reconcileRemoteState(state, remoteTodos),
         noteEditsAtLoad,
         snapshotNoteEdits([...todoIds]),
       );
+      clearNoteEdits(merged.staleEditIds ?? []);
+      state = { todos: merged.todos };
       saveLocalState(state);
       renderSyncStatus();
     } catch (error) {
@@ -417,9 +418,14 @@
   }
 
   async function saveNoteToRemote(todoId, edit) {
-    if (!useRemote || !authUser) {
+    if (!useRemote) {
+      markNoteEditSynced(todoId, edit.revision);
       setNoteSaveStatus(todoId, 'saved');
       return;
+    }
+
+    if (!authUser) {
+      throw new Error('Not signed in');
     }
 
     await withNoteSaveLock(todoId, async () => {

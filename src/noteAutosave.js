@@ -109,14 +109,53 @@ export function recordNoteEdit(
   storage = localStorage,
   createRevision = () =>
     globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random().toString(16).slice(2)}`,
+  createEditedAt = () => new Date().toISOString(),
 ) {
   const edit = {
     note,
     revision: createRevision(),
     syncedRevision: null,
+    editedAt: createEditedAt(),
   };
   storage.setItem(noteEditKey(todoId), JSON.stringify(edit));
   return edit;
+}
+
+export function clearNoteEdits(todoIds, storage = localStorage) {
+  for (const todoId of todoIds) {
+    storage.removeItem(noteEditKey(todoId));
+  }
+}
+
+export async function loadRemoteAfterNoteFlush(flushAll, loadRemote) {
+  try {
+    await flushAll();
+  } catch {
+    // Pending notes stay in local storage. Still load the cloud snapshot so
+    // the rest of the board can catch up with the other device.
+  }
+
+  return loadRemote();
+}
+
+export function resolveSelectedNoteDraft({ task, noteDraftTaskId, noteDraft, edit }) {
+  if (!task) {
+    return { noteDraftTaskId: null, noteDraft: '' };
+  }
+
+  const pending = Boolean(edit && edit.syncedRevision !== edit.revision);
+  if (task.id !== noteDraftTaskId) {
+    return {
+      noteDraftTaskId: task.id,
+      noteDraft: pending ? edit.note : task.note ?? '',
+    };
+  }
+
+  if (!pending && noteDraft !== (task.note ?? '')) {
+    return { noteDraftTaskId: task.id, noteDraft: task.note ?? '' };
+  }
+
+  return { noteDraftTaskId, noteDraft };
 }
 
 export function markNoteEditSynced(todoId, revision, storage = localStorage) {
@@ -142,22 +181,51 @@ export function getPendingNoteEdits(todos, storage = localStorage) {
 }
 
 export function preservePendingNotesDuringLoad(remoteState, editsAtLoad, currentEdits) {
+  const staleEditIds = [];
+  const todos = remoteState.todos.map((todo) => {
+    const editAtLoad = editsAtLoad[todo.id];
+    const currentEdit = currentEdits[todo.id];
+    if (!currentEdit) {
+      return todo;
+    }
+
+    const changedDuringLoad = currentEdit.revision !== editAtLoad?.revision;
+    if (changedDuringLoad) {
+      return { ...todo, note: currentEdit.note };
+    }
+
+    const pendingAtLoad = editAtLoad && editAtLoad.syncedRevision !== editAtLoad.revision;
+    if (!pendingAtLoad) {
+      return todo;
+    }
+
+    if (localNoteIsNewerThanRemote(editAtLoad, todo)) {
+      return { ...todo, note: currentEdit.note };
+    }
+
+    staleEditIds.push(todo.id);
+    return todo;
+  });
+
   return {
     ...remoteState,
-    todos: remoteState.todos.map((todo) => {
-      const editAtLoad = editsAtLoad[todo.id];
-      const currentEdit = currentEdits[todo.id];
-      if (!currentEdit) {
-        return todo;
-      }
-
-      const changedDuringLoad = currentEdit.revision !== editAtLoad?.revision;
-      const pendingAtLoad = editAtLoad && editAtLoad.syncedRevision !== editAtLoad.revision;
-      return changedDuringLoad || pendingAtLoad
-        ? { ...todo, note: currentEdit.note }
-        : todo;
-    }),
+    todos,
+    staleEditIds,
   };
+}
+
+function localNoteIsNewerThanRemote(edit, todo) {
+  const editedAt = Date.parse(edit?.editedAt ?? '');
+  const updatedAt = Date.parse(todo?.updatedAt ?? '');
+  if (Number.isNaN(updatedAt)) {
+    return true;
+  }
+
+  if (Number.isNaN(editedAt)) {
+    return false;
+  }
+
+  return editedAt >= updatedAt;
 }
 
 export function withNoteSaveLock(todoId, action, locks = globalThis.navigator?.locks) {

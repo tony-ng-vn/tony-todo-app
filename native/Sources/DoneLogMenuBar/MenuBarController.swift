@@ -125,13 +125,13 @@ final class MenuBarController: NSObject {
     DistributedNotificationCenter.default().addObserver(
       self,
       selector: #selector(showFullApp),
-      name: .doneLogShowFullApp,
+      name: MenuBarLaunchPolicy.showFullAppNotification(),
       object: nil
     )
     DistributedNotificationCenter.default().addObserver(
       self,
       selector: #selector(quit),
-      name: .doneLogQuit,
+      name: MenuBarLaunchPolicy.quitNotification(),
       object: nil
     )
   }

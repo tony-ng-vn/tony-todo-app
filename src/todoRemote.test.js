@@ -49,6 +49,7 @@ describe('todo remote mapping', () => {
 
     expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
     expect(calls).toContainEqual(['neq', 'loop_status', 'inbox']);
+    expect(calls.find((call) => call[0] === 'select')[1]).toContain('updated_at');
   });
 
 
@@ -136,6 +137,7 @@ describe('todo remote mapping', () => {
         parent_task_id: null,
         is_progress_session: false,
         progress_label: 'Chapter 4',
+        updated_at: '2026-08-13T16:44:21.431Z',
       }),
     ).toEqual({
       id: 'todo-1',
@@ -163,6 +165,7 @@ describe('todo remote mapping', () => {
       parentTaskId: null,
       isProgressSession: false,
       progressLabel: 'Chapter 4',
+      updatedAt: '2026-08-13T16:44:21.431Z',
     });
   });
 
