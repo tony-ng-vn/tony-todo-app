@@ -107,6 +107,22 @@ struct NativeAppLaunchPolicyTests {
     )
   }
 
+  @Test("Keeps retrying the extra after the window is already open")
+  func keepsWaitingAfterWindowOpens() {
+    #expect(
+      NativeAppLaunchPolicy.shouldKeepWaitingForStatusItem(
+        statusItemIsReady: false,
+        elapsed: 1.5
+      )
+    )
+    #expect(
+      !NativeAppLaunchPolicy.shouldKeepWaitingForStatusItem(
+        statusItemIsReady: false,
+        elapsed: 8
+      )
+    )
+  }
+
   @Test("Opens the full window immediately on a user reopen")
   func opensFullAppImmediatelyOnReopen() {
     #expect(
@@ -118,26 +134,40 @@ struct NativeAppLaunchPolicyTests {
     )
   }
 
-  @Test("Recreates an unhosted status extra once during launch")
-  func recreatesUnhostedStatusItemOnce() {
+  @Test("Recreates an unhosted status extra a few times during launch")
+  func recreatesUnhostedStatusItemAFewTimes() {
     #expect(
       NativeAppLaunchPolicy.shouldRecreateStatusItem(
         statusItemIsReady: false,
-        alreadyRecreated: false,
+        recreateCount: 0,
         elapsed: 0.5
       )
     )
     #expect(
       !NativeAppLaunchPolicy.shouldRecreateStatusItem(
         statusItemIsReady: false,
-        alreadyRecreated: true,
+        recreateCount: 1,
         elapsed: 0.5
+      )
+    )
+    #expect(
+      NativeAppLaunchPolicy.shouldRecreateStatusItem(
+        statusItemIsReady: false,
+        recreateCount: 1,
+        elapsed: 0.8
+      )
+    )
+    #expect(
+      !NativeAppLaunchPolicy.shouldRecreateStatusItem(
+        statusItemIsReady: false,
+        recreateCount: 3,
+        elapsed: 2
       )
     )
     #expect(
       !NativeAppLaunchPolicy.shouldRecreateStatusItem(
         statusItemIsReady: true,
-        alreadyRecreated: false,
+        recreateCount: 0,
         elapsed: 0.5
       )
     )

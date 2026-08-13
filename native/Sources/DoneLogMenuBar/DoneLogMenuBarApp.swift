@@ -8,7 +8,7 @@ final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
   private var menuBarController: MenuBarController?
   private var smokeTimeout: DispatchWorkItem?
   private var didFinishSmokeCheck = false
-  private var didRecreateStatusItem = false
+  private var statusItemRecreateCount = 0
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     let controller = MenuBarController(
@@ -56,23 +56,17 @@ final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
     action: NativeAppLaunchPolicy.Action,
     allowUnhosted: Bool = false
   ) {
+    let elapsed = Date().timeIntervalSince(startedAt)
     if NativeAppLaunchPolicy.shouldOpenFullAppNow(
       action: action,
       statusItemIsReady: controller.isReady,
       allowUnhosted: allowUnhosted
-    ) {
-      controller.showFullApp()
-      return
-    }
-
-    let elapsed = Date().timeIntervalSince(startedAt)
-    if NativeAppLaunchPolicy.shouldOpenFullAppAfterTimeout(
+    ) || NativeAppLaunchPolicy.shouldOpenFullAppAfterTimeout(
       action: action,
       statusItemIsReady: controller.isReady,
       elapsed: elapsed
     ) {
       controller.showFullApp()
-      return
     }
 
     if controller.isReady {
@@ -81,10 +75,10 @@ final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
 
     if NativeAppLaunchPolicy.shouldRecreateStatusItem(
       statusItemIsReady: controller.isReady,
-      alreadyRecreated: didRecreateStatusItem,
+      recreateCount: statusItemRecreateCount,
       elapsed: elapsed
     ) {
-      didRecreateStatusItem = true
+      statusItemRecreateCount += 1
       controller.recreateStatusItem()
     }
 

@@ -64,6 +64,35 @@ struct MenuBarConfigurationTests {
     )
   }
 
+  @Test("Turns the Control Center extra on before creating it")
+  func revealsStatusItemInControlCenter() {
+    let defaults = UserDefaults(suiteName: "done-log.status-item.visible-test")!
+
+    MenuBarConfiguration.revealStatusItemInControlCenter(defaults: defaults)
+
+    #expect(
+      defaults.bool(
+        forKey: MenuBarConfiguration.statusItemVisibleDefaultsKey(
+          prefix: "NSStatusItem Visible"
+        )
+      )
+    )
+    #expect(
+      defaults.bool(
+        forKey: MenuBarConfiguration.statusItemVisibleDefaultsKey(
+          prefix: "NSStatusItem VisibleCC"
+        )
+      )
+    )
+    #expect(
+      defaults.integer(
+        forKey: MenuBarConfiguration.statusItemVisibleDefaultsKey(
+          prefix: "NSStatusItem Preferred Position"
+        )
+      ) == 450
+    )
+  }
+
   @Test("Builds a visible native template icon")
   @MainActor
   func buildsNativeTemplateIcon() throws {
@@ -101,7 +130,17 @@ struct MenuBarConfigurationTests {
   func acceptsVisibleStatusItem() {
     #expect(
       MenuBarConfiguration.statusItemFrameIsInMenuBar(
-        NSRect(x: 1762, y: 1147, width: 38, height: 22),
+        NSRect(x: 1378, y: 1147, width: 34, height: 22),
+        usableAreas: [NSRect(x: 1000, y: 1130, width: 800, height: 39)]
+      )
+    )
+  }
+
+  @Test("Rejects a status item parked on the trailing screen edge")
+  func rejectsTrailingEdgeStatusItem() {
+    #expect(
+      !MenuBarConfiguration.statusItemFrameIsInMenuBar(
+        NSRect(x: 1767, y: 1147, width: 33, height: 22),
         usableAreas: [NSRect(x: 1000, y: 1130, width: 800, height: 39)]
       )
     )

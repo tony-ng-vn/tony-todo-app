@@ -39,6 +39,8 @@ enum NativeAppLaunchPolicy {
   }
 
   static let statusItemHostTimeout: TimeInterval = 1
+  static let statusItemRetryTimeout: TimeInterval = 8
+  static let statusItemRecreateLimit = 3
 
   static func action(for intent: Intent) -> Action {
     switch intent {
@@ -72,18 +74,18 @@ enum NativeAppLaunchPolicy {
     statusItemIsReady: Bool,
     elapsed: TimeInterval
   ) -> Bool {
-    !statusItemIsReady && elapsed < statusItemHostTimeout
+    !statusItemIsReady && elapsed < statusItemRetryTimeout
   }
 
   static func shouldRecreateStatusItem(
     statusItemIsReady: Bool,
-    alreadyRecreated: Bool,
+    recreateCount: Int,
     elapsed: TimeInterval
   ) -> Bool {
     !statusItemIsReady
-      && !alreadyRecreated
-      && elapsed >= 0.4
-      && elapsed < statusItemHostTimeout
+      && recreateCount < statusItemRecreateLimit
+      && elapsed >= 0.4 * Double(recreateCount + 1)
+      && elapsed < statusItemRetryTimeout
   }
 
   @MainActor

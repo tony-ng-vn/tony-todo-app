@@ -1,7 +1,7 @@
 import AppKit
 
 @MainActor
-final class MenuBarController: NSObject {
+final class MenuBarController: NSObject, NSMenuDelegate {
   private var statusItem: NSStatusItem
   private let popover: NSPopover
   private let contextMenu: NSMenu
@@ -14,8 +14,12 @@ final class MenuBarController: NSObject {
   private var floatingNoteWindows: [String: FloatingNoteWindowController] = [:]
 
   init(url: URL, updateChecker: any AppUpdateChecking) {
+    MenuBarConfiguration.revealStatusItemInControlCenter()
     statusItem = NSStatusBar.system.statusItem(
       withLength: NSStatusItem.variableLength
+    )
+    statusItem.autosaveName = NSStatusItem.AutosaveName(
+      MenuBarConfiguration.statusItemAutosaveName
     )
     popover = NSPopover()
     contextMenu = NSMenu()
@@ -113,14 +117,21 @@ final class MenuBarController: NSObject {
     )
     quitItem.target = self
     contextMenu.addItem(quitItem)
+    contextMenu.delegate = self
+    statusItem.menu = contextMenu
   }
 
   func recreateStatusItem() {
     NSStatusBar.system.removeStatusItem(statusItem)
+    MenuBarConfiguration.revealStatusItemInControlCenter()
     statusItem = NSStatusBar.system.statusItem(
       withLength: NSStatusItem.variableLength
     )
+    statusItem.autosaveName = NSStatusItem.AutosaveName(
+      MenuBarConfiguration.statusItemAutosaveName
+    )
     applyStatusItemAppearance()
+    statusItem.menu = contextMenu
     statusItem.isVisible = true
   }
 
@@ -155,24 +166,8 @@ final class MenuBarController: NSObject {
     }
 
     button.image = MenuBarConfiguration.makeStatusIcon()
-    button.imagePosition = .imageOnly
+    button.imagePosition = .imageLeft
     button.toolTip = "Done Log"
-    button.target = self
-    button.action = #selector(statusItemClicked)
-    button.sendAction(on: [.leftMouseUp, .rightMouseUp])
-  }
-
-  @objc
-  private func statusItemClicked() {
-    guard let event = NSApp.currentEvent else {
-      return
-    }
-
-    if event.type == .rightMouseUp {
-      showContextMenu()
-    } else {
-      togglePopover()
-    }
   }
 
   private func togglePopover() {
@@ -201,15 +196,19 @@ final class MenuBarController: NSObject {
     popover.contentViewController?.view.window?.makeKey()
   }
 
-  private func showContextMenu() {
-    guard let button = statusItem.button else {
+  func menuNeedsUpdate(_ menu: NSMenu) {
+    updateLaunchAtLoginItem()
+  }
+
+  func menuWillOpen(_ menu: NSMenu) {
+    guard let event = NSApp.currentEvent, event.type == .leftMouseDown else {
       return
     }
 
-    updateLaunchAtLoginItem()
-    statusItem.menu = contextMenu
-    button.performClick(nil)
-    statusItem.menu = nil
+    menu.cancelTracking()
+    DispatchQueue.main.async { [weak self] in
+      self?.togglePopover()
+    }
   }
 
   private func updateLaunchAtLoginItem() {
