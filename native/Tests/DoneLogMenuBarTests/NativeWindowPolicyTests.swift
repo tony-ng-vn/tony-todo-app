@@ -13,8 +13,8 @@ struct NativeWindowPolicyTests {
     #expect(style.contains(.closable))
     #expect(style.contains(.miniaturizable))
     #expect(style.contains(.resizable))
+    #expect(style.contains(.fullSizeContentView))
     #expect(style != .borderless)
-    #expect(!style.contains(.fullSizeContentView))
     #expect(NativeWindowPolicy.fullScreenMenuTitle(isFullScreen: false) == "Enter Full Screen")
     #expect(NativeWindowPolicy.fullScreenMenuTitle(isFullScreen: true) == "Exit Full Screen")
   }
@@ -49,6 +49,21 @@ struct NativeWindowPolicyTests {
     #expect(window.contentMaxSize.width > 1_800)
     #expect(window.contentMaxSize.height > 1_130)
     #expect(window.contentViewController?.preferredContentSize == .zero)
+  }
+
+  @Test("Hides the system title bar so content can fill the window")
+  @MainActor
+  func usesTransparentUnifiedChrome() throws {
+    let controller = FullAppWindowController(
+      url: try #require(URL(string: "https://example.com/"))
+    )
+    let window = try #require(controller.window)
+
+    #expect(window.styleMask.contains(.fullSizeContentView))
+    #expect(window.titlebarAppearsTransparent)
+    #expect(window.titleVisibility == .hidden)
+    #expect(window.titlebarSeparatorStyle == .none)
+    #expect(window.isOpaque == false)
   }
 
   @Test("Uses the screen visible frame for the native zoom action")

@@ -14,7 +14,8 @@ final class FullAppWindowController: NSWindowController, NSWindowDelegate {
     let contentController = MenuBarWebViewController(
       homeURL: url,
       preferredSize: MenuBarConfiguration.fullAppSize,
-      readySelector: nil
+      readySelector: nil,
+      usesWindowChrome: true
     )
     let window = NSWindow(
       contentRect: NSRect(origin: .zero, size: MenuBarConfiguration.fullAppSize),
@@ -23,6 +24,7 @@ final class FullAppWindowController: NSWindowController, NSWindowDelegate {
       defer: false
     )
     window.title = "Done Log"
+    NativeWindowPolicy.applyChrome(to: window)
     window.contentMinSize = MenuBarConfiguration.fullAppMinimumSize
     window.contentViewController = contentController
     window.isReleasedWhenClosed = false

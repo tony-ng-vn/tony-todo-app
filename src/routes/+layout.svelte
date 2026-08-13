@@ -7,6 +7,10 @@
 
   injectAnalytics({ mode: dev ? 'development' : 'production' });
   injectSpeedInsights();
+
+  if (typeof window !== 'undefined' && window.__doneLogNativeChrome) {
+    document.documentElement.classList.add('is-native-host');
+  }
 </script>
 
 {@render children()}
