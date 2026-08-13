@@ -99,6 +99,7 @@ function applyTodoNote(previousNote, nextNote, now = new Date()) {
     pending.push({ entry, index, normalized: normalizeUnitText(entry.text) });
   });
 
+  reservePassThroughUnits(nextEntries, previousUnits);
   matchUniquePairs(pending, previousUnits, resolved);
   matchFirstAvailableByText(pending, previousUnits, resolved);
   matchBySimilarity(pending, previousUnits, resolved);
@@ -119,6 +120,26 @@ function stripNoteStampsForEditor(storedNote) {
   return parseNoteEntries(storedNote)
     .map((entry) => entry.text)
     .join('\n');
+}
+
+// A next entry that already carries a header (parsed straight from an
+// explicit "@ " line, e.g. the untouched part of an appendNote flow) skips
+// matching entirely and keeps its own stamp - but its previous-side
+// counterpart must still be marked used, or a later similar bullet in the
+// same note could steal that still-present bullet's time in passes A-D.
+function reservePassThroughUnits(nextEntries, previousUnits) {
+  for (const entry of nextEntries) {
+    if (!entry.at) {
+      continue;
+    }
+    const normalized = normalizeUnitText(entry.text);
+    const match = previousUnits.find(
+      (unit) => !unit.used && unit.entry.at === entry.at && unit.normalized === normalized,
+    );
+    if (match) {
+      match.used = true;
+    }
+  }
 }
 
 // Pass A: a normalized string unique on both sides pairs unambiguously

@@ -212,6 +212,33 @@ describe('applyTodoNote bullet matching', () => {
 
     expect(next).toBe(stored);
   });
+
+  // Regression: nextNote built by appending fresh text onto the previous
+  // stored note (the appendNote flow) carries the untouched bullet through
+  // as a pass-through entry (it already has its header). Passes A-D must not
+  // also hand that same previous-side bullet to a similar new bullet, or the
+  // still-present original loses its claim on its own time.
+  it('does not let a newly appended similar bullet steal the still-present original bullet\'s time', () => {
+    const stored = applyTodoNote('', '- call mom', first);
+
+    const next = applyTodoNote(stored, `${stored}\n\n- call mom later tonight`, now);
+
+    expect(parseNoteEntries(next)).toEqual([
+      { at: first.toISOString(), text: '- call mom' },
+      { at: now.toISOString(), text: '- call mom later tonight' },
+    ]);
+  });
+
+  it('does not let an appended duplicate bullet steal the still-present original bullet\'s time', () => {
+    const stored = applyTodoNote('', '- call bank', first);
+
+    const next = applyTodoNote(stored, `${stored}\n\n- call bank`, now);
+
+    expect(parseNoteEntries(next)).toEqual([
+      { at: first.toISOString(), text: '- call bank' },
+      { at: now.toISOString(), text: '- call bank' },
+    ]);
+  });
 });
 
 describe('stripNoteStampsForEditor', () => {
