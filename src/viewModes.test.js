@@ -13,13 +13,16 @@ describe('view modes', () => {
 
   it('keeps a known view mode unchanged', () => {
     expect(normalizeViewMode('projects')).toBe('projects');
-    expect(normalizeViewMode('agenda')).toBe('agenda');
     expect(normalizeViewMode('board')).toBe('board');
     expect(normalizeViewMode('settings')).toBe('settings');
   });
 
   it('migrates a saved profile view to settings', () => {
     expect(normalizeViewMode('profile')).toBe('settings');
+  });
+
+  it('migrates a saved agenda view to tasks', () => {
+    expect(normalizeViewMode('agenda')).toBe('flow');
   });
 
   it('falls back to flow for anything unknown', () => {
