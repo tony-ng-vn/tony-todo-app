@@ -13,7 +13,7 @@ Migrations and `insforge.toml` config apply stay manual.
 - Migrations always land in the repo before or together with being applied to the live database.
   If an urgent fix must be applied live first, commit and PR it in the same session so the repo never drifts from production.
 - Test risky schema, RLS, or function changes on an InsForge backend branch first (`npx -y @insforge/cli branch create/switch/merge`), not on production.
-- Never change the sign-up lock (`disable_signup`) in either direction without an explicit ask from the owner (see "Live backend ops truth" in AGENTS.md).
+- Never change the sign-up lock (`disable_signup`) in either direction without an explicit ask from the owner (see "Live backend" in AGENTS.md).
 - The CLI login is interactive; the owner runs `npx -y @insforge/cli login --device` themselves on headless machines for SQL and config work.
 
 ## Sequence
