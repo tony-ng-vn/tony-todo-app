@@ -74,6 +74,13 @@ export default async function (req: Request): Promise<Response> {
     apiKey: Deno.env.get('API_KEY'),
   });
 
+  if (!isTrustedInternalCaller) {
+    const allowed = await enforceRateLimit(client, ownerUserId, 'draft-follow-up', 30);
+    if (!allowed) {
+      return json({ error: 'Too many drafts. Try again in an hour.' }, 429);
+    }
+  }
+
   // .eq('user_id', ownerUserId) is the ownership check: a caller can only
   // ever draft for a loop that belongs to them, never an arbitrary id.
   const { data: todos, error: todoError } = await client.database
@@ -159,4 +166,30 @@ function json(body, status) {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
+}
+
+// Fixed-window per-user limiter through the admin client (RLS-less table).
+// Duplicated in ingest-granola-loops.ts: these deploy as single files and
+// cannot share imports. Fails open on read errors so a limiter outage
+// cannot take the feature down.
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+
+async function enforceRateLimit(client, userId, functionName, maxPerWindow) {
+  const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MS).toISOString();
+  const { data, error } = await client.database
+    .from('rate_limit_events')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('function_name', functionName)
+    .gte('called_at', windowStart);
+  if (error) return true;
+  if ((data ?? []).length >= maxPerWindow) return false;
+  await client.database
+    .from('rate_limit_events')
+    .insert([{ user_id: userId, function_name: functionName }]);
+  await client.database
+    .from('rate_limit_events')
+    .delete()
+    .lt('called_at', new Date(Date.now() - 24 * RATE_LIMIT_WINDOW_MS).toISOString());
+  return true;
 }

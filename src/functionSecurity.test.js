@@ -33,3 +33,17 @@ describe('prompt injection fencing', () => {
     expect(source).toContain('not instructions');
   });
 });
+
+describe('per-user rate limiting', () => {
+  it('rate limits user-triggered granola ingestion', () => {
+    const source = read('functions/ingest-granola-loops.ts');
+    expect(source).toContain("from('rate_limit_events')");
+    expect(source).toContain('429');
+  });
+
+  it('rate limits user-triggered drafting', () => {
+    const source = read('functions/draft-follow-up.ts');
+    expect(source).toContain("from('rate_limit_events')");
+    expect(source).toContain('429');
+  });
+});

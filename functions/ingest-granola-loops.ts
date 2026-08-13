@@ -148,6 +148,13 @@ export default async function (req: Request): Promise<Response> {
     apiKey: Deno.env.get('API_KEY'),
   });
 
+  if (!isTrustedInternalCaller) {
+    const allowed = await enforceRateLimit(client, ownerUserId, 'ingest-granola-loops', 10);
+    if (!allowed) {
+      return json({ error: 'Too many ingestion runs. Try again in an hour.' }, 429);
+    }
+  }
+
   const sources = [];
   if (sourceFilter === 'both' || sourceFilter === 'personal') {
     const key = Deno.env.get('GRANOLA_PERSONAL_API_KEY');
@@ -483,4 +490,30 @@ function json(body, status) {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
+}
+
+// Fixed-window per-user limiter through the admin client (RLS-less table).
+// Duplicated in draft-follow-up.ts: these deploy as single files and
+// cannot share imports. Fails open on read errors so a limiter outage
+// cannot take the feature down.
+const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000;
+
+async function enforceRateLimit(client, userId, functionName, maxPerWindow) {
+  const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MS).toISOString();
+  const { data, error } = await client.database
+    .from('rate_limit_events')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('function_name', functionName)
+    .gte('called_at', windowStart);
+  if (error) return true;
+  if ((data ?? []).length >= maxPerWindow) return false;
+  await client.database
+    .from('rate_limit_events')
+    .insert([{ user_id: userId, function_name: functionName }]);
+  await client.database
+    .from('rate_limit_events')
+    .delete()
+    .lt('called_at', new Date(Date.now() - 24 * RATE_LIMIT_WINDOW_MS).toISOString());
+  return true;
 }
