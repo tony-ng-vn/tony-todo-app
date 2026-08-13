@@ -38,6 +38,11 @@
   import { getCurrentUser, signInWithPassword, signOut, signUp } from '../../auth.js';
   import { insforge, isInsForgeConfigured } from '../../insforgeClient.js';
   import {
+    BOOTSTRAP_DOWNLOAD_URL,
+    requestNativeUpdate,
+    resolveUpdateAction,
+  } from '../../appUpdate.js';
+  import {
     loadLocalState,
     reconcileRemoteState,
     saveLocalState as writeLocalState,
@@ -94,6 +99,8 @@
   let standaloneNoteId = null;
   let isNativeHost = false;
   let isLegacyNativeHost = false;
+  let hasNativeUpdater = false;
+  let bootstrapAvailable = false;
   let themeMode = 'light';
   let expandedTaskId = null;
   let noteSaveStatuses = {};
@@ -118,6 +125,13 @@
   $: openTodos = openTodoSections.flatMap((section) => section.items);
   $: somedayTodos = getSomedayTodos(state);
   $: completedTodoSections = getCompletedTodoSections(state, new Date());
+  $: updateAction = resolveUpdateAction({
+    isNativeHost,
+    isLegacyNativeHost,
+    hasNativeUpdater,
+    bootstrapAvailable,
+    webUpdateAvailable: updateAvailable,
+  });
   $: floatingNoteTodo = floatingNoteId ? findTodo(floatingNoteId) : null;
   $: standaloneNoteTodo = standaloneNoteId ? findTodo(standaloneNoteId) : null;
 
@@ -125,8 +139,16 @@
     const searchParams = new URLSearchParams(window.location.search);
     const requestedNoteId = searchParams.get('note');
     isNativeHost = Boolean(window.__doneLogNativeHost);
+    hasNativeUpdater = Boolean(
+      window.__doneLogNativeUpdater && window.webkit?.messageHandlers?.doneLogUpdater,
+    );
     isLegacyNativeHost =
-      !isNativeHost && Boolean(window.webkit) && !navigator.userAgent.includes('Safari/');
+      Boolean(window.webkit) &&
+      !navigator.userAgent.includes('Safari/') &&
+      !hasNativeUpdater;
+    if (isLegacyNativeHost) {
+      checkForBootstrapRelease();
+    }
     standaloneNoteId = requestedNoteId;
     useRemote = isInsForgeConfigured && !searchParams.has('local');
     syncMessage = useRemote ? 'Connecting' : 'Local only';
@@ -210,7 +232,7 @@
   }
 
   async function checkForUpdate() {
-    if (updateAvailable || updateCheckInFlight) {
+    if (isNativeHost || isLegacyNativeHost || updateAvailable || updateCheckInFlight) {
       return;
     }
 
@@ -219,6 +241,20 @@
       updateAvailable = await updated.check();
     } finally {
       updateCheckInFlight = false;
+    }
+  }
+
+  async function checkForBootstrapRelease() {
+    try {
+      const response = await fetch('/api/native-release');
+      if (!response.ok) {
+        return;
+      }
+
+      const result = await response.json();
+      bootstrapAvailable = result.available === true;
+    } catch {
+      bootstrapAvailable = false;
     }
   }
 
@@ -251,6 +287,20 @@
       await noteAutosave.flushAll();
     } catch {
       // Pending notes remain in local storage and retry after the reload.
+    }
+
+    if (updateAction.kind === 'native-check') {
+      requestNativeUpdate(window);
+      updateInFlight = false;
+      syncMessage = 'Update check opened';
+      return;
+    }
+
+    if (updateAction.kind === 'legacy-bootstrap') {
+      window.location.assign(BOOTSTRAP_DOWNLOAD_URL);
+      updateInFlight = false;
+      syncMessage = 'Desktop update download opened';
+      return;
     }
 
     const nextUrl = new URL(window.location.href);
@@ -726,16 +776,14 @@
         <button
           type="button"
           class="menubar-update"
-          class:is-available={updateAvailable}
+          class:is-available={updateAction.isAvailable}
           disabled={updateInFlight}
           aria-live="polite"
-          aria-label={updateAvailable ? 'Update available for Done Log' : 'Check for Done Log updates'}
-          title={updateAvailable
-            ? 'A newer Done Log is ready to load'
-            : 'Check for and load the latest Done Log'}
+          aria-label={updateAction.label}
+          title={updateAction.title}
           on:click={handleManualUpdate}
         >
-          {updateInFlight ? 'Updating' : updateAvailable ? 'Update available' : 'Update'}
+          {updateInFlight ? 'Updating' : updateAction.label}
         </button>
         <a
           class="menubar-open-full"

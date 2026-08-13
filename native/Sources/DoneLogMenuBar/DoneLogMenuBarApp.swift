@@ -4,13 +4,15 @@ import Foundation
 @MainActor
 final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
   let windowCommands = NativeWindowCommandHandler()
+  let updateCoordinator = AppUpdateCoordinator()
   private var menuBarController: MenuBarController?
   private var smokeTimeout: DispatchWorkItem?
   private var didFinishSmokeCheck = false
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     let controller = MenuBarController(
-      url: MenuBarConfiguration.resolveURL()
+      url: MenuBarConfiguration.resolveURL(),
+      updateChecker: updateCoordinator
     )
     menuBarController = controller
 
@@ -147,7 +149,8 @@ enum DoneLogMenuBarApp {
     let delegate = DoneLogApplicationDelegate()
     application.delegate = delegate
     let mainMenu = ApplicationMenuFactory.makeMainMenu(
-      windowCommands: delegate.windowCommands
+      windowCommands: delegate.windowCommands,
+      updateChecker: delegate.updateCoordinator
     )
     application.mainMenu = mainMenu
     application.windowsMenu = mainMenu.items.first {

@@ -32,6 +32,19 @@ These live outside the INSFORGE block on purpose: a skill sync rewrites that blo
 
 Agents have permission to open PRs, watch CI, fix review comments, and merge when required checks are green and comments are addressed. Do not wait for a second ask.
 
+## Working in parallel
+
+Several agents work this repo concurrently; these rules keep them from colliding.
+
+- Before starting a task, check open PRs' changed paths (`gh pr list` plus `gh pr diff --name-only <n>`) and prefer work that does not overlap an in-flight PR.
+- Open your PR as a draft as soon as the branch exists, before the implementation is done.
+  A draft PR is the visible claim on the files you are touching.
+- Run a code-review pass over the branch before marking the PR ready (in Claude Code use `/code-review`; elsewhere an equivalent reviewer pass), and address what it finds.
+  The hosted reviewers (CodeRabbit, Copilot) are rate limited and must not be relied on.
+- When checks are green and comments addressed, merge, or enable auto-merge (merge commit) and move on; the head branch deletes itself on merge.
+- Dependency changes (`package-lock.json`) go in their own small PRs, never bundled with feature work.
+- Keep PRs small and short-lived; a long-lived branch in this repo will need repeated merges from main because required checks are strict.
+
 ## Native menu bar
 
 - Local `npm run menubar` / `menubar:dev` from a worktree must use the `dev` instance lock and `com.tonynguyen.donelog.dev`. Never share the production lock or `doneLogQuit` notification, or a test run will steal or quit `/Applications/Done Log.app`.
@@ -55,8 +68,10 @@ Agents have permission to open PRs, watch CI, fix review comments, and merge whe
 ## Changelog
 
 - CHANGELOG.md entries use these categories, matching the project's architecture: `Web App` (SvelteKit frontend), `Backend` (InsForge functions, migrations, auth config), `Native App` (macOS menu bar companion), `CI & Tooling` (hooks, scripts, verification), `Docs`.
-- Only include the categories a release actually touched.
-- Keep the newest entry first, keep `package.json` version in sync with the newest entry, and update the changelog in the same commit as the change that prompted it.
+- Feature PRs never edit `CHANGELOG.md` or a version field directly. Instead, each PR adds one fragment file to `changelog.d/` describing its own change; see `changelog.d/README.md` for the exact format.
+- Only include the categories a fragment's change actually touched.
+- At release time, run `npm run release:changelog -- <patch|minor|major>` to compile every fragment into a new CHANGELOG.md entry, bump the version in `package.json` and `native/App/Info.plist`, refresh the lockfile, and delete the consumed fragments.
+- This keeps concurrent PRs from conflicting on a shared changelog or version line.
 
 ## Live backend ops truth
 

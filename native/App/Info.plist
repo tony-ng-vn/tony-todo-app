@@ -28,5 +28,13 @@
   <true/>
   <key>NSHighResolutionCapable</key>
   <true/>
+  <key>SUFeedURL</key>
+  <string>https://github.com/tony-ng-vn/tony-todo-app/releases/latest/download/appcast.xml</string>
+  <key>SUPublicEDKey</key>
+  <string>GV8/H4LwsCkJapGXHEAZ+E+osVsjYDmz7Q5gVr1OuNU=</string>
+  <key>SURequireSignedFeed</key>
+  <true/>
+  <key>SUVerifyUpdateBeforeExtraction</key>
+  <true/>
 </dict>
 </plist>

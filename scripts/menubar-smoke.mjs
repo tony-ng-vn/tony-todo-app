@@ -695,7 +695,7 @@ try {
     failures.push(`theme toggle did not persist its state: ${JSON.stringify({ initial, themeChange })}`);
   }
   if (
-    initial.updateButtonLabel !== (expectUpdateAvailable ? 'Update available' : 'Update') ||
+    initial.updateButtonLabel !== (expectUpdateAvailable ? 'Reload latest' : 'Reload') ||
     initial.updateAvailable !== expectUpdateAvailable ||
     initial.updateLiveRegion !== 'polite' ||
     !manualUpdate.keptLocalMode ||
