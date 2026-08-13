@@ -239,14 +239,18 @@ describe('CI workflow', () => {
 
     const deploy = functionsWorkflow.jobs.deploy;
     expect(deploy.name).toBe('Deploy InsForge functions');
+    expect(deploy.if).toContain("github.event_name == 'workflow_dispatch'");
+    expect(deploy.if).toContain("github.ref == 'refs/heads/main'");
     expect(deploy.if).toContain("github.event.workflow_run.conclusion == 'success'");
     expect(deploy.if).toContain("github.event.workflow_run.head_branch == 'main'");
     expect(deploy.env.INSFORGE_PROJECT_ID).toBe('7e77e15d-9e4d-4591-9951-8b99289200cd');
+    expect(packageJson.devDependencies['@insforge/cli']).toBe('0.2.6');
 
     const stepsByName = Object.fromEntries(deploy.steps.map((step) => [step.name, step]));
     expect(stepsByName['Check out repository'].with.ref).toContain('workflow_run.head_sha');
+    expect(stepsByName['Install dependencies'].run).toBe('npm ci');
     expect(stepsByName['Deploy changed functions and verify live source'].run).toContain(
-      'login --user-api-key',
+      'npx -y --offline @insforge/cli@0.2.6 login --user-api-key',
     );
     expect(stepsByName['Deploy changed functions and verify live source'].run).toContain(
       'sync:insforge-functions',
