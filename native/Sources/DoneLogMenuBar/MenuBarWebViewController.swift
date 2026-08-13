@@ -1,6 +1,23 @@
 import AppKit
 import WebKit
 
+private final class WindowChromeMessageRelay: NSObject, WKScriptMessageHandler {
+  weak var controller: MenuBarWebViewController?
+
+  init(controller: MenuBarWebViewController) {
+    self.controller = controller
+  }
+
+  func userContentController(
+    _ userContentController: WKUserContentController,
+    didReceive message: WKScriptMessage
+  ) {
+    Task { @MainActor in
+      self.controller?.handleWindowChromeMessage(message)
+    }
+  }
+}
+
 @MainActor
 final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WKUIDelegate {
   private let homeURL: URL
@@ -44,6 +61,12 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
       forMainFrameOnly: true
     )
     configuration.userContentController.addUserScript(nativeHostScript)
+    if usesWindowChrome {
+      configuration.userContentController.add(
+        WindowChromeMessageRelay(controller: self),
+        name: NativeWindowPolicy.chromeMessageName
+      )
+    }
 
     webView = NativeChromeWebView(
       frame: NSRect(origin: .zero, size: initialSize),
@@ -120,11 +143,33 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     }
 
     let inset = NativeWindowPolicy.titlebarInset(in: webView, window: window)
+    let lightsInset = NativeWindowPolicy.trafficLightsLeadingInset(in: webView, window: window)
     webView.titlebarPassthroughHeight = inset
-    let cssValue = NativeWindowPolicy.titlebarInsetCSSValue(inset)
+    webView.titlebarPassthroughLeadingInset = lightsInset
+    let insetCSS = NativeWindowPolicy.titlebarInsetCSSValue(inset)
+    let lightsCSS = NativeWindowPolicy.titlebarInsetCSSValue(lightsInset)
     webView.evaluateJavaScript(
-      "document.documentElement.style.setProperty('--native-titlebar-inset', '\(cssValue)');"
+      """
+      document.documentElement.style.setProperty('--native-titlebar-inset', '\(insetCSS)');
+      document.documentElement.style.setProperty('--native-traffic-lights-inset', '\(lightsCSS)');
+      """
     )
+  }
+
+  func handleWindowChromeMessage(_ message: WKScriptMessage) {
+    guard usesWindowChrome,
+      message.name == NativeWindowPolicy.chromeMessageName,
+      let window = webView.window
+    else {
+      return
+    }
+
+    switch NativeWindowPolicy.chromeCommand(from: message.body) {
+    case .zoom:
+      window.performZoom(nil)
+    case nil:
+      break
+    }
   }
 
   func webView(
@@ -224,6 +269,7 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     if (\(chromeFlag)) {
       document.documentElement.classList.add('is-native-host');
       document.documentElement.style.setProperty('--native-titlebar-inset', '28px');
+      document.documentElement.style.setProperty('--native-traffic-lights-inset', '78px');
     }
     """
   }

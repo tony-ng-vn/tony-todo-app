@@ -82,6 +82,7 @@ struct MenuBarConfigurationTests {
 
     #expect(source.contains("classList.add('is-native-host')"))
     #expect(source.contains("--native-titlebar-inset"))
+    #expect(source.contains("--native-traffic-lights-inset"))
     #expect(!source.contains("createElement('style')"))
     #expect(!source.contains("padding-top"))
   }
