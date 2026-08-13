@@ -1,7 +1,6 @@
 import {
   SUMMARY_BUCKETS,
   addTodo,
-  applyTodoNote,
   closeActiveTimeSegment,
   compareTodosNewestFirst,
   completeTodo,
@@ -618,12 +617,10 @@ export function getCalendarMonth(state, { year, month, now = new Date() } = {}) 
   };
 }
 
-export function updateTodoNote(state, todoId, note, now = new Date()) {
+export function updateTodoNote(state, todoId, note) {
   return {
     ...state,
-    todos: state.todos.map((todo) =>
-      todo.id === todoId ? { ...todo, note: applyTodoNote(todo.note ?? '', note, now) } : todo,
-    ),
+    todos: state.todos.map((todo) => (todo.id === todoId ? { ...todo, note } : todo)),
   };
 }
 

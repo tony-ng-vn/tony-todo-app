@@ -47,7 +47,6 @@ import {
   updateTodoTitle,
   updateTodoNote,
 } from './todoStore.js';
-import { formatNoteAtLocal } from './todoCommands.js';
 
 describe('day navigation', () => {
   it('moves one local calendar day in either direction', () => {
@@ -521,13 +520,32 @@ describe('todo day summary', () => {
     state = addTodo(state, 'Call school', new Date('2026-06-08T08:00:00'));
     const todo = state.todos[0];
 
-    const now = new Date('2026-06-08T15:00:00.000Z');
-    state = updateTodoNote(state, todo.id, 'Ask about the scholarship deadline.', now);
+    state = updateTodoNote(state, todo.id, 'Ask about the scholarship deadline.');
 
     expect(state.todos[0]).toEqual({
       ...todo,
-      note: `@ ${formatNoteAtLocal(now)}\nAsk about the scholarship deadline.`,
+      note: 'Ask about the scholarship deadline.',
     });
+  });
+
+  it('does not rewrite a typed note with timestamp headers', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Call school', new Date('2026-06-08T08:00:00'));
+    const todoId = state.todos[0].id;
+    state = {
+      ...state,
+      todos: state.todos.map((todo) =>
+        todo.id === todoId
+          ? { ...todo, note: '@ 2026-08-13 12:43\n- leftover rant' }
+          : todo,
+      ),
+    };
+
+    state = updateTodoNote(state, todoId, '- leftover rant');
+    expect(state.todos[0].note).toBe('- leftover rant');
+
+    state = updateTodoNote(state, todoId, '');
+    expect(state.todos[0].note).toBe('');
   });
 
   it('updates a task title when the new title has content', () => {
