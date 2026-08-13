@@ -300,6 +300,39 @@ describe('applyTodoNote bullet matching', () => {
       { at: now.toISOString(), text: '- call bank' },
     ]);
   });
+
+  // splitChunkIntoUnits only stamps paragraph 0 of a legacy chunk; a later
+  // paragraph parses as at: null. Matching such a unit must not carry that
+  // null forward forever - only an empty structural line is allowed to stay
+  // unstamped.
+  it('stamps a matched legacy-unstamped unit instead of leaving it unstamped forever', () => {
+    const stored = `@ ${formatNoteAtLocal(first)}\n- a\n\n- b`;
+
+    expect(parseNoteEntries(stored)).toEqual([
+      { at: first.toISOString(), text: '- a' },
+      { at: null, text: '- b' },
+    ]);
+
+    const next = applyTodoNote(stored, '- a\n- b', now);
+
+    expect(parseNoteEntries(next)).toEqual([
+      { at: first.toISOString(), text: '- a' },
+      { at: now.toISOString(), text: '- b' },
+    ]);
+    expect(next).toBe(`@ ${formatNoteAtLocal(first)}\n- a\n\n@ ${formatNoteAtLocal(now)}\n- b`);
+  });
+
+  it('still serializes an empty structural bullet bare while backfilling a legacy-unstamped unit', () => {
+    const stored = `@ ${formatNoteAtLocal(first)}\n- a\n\n- b`;
+
+    const next = applyTodoNote(stored, '- a\n- b\n- ', now);
+
+    expect(parseNoteEntries(next)).toEqual([
+      { at: first.toISOString(), text: '- a' },
+      { at: now.toISOString(), text: '- b' },
+      { at: null, text: '- ' },
+    ]);
+  });
 });
 
 describe('stripNoteStampsForEditor', () => {
