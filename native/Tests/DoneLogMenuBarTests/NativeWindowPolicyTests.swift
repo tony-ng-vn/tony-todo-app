@@ -91,16 +91,18 @@ struct NativeWindowPolicyTests {
     #expect(window.frame == visibleFrame)
   }
 
-  @Test("Leaves only the flipped top strip for native drag and zoom")
+  @Test("Passes only the traffic-light titlebar hits through")
   @MainActor
   func passesTitlebarHitsThrough() {
     let webView = NativeChromeWebView(
       frame: NSRect(x: 0, y: 0, width: 1_200, height: 800)
     )
     webView.titlebarPassthroughHeight = 28
+    webView.titlebarPassthroughLeadingInset = 78
 
     #expect(webView.isFlipped)
     #expect(webView.hitTest(NSPoint(x: 24, y: 10)) == nil)
+    #expect(webView.hitTest(NSPoint(x: 240, y: 10)) != nil)
     #expect(webView.hitTest(NSPoint(x: 24, y: 790)) != nil)
   }
 
@@ -145,8 +147,36 @@ struct NativeWindowPolicyTests {
         NSPoint(x: 24, y: 10),
         in: bounds,
         titlebarInset: inset,
+        trafficLightsLeadingInset: 78,
         isFlipped: true
       )
     )
+  }
+
+  @Test("Keeps the leading traffic-light slot for window drag and zoom")
+  func reservesTrafficLightDragSlot() {
+    let bounds = NSRect(x: 0, y: 0, width: 1_200, height: 800)
+
+    #expect(
+      NativeWindowPolicy.isTitlebarPassthroughPoint(
+        NSPoint(x: 24, y: 10),
+        in: bounds,
+        titlebarInset: 28,
+        trafficLightsLeadingInset: 78,
+        isFlipped: true
+      )
+    )
+    #expect(
+      !NativeWindowPolicy.isTitlebarPassthroughPoint(
+        NSPoint(x: 240, y: 10),
+        in: bounds,
+        titlebarInset: 28,
+        trafficLightsLeadingInset: 78,
+        isFlipped: true
+      )
+    )
+    #expect(NativeWindowPolicy.trafficLightsLeadingInset(zoomMaxX: 62) == 78)
+    #expect(NativeWindowPolicy.chromeCommand(from: ["command": "zoom"]) == .zoom)
+    #expect(NativeWindowPolicy.chromeCommand(from: ["command": "nope"]) == nil)
   }
 }
