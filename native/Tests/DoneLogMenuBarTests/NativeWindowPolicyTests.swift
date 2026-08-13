@@ -70,6 +70,7 @@ struct NativeWindowPolicyTests {
     #expect(window.appearance?.name == .darkAqua)
     #expect(window.backgroundColor == NativeWindowPolicy.canvasColor)
     #expect(window.isOpaque)
+    #expect(!window.hidesOnDeactivate)
     #expect(window.standardWindowButton(.closeButton)?.isHidden != true)
     #expect(window.contentView is NativeChromeWebView)
   }

@@ -77,6 +77,8 @@ describe('menu bar app bundle', () => {
     expect(runner).not.toContain('menubar:install');
     expect(installer).toContain('unset DONE_LOG_INSTANCE');
     expect(builder).toContain('DONE_LOG_BUNDLE_IDENTIFIER');
+    expect(installer).toContain('refusing to install a development Done Log');
+    expect(installer).toContain('Sparkle.framework');
   });
 
   it('keeps local app identity stable when a signing certificate is available', () => {
@@ -123,13 +125,25 @@ describe('menu bar app bundle', () => {
       path.join(repoRoot, 'native/Sources/DoneLogMenuBar/FloatingNoteWindowController.swift'),
       'utf8',
     );
+    const menuBarController = readFileSync(
+      path.join(repoRoot, 'native/Sources/DoneLogMenuBar/MenuBarController.swift'),
+      'utf8',
+    );
+    const note = readFileSync(
+      path.join(repoRoot, 'src/lib/components/FloatingTaskNote.svelte'),
+      'utf8',
+    );
 
     expect(controller).toContain('NSPanel');
     expect(controller).toContain('window.level = .floating');
+    expect(controller).toContain('window.hidesOnDeactivate = false');
     expect(controller).toContain('NativeWindowPolicy.applyChrome');
     expect(controller).toContain('usesWindowChrome: true');
     expect(controller).toContain('window.contentMinSize');
     expect(controller).toContain('contentController.onCloseWindow');
+    expect(menuBarController).toContain('onShowMenuBar:');
+    expect(note).toContain('requestNativeMenuBar(window)');
+    expect(note).toContain('Mini todos');
   });
 
   it('keeps floating-note activation from opening the full app', () => {
@@ -158,14 +172,23 @@ describe('menu bar app bundle', () => {
       path.join(repoRoot, 'native/Sources/DoneLogMenuBar/MenuBarController.swift'),
       'utf8',
     );
-
-    expect(controller).toContain(
-      'statusItem.autosaveName = "com.tonynguyen.donelog.primary-status-item"',
+    const app = readFileSync(
+      path.join(repoRoot, 'native/Sources/DoneLogMenuBar/DoneLogMenuBarApp.swift'),
+      'utf8',
     );
+
+    expect(controller).not.toContain('autosaveName');
     expect(controller).toContain('statusItem.isVisible = true');
-    expect(controller).toContain('withLength: NSStatusItem.squareLength');
+    expect(controller).toContain('withLength: NSStatusItem.variableLength');
     expect(controller).toContain('statusItemWindow.isVisible');
     expect(controller).toContain('statusItemFrameIsInMenuBar');
+    expect(controller).toContain('func revealStatusItem()');
+    expect(controller).toContain('func recreateStatusItem()');
+    expect(app).toContain('hostStatusItem');
+    expect(app).toContain('shouldKeepWaitingForStatusItem');
+    expect(app).toContain('shouldRecreateStatusItem');
+    expect(app).toContain('allowUnhosted: true');
+    expect(app).toContain('shouldOpenFullAppAfterTimeout');
   });
 
   it('opens the browser-sized experience in a native window', () => {

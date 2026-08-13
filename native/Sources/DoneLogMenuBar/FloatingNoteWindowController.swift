@@ -9,6 +9,7 @@ final class FloatingNoteWindowController: NSWindowController, NSWindowDelegate {
   init(
     url: URL,
     updateChecker: (any AppUpdateChecking)? = nil,
+    onShowMenuBar: (() -> Void)? = nil,
     onClose: @escaping () -> Void
   ) {
     self.onClose = onClose
@@ -18,6 +19,7 @@ final class FloatingNoteWindowController: NSWindowController, NSWindowDelegate {
       preferredSize: MenuBarConfiguration.floatingNoteSize,
       readySelector: ".floating-note-shell",
       usesWindowChrome: true,
+      canShowMenuBar: onShowMenuBar != nil,
       updateChecker: updateChecker
     )
     let window = NSPanel(
@@ -33,12 +35,14 @@ final class FloatingNoteWindowController: NSWindowController, NSWindowDelegate {
       window?.close()
     }
     window.isReleasedWhenClosed = false
+    window.hidesOnDeactivate = false
     window.level = .floating
     window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
     super.init(window: window)
     NativeWindowPolicy.applyChrome(to: window)
     window.delegate = self
+    contentController.onShowMenuBar = onShowMenuBar
   }
 
   @available(*, unavailable)

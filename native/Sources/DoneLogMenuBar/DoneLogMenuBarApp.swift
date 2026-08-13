@@ -8,6 +8,7 @@ final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
   private var menuBarController: MenuBarController?
   private var smokeTimeout: DispatchWorkItem?
   private var didFinishSmokeCheck = false
+  private var didRecreateStatusItem = false
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     let controller = MenuBarController(
@@ -21,9 +22,11 @@ final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
       launchDate: NSRunningApplication.current.launchDate,
       environment: environment
     )
-    if NativeAppLaunchPolicy.action(for: launchIntent) == .openFullApp {
-      controller.showFullApp()
-    }
+    hostStatusItem(
+      controller: controller,
+      startedAt: Date(),
+      action: NativeAppLaunchPolicy.action(for: launchIntent)
+    )
 
     if environment["MENUBAR_NATIVE_SMOKE"] == "1" {
       startSmokeCheck(controller: controller)
@@ -34,10 +37,75 @@ final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
     _ sender: NSApplication,
     hasVisibleWindows flag: Bool
   ) -> Bool {
-    if NativeAppLaunchPolicy.reopenAction == .openFullApp {
-      menuBarController?.showFullApp()
+    guard let controller = menuBarController else {
+      return false
     }
+
+    hostStatusItem(
+      controller: controller,
+      startedAt: Date(),
+      action: NativeAppLaunchPolicy.reopenAction,
+      allowUnhosted: true
+    )
     return false
+  }
+
+  private func hostStatusItem(
+    controller: MenuBarController,
+    startedAt: Date,
+    action: NativeAppLaunchPolicy.Action,
+    allowUnhosted: Bool = false
+  ) {
+    if NativeAppLaunchPolicy.shouldOpenFullAppNow(
+      action: action,
+      statusItemIsReady: controller.isReady,
+      allowUnhosted: allowUnhosted
+    ) {
+      controller.showFullApp()
+      return
+    }
+
+    let elapsed = Date().timeIntervalSince(startedAt)
+    if NativeAppLaunchPolicy.shouldOpenFullAppAfterTimeout(
+      action: action,
+      statusItemIsReady: controller.isReady,
+      elapsed: elapsed
+    ) {
+      controller.showFullApp()
+      return
+    }
+
+    if controller.isReady {
+      return
+    }
+
+    if NativeAppLaunchPolicy.shouldRecreateStatusItem(
+      statusItemIsReady: controller.isReady,
+      alreadyRecreated: didRecreateStatusItem,
+      elapsed: elapsed
+    ) {
+      didRecreateStatusItem = true
+      controller.recreateStatusItem()
+    }
+
+    if NativeAppLaunchPolicy.shouldKeepWaitingForStatusItem(
+      statusItemIsReady: controller.isReady,
+      elapsed: elapsed
+    ) {
+      controller.revealStatusItem()
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        [weak self, weak controller] in
+        guard let controller else {
+          return
+        }
+        self?.hostStatusItem(
+          controller: controller,
+          startedAt: startedAt,
+          action: action,
+          allowUnhosted: allowUnhosted
+        )
+      }
+    }
   }
 
   private func startSmokeCheck(controller: MenuBarController) {

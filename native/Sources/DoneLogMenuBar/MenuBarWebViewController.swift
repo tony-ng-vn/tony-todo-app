@@ -35,6 +35,23 @@ private final class NativeUpdateMessageRelay: NSObject, WKScriptMessageHandler {
   }
 }
 
+private final class MenuBarReturnMessageRelay: NSObject, WKScriptMessageHandler {
+  weak var controller: MenuBarWebViewController?
+
+  init(controller: MenuBarWebViewController) {
+    self.controller = controller
+  }
+
+  func userContentController(
+    _ userContentController: WKUserContentController,
+    didReceive message: WKScriptMessage
+  ) {
+    Task { @MainActor in
+      self.controller?.handleMenuBarReturnMessage(message)
+    }
+  }
+}
+
 @MainActor
 final class InitialLoadResultRelay {
   private var result: Result<Void, Error>?
@@ -62,6 +79,7 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
   private let readySelector: String?
   private let initialSize: NSSize
   private let usesWindowChrome: Bool
+  private let canShowMenuBar: Bool
   private(set) weak var updateChecker: (any AppUpdateChecking)?
   private var webView: NativeChromeWebView!
   private var didCompleteInitialLoad = false
@@ -80,18 +98,21 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
 
   var onOpenFloatingNote: ((URL) -> Void)?
   var onCloseWindow: (() -> Void)?
+  var onShowMenuBar: (() -> Void)?
 
   init(
     homeURL: URL,
     preferredSize: NSSize = MenuBarConfiguration.popoverSize,
     readySelector: String? = ".menubar-shell",
     usesWindowChrome: Bool = false,
+    canShowMenuBar: Bool = false,
     updateChecker: (any AppUpdateChecking)? = nil
   ) {
     self.homeURL = homeURL
     self.readySelector = readySelector
     initialSize = preferredSize
     self.usesWindowChrome = usesWindowChrome
+    self.canShowMenuBar = canShowMenuBar
     self.updateChecker = updateChecker
     super.init(nibName: nil, bundle: nil)
   }
@@ -107,6 +128,7 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     let nativeHostScript = WKUserScript(
       source: Self.nativeHostScriptSource(
         usesWindowChrome: usesWindowChrome,
+        canShowMenuBar: canShowMenuBar,
         hasNativeUpdater: updateChecker != nil
       ),
       injectionTime: .atDocumentStart,
@@ -123,6 +145,12 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
       configuration.userContentController.add(
         NativeUpdateMessageRelay(controller: self),
         name: NativeUpdatePolicy.messageName
+      )
+    }
+    if canShowMenuBar {
+      configuration.userContentController.add(
+        MenuBarReturnMessageRelay(controller: self),
+        name: NativeMenuBarReturnPolicy.messageName
       )
     }
 
@@ -246,6 +274,22 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     updateChecker?.checkForUpdates(nil)
   }
 
+  func handleMenuBarReturnMessage(_ message: WKScriptMessage) {
+    guard canShowMenuBar,
+      NativeMenuBarReturnPolicy.accepts(
+        messageName: message.name,
+        body: message.body,
+        isMainFrame: message.frameInfo.isMainFrame,
+        sourceURL: message.frameInfo.request.url,
+        homeURL: homeURL
+      )
+    else {
+      return
+    }
+
+    onShowMenuBar?()
+  }
+
   func webView(
     _ webView: WKWebView,
     didFail navigation: WKNavigation!,
@@ -337,13 +381,17 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
 
   static func nativeHostScriptSource(
     usesWindowChrome: Bool,
+    canShowMenuBar: Bool = false,
     hasNativeUpdater: Bool = false
   ) -> String {
     let chromeFlag = usesWindowChrome ? "true" : "false"
+    let menuBarFlag = canShowMenuBar ? "true" : "false"
     let updaterFlag = hasNativeUpdater ? "true" : "false"
     return """
     window.__doneLogNativeHost = true;
     window.__doneLogNativeChrome = \(chromeFlag);
+    window.__doneLogCanShowMenuBar = \(menuBarFlag);
+    window.__doneLogMenuBarMessage = '\(NativeMenuBarReturnPolicy.messageName)';
     window.__doneLogNativeUpdater = \(updaterFlag);
     window.__doneLogNativeUpdaterMessage = '\(NativeUpdatePolicy.messageName)';
     if (\(chromeFlag)) {

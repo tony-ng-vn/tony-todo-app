@@ -6,6 +6,7 @@ final class FullAppWindowController: NSWindowController, NSWindowDelegate {
   private let contentController: MenuBarWebViewController
   private weak var updateChecker: (any AppUpdateChecking)?
   private var floatingNoteWindows: [String: FloatingNoteWindowController] = [:]
+  var onActivationPolicyChanged: (() -> Void)?
 
   init(
     url: URL,
@@ -56,6 +57,7 @@ final class FullAppWindowController: NSWindowController, NSWindowDelegate {
 
   func show() {
     application.setActivationPolicy(.regular)
+    onActivationPolicyChanged?()
     if let window {
       NativeWindowPolicy.applyChrome(to: window)
       contentController.syncNativeChrome(from: window)
@@ -85,6 +87,7 @@ final class FullAppWindowController: NSWindowController, NSWindowDelegate {
 
   func windowWillClose(_ notification: Notification) {
     application.setActivationPolicy(.accessory)
+    onActivationPolicyChanged?()
   }
 
   func windowWillUseStandardFrame(

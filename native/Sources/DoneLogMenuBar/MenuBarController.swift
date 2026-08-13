@@ -2,10 +2,11 @@ import AppKit
 
 @MainActor
 final class MenuBarController: NSObject {
-  private let statusItem: NSStatusItem
+  private var statusItem: NSStatusItem
   private let popover: NSPopover
   private let contextMenu: NSMenu
-  private let fullAppWindowController: FullAppWindowController
+  private let fullAppURL: URL
+  private var fullAppWindowController: FullAppWindowController?
   private let webViewController: MenuBarWebViewController
   private let updateChecker: any AppUpdateChecking
   private let loginItemManager: LoginItemManager
@@ -14,14 +15,11 @@ final class MenuBarController: NSObject {
 
   init(url: URL, updateChecker: any AppUpdateChecking) {
     statusItem = NSStatusBar.system.statusItem(
-      withLength: NSStatusItem.squareLength
+      withLength: NSStatusItem.variableLength
     )
     popover = NSPopover()
     contextMenu = NSMenu()
-    fullAppWindowController = FullAppWindowController(
-      url: MenuBarConfiguration.fullAppURL(for: url),
-      updateChecker: updateChecker
-    )
+    fullAppURL = MenuBarConfiguration.fullAppURL(for: url)
     webViewController = MenuBarWebViewController(
       homeURL: url,
       updateChecker: updateChecker
@@ -67,11 +65,9 @@ final class MenuBarController: NSObject {
     popover.behavior = .transient
     popover.animates = true
     popover.contentSize = MenuBarConfiguration.popoverSize
-    popover.contentViewController = webViewController
     webViewController.onOpenFloatingNote = { [weak self] url in
       self?.openFloatingNote(url)
     }
-    _ = webViewController.view
   }
 
   private func openFloatingNote(_ url: URL) {
@@ -83,7 +79,10 @@ final class MenuBarController: NSObject {
 
     let controller = FloatingNoteWindowController(
       url: url,
-      updateChecker: updateChecker
+      updateChecker: updateChecker,
+      onShowMenuBar: { [weak self] in
+        self?.showPopover()
+      }
     ) { [weak self] in
       self?.floatingNoteWindows[key] = nil
     }
@@ -116,20 +115,25 @@ final class MenuBarController: NSObject {
     contextMenu.addItem(quitItem)
   }
 
-  private func configureStatusItem() {
-    statusItem.autosaveName = "com.tonynguyen.donelog.primary-status-item"
+  func recreateStatusItem() {
+    NSStatusBar.system.removeStatusItem(statusItem)
+    statusItem = NSStatusBar.system.statusItem(
+      withLength: NSStatusItem.variableLength
+    )
+    applyStatusItemAppearance()
     statusItem.isVisible = true
+  }
 
-    guard let button = statusItem.button else {
-      return
+  func revealStatusItem() {
+    statusItem.isVisible = true
+    if statusItem.button?.image == nil {
+      applyStatusItemAppearance()
     }
+  }
 
-    button.image = MenuBarConfiguration.makeStatusIcon()
-    button.imagePosition = .imageOnly
-    button.toolTip = "Done Log"
-    button.target = self
-    button.action = #selector(statusItemClicked)
-    button.sendAction(on: [.leftMouseUp, .rightMouseUp])
+  private func configureStatusItem() {
+    applyStatusItemAppearance()
+    statusItem.isVisible = true
 
     DistributedNotificationCenter.default().addObserver(
       self,
@@ -143,6 +147,19 @@ final class MenuBarController: NSObject {
       name: MenuBarLaunchPolicy.quitNotification(),
       object: nil
     )
+  }
+
+  private func applyStatusItemAppearance() {
+    guard let button = statusItem.button else {
+      return
+    }
+
+    button.image = MenuBarConfiguration.makeStatusIcon()
+    button.imagePosition = .imageOnly
+    button.toolTip = "Done Log"
+    button.target = self
+    button.action = #selector(statusItemClicked)
+    button.sendAction(on: [.leftMouseUp, .rightMouseUp])
   }
 
   @objc
@@ -170,6 +187,10 @@ final class MenuBarController: NSObject {
   private func showPopover() {
     guard let button = statusItem.button else {
       return
+    }
+
+    if popover.contentViewController == nil {
+      popover.contentViewController = webViewController
     }
 
     popover.show(
@@ -235,7 +256,18 @@ final class MenuBarController: NSObject {
 
   @objc
   func showFullApp() {
-    fullAppWindowController.show()
+    let windowController = fullAppWindowController ?? FullAppWindowController(
+      url: fullAppURL,
+      updateChecker: updateChecker
+    )
+    if fullAppWindowController == nil {
+      windowController.onActivationPolicyChanged = { [weak self] in
+        self?.revealStatusItem()
+      }
+      fullAppWindowController = windowController
+    }
+    windowController.show()
+    revealStatusItem()
   }
 
   @objc
