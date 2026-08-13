@@ -116,6 +116,22 @@ struct MenuBarPolicyTests {
     )
   }
 
+  @Test("Advertises menu bar return only to supported quick notes")
+  @MainActor
+  func advertisesMenuBarReturnCapability() {
+    let supportedSource = MenuBarWebViewController.nativeHostScriptSource(
+      usesWindowChrome: true,
+      canShowMenuBar: true
+    )
+    let unsupportedSource = MenuBarWebViewController.nativeHostScriptSource(
+      usesWindowChrome: true
+    )
+
+    #expect(supportedSource.contains("window.__doneLogCanShowMenuBar = true"))
+    #expect(supportedSource.contains(NativeMenuBarReturnPolicy.messageName))
+    #expect(unsupportedSource.contains("window.__doneLogCanShowMenuBar = false"))
+  }
+
   @Test("Reports a completed initial load to a late observer")
   @MainActor
   func reportsCompletedLoadToLateObserver() {
