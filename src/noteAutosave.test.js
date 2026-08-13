@@ -260,6 +260,59 @@ describe('shared note edit state', () => {
     });
   });
 
+  // A pending edit recorded before per-bullet stamps shipped can still carry
+  // raw "@ " headers; switching to that task must not paint them into the
+  // open textarea.
+  it('strips a stamped pending edit when it seeds the draft for a newly selected task', () => {
+    expect(
+      resolveSelectedNoteDraft({
+        task: { id: 'task-1', note: 'irrelevant while the edit is pending' },
+        noteDraftTaskId: 'task-0',
+        noteDraft: 'previous task draft',
+        edit: {
+          note: '@ 2026-08-13 09:00\nCall the vet',
+          revision: '2',
+          syncedRevision: '1',
+        },
+      }),
+    ).toEqual({
+      noteDraftTaskId: 'task-1',
+      noteDraft: 'Call the vet',
+    });
+  });
+
+  it('strips a stamped task note when it seeds the draft for a newly selected task', () => {
+    expect(
+      resolveSelectedNoteDraft({
+        task: { id: 'task-1', note: '@ 2026-08-13 09:00\nCall the vet' },
+        noteDraftTaskId: 'task-0',
+        noteDraft: 'previous task draft',
+        edit: null,
+      }),
+    ).toEqual({
+      noteDraftTaskId: 'task-1',
+      noteDraft: 'Call the vet',
+    });
+  });
+
+  // The resync guard compares noteDraft (always stripped) against the
+  // stored note; if that comparison used the raw stamped form it would
+  // never see the two as equal and would repaint the stamped text into an
+  // already-open, already-in-sync textarea on every unrelated state change.
+  it('does not resync a draft that already matches the stripped form of a stamped stored note', () => {
+    expect(
+      resolveSelectedNoteDraft({
+        task: { id: 'task-1', note: '@ 2026-08-13 09:00\nCall the vet' },
+        noteDraftTaskId: 'task-1',
+        noteDraft: 'Call the vet',
+        edit: null,
+      }),
+    ).toEqual({
+      noteDraftTaskId: 'task-1',
+      noteDraft: 'Call the vet',
+    });
+  });
+
   it('clears stale note edits from storage', () => {
     const storage = createStorage();
     recordNoteEdit('task-1', 'stale', storage, () => 'revision-1');
