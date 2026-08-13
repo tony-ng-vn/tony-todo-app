@@ -249,6 +249,12 @@ describe('CI workflow', () => {
     const stepsByName = Object.fromEntries(deploy.steps.map((step) => [step.name, step]));
     expect(stepsByName['Check out repository'].with.ref).toContain('workflow_run.head_sha');
     expect(stepsByName['Install dependencies'].run).toBe('npm ci');
+    expect(stepsByName['Block automatic deploy for backend state changes'].if).toBe(
+      "github.event_name != 'workflow_dispatch'",
+    );
+    expect(stepsByName['Block automatic deploy for backend state changes'].run).toContain(
+      'git diff --quiet HEAD^ HEAD -- migrations insforge.toml',
+    );
     expect(stepsByName['Deploy changed functions and verify live source'].run).toContain(
       'npx -y --offline @insforge/cli@0.2.6 login --user-api-key',
     );
