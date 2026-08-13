@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
+  AGENT_KEY_NAME_MAX,
   AGENT_TODOS_URL,
   buildAgentSetupPrompt,
   createAgentToken,
   isAgentAccessToken,
-  maskAgentToken,
+  normalizeAgentKeyName,
 } from './agentSetup.js';
 
 describe('createAgentToken', () => {
@@ -26,6 +27,20 @@ describe('isAgentAccessToken', () => {
   });
 });
 
+describe('normalizeAgentKeyName', () => {
+  it('trims and collapses spaces', () => {
+    expect(normalizeAgentKeyName('  Cursor   Codex  ')).toBe('Cursor Codex');
+  });
+
+  it('rejects an empty name', () => {
+    expect(() => normalizeAgentKeyName('   ')).toThrow('Name the key');
+  });
+
+  it('rejects a name that is too long', () => {
+    expect(() => normalizeAgentKeyName('k'.repeat(AGENT_KEY_NAME_MAX + 1))).toThrow('40 characters');
+  });
+});
+
 describe('buildAgentSetupPrompt', () => {
   it('copies a ready-to-paste HTTP setup without ownerUserId', () => {
     const token = createAgentToken(() => new Uint8Array(32).fill(10));
@@ -39,12 +54,5 @@ describe('buildAgentSetupPrompt', () => {
     expect(prompt).toContain('{"command":"daySummary"}');
     expect(prompt).not.toMatch(/"ownerUserId"/);
     expect(prompt).not.toContain('INGEST_FUNCTION_TOKEN');
-  });
-});
-
-describe('maskAgentToken', () => {
-  it('keeps the prefix and last four characters', () => {
-    const token = createAgentToken(() => new Uint8Array(32).fill(11));
-    expect(maskAgentToken(token)).toBe('dlg_••••0b0b');
   });
 });
