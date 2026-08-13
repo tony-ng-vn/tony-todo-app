@@ -2,7 +2,7 @@
   import { tick } from 'svelte';
   import { getStandaloneWebUrl, shortenLinksText } from '../../linkify.js';
   import { expandTodoCommand, parseNoteTodos, toggleNoteTodo } from '../../noteTodos.js';
-  import { getTextareaKeyEdit, restoreTextareaCaret } from '../../textareaEditing.js';
+  import { getTextareaCaretRestore, getTextareaKeyEdit } from '../../textareaEditing.js';
   import {
     formatDueDate,
     formatDuration,
@@ -222,9 +222,10 @@
     }
 
     event.preventDefault();
+    const restoreCaret = getTextareaCaretRestore(textarea);
     updateDraft(edit.value);
 
-    requestAnimationFrame(() => restoreTextareaCaret(textarea, edit.cursor));
+    requestAnimationFrame(() => restoreCaret(edit.cursor));
   }
 
   function updateNoteDraft(nextNote) {
@@ -234,6 +235,7 @@
 
   async function handleNoteTextareaInput(event) {
     const textarea = event.currentTarget;
+    const restoreCaret = getTextareaCaretRestore(textarea);
     const expanded = expandTodoCommand(
       textarea.value,
       textarea.selectionStart ?? textarea.value.length,
@@ -241,10 +243,7 @@
     updateNoteDraft(expanded.value);
 
     await tick();
-    restoreTextareaCaret(
-      textarea,
-      expanded.changed ? expanded.cursor : (textarea.selectionStart ?? textarea.value.length),
-    );
+    restoreCaret(expanded.cursor);
   }
 
   function handleTodoToggle(item) {

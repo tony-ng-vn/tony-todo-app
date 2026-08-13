@@ -1,50 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getTextareaKeyEdit, textareaScrollTopForCursor } from './textareaEditing.js';
-
-describe('textarea caret follow', () => {
-  it('scrolls down when enter grows the note past the visible range', () => {
-    const value = `${'x\n'.repeat(40)}- `;
-    expect(
-      textareaScrollTopForCursor({
-        value,
-        cursor: value.length,
-        scrollTop: 500,
-        clientHeight: 200,
-        lineHeight: 20,
-        paddingTop: 0,
-        paddingBottom: 0,
-      }),
-    ).toBe(620);
-  });
-
-  it('keeps scroll when the caret is already visible', () => {
-    expect(
-      textareaScrollTopForCursor({
-        value: '- item\n- ',
-        cursor: 9,
-        scrollTop: 0,
-        clientHeight: 278,
-        lineHeight: 20,
-        paddingTop: 14,
-        paddingBottom: 14,
-      }),
-    ).toBe(0);
-  });
-
-  it('scrolls up when the caret moves above the visible range', () => {
-    expect(
-      textareaScrollTopForCursor({
-        value: 'top\n\n\n\n\n\n\nbottom',
-        cursor: 0,
-        scrollTop: 200,
-        clientHeight: 80,
-        lineHeight: 20,
-        paddingTop: 0,
-        paddingBottom: 0,
-      }),
-    ).toBe(0);
-  });
-});
+import { getTextareaKeyEdit } from './textareaEditing.js';
 
 describe('textarea editing', () => {
   it('inserts a tab at the current selection', () => {

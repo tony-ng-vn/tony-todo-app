@@ -59,12 +59,7 @@ try {
       ({ selector, suffix }) => document.querySelector(selector)?.value.endsWith(suffix),
       { selector: '#detail-note', suffix: scenario.expectedSuffix },
     );
-    await textarea.evaluate(
-      () =>
-        new Promise((resolve) => {
-          requestAnimationFrame(() => requestAnimationFrame(resolve));
-        }),
-    );
+    await page.waitForTimeout(50);
     const after = await textarea.evaluate(caretMetrics);
 
     console.log(`${scenario.name} before ${JSON.stringify(before)}`);

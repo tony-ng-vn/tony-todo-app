@@ -1,7 +1,7 @@
 <script>
   import { onMount, tick } from 'svelte';
   import { expandTodoCommand, parseNoteTodos, toggleNoteTodo } from '../../noteTodos.js';
-  import { getTextareaKeyEdit, restoreTextareaCaret } from '../../textareaEditing.js';
+  import { getTextareaCaretRestore, getTextareaKeyEdit } from '../../textareaEditing.js';
 
   export let todo;
   export let noteSaveStatus = 'saved';
@@ -28,6 +28,7 @@
 
   async function handleInput(event) {
     const textarea = event.currentTarget;
+    const restoreCaret = getTextareaCaretRestore(textarea);
     const expanded = expandTodoCommand(
       textarea.value,
       textarea.selectionStart ?? textarea.value.length,
@@ -35,10 +36,7 @@
     updateNote(expanded.value);
 
     await tick();
-    restoreTextareaCaret(
-      textarea,
-      expanded.changed ? expanded.cursor : (textarea.selectionStart ?? textarea.value.length),
-    );
+    restoreCaret(expanded.cursor);
   }
 
   async function handleKeydown(event) {
@@ -61,9 +59,10 @@
     }
 
     event.preventDefault();
+    const restoreCaret = getTextareaCaretRestore(textarea);
     updateNote(edit.value);
     await tick();
-    restoreTextareaCaret(textarea, edit.cursor);
+    restoreCaret(edit.cursor);
   }
 
   function startDrag(event) {
