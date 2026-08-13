@@ -2527,10 +2527,10 @@ h2 {
 }
 
 @media (max-width: 900px) {
-  .workspace,
-  .workspace.has-detail,
-  .workspace.is-board-view,
-  .workspace.is-board-view.has-detail {
+  html:not(.is-native-host) .workspace,
+  html:not(.is-native-host) .workspace.has-detail,
+  html:not(.is-native-host) .workspace.is-board-view,
+  html:not(.is-native-host) .workspace.is-board-view.has-detail {
     display: flex;
     flex-direction: column;
     align-content: stretch;
@@ -2542,60 +2542,60 @@ h2 {
     padding-bottom: 88px;
   }
 
-  .task-panel,
-  .summary-panel,
-  .flow-rail,
-  .task-detail,
-  .board-panel,
-  .inbox-panel,
-  .waiting-panel,
-  .history-panel,
-  .meetings-panel,
-  .settings-panel {
+  html:not(.is-native-host) .task-panel,
+  html:not(.is-native-host) .summary-panel,
+  html:not(.is-native-host) .flow-rail,
+  html:not(.is-native-host) .task-detail,
+  html:not(.is-native-host) .board-panel,
+  html:not(.is-native-host) .inbox-panel,
+  html:not(.is-native-host) .waiting-panel,
+  html:not(.is-native-host) .history-panel,
+  html:not(.is-native-host) .meetings-panel,
+  html:not(.is-native-host) .settings-panel {
     flex: 0 0 auto;
     width: 100%;
     border-radius: 20px;
   }
 
-  .task-panel,
-  .summary-panel,
-  .board-panel {
+  html:not(.is-native-host) .task-panel,
+  html:not(.is-native-host) .summary-panel,
+  html:not(.is-native-host) .board-panel {
     height: auto;
     min-height: auto;
     overflow: visible;
   }
 
-  .todo-list,
-  .summary-list,
-  .board-columns,
-  .inbox-panel .loop-list,
-  .waiting-panel .loop-list,
-  .history-panel .loop-list,
-  .meetings-panel .meeting-list {
+  html:not(.is-native-host) .todo-list,
+  html:not(.is-native-host) .summary-list,
+  html:not(.is-native-host) .board-columns,
+  html:not(.is-native-host) .inbox-panel .loop-list,
+  html:not(.is-native-host) .waiting-panel .loop-list,
+  html:not(.is-native-host) .history-panel .loop-list,
+  html:not(.is-native-host) .meetings-panel .meeting-list {
     flex: 0 0 auto;
     overflow: visible;
   }
 
-  .inbox-panel,
-  .waiting-panel,
-  .history-panel,
-  .meetings-panel,
-  .settings-panel {
+  html:not(.is-native-host) .inbox-panel,
+  html:not(.is-native-host) .waiting-panel,
+  html:not(.is-native-host) .history-panel,
+  html:not(.is-native-host) .meetings-panel,
+  html:not(.is-native-host) .settings-panel {
     height: auto;
     min-height: auto;
     overflow: visible;
   }
 
-  .board-columns {
+  html:not(.is-native-host) .board-columns {
     display: grid;
     grid-template-columns: 1fr;
   }
 
-  .board-column {
+  html:not(.is-native-host) .board-column {
     min-height: 220px;
   }
 
-  .flow-rail {
+  html:not(.is-native-host) .flow-rail {
     display: grid;
     grid-template-columns: auto minmax(0, 1fr) auto;
     grid-template-rows: auto;
@@ -2607,7 +2607,7 @@ h2 {
     border-inline: 1px solid var(--border);
   }
 
-  .done-count {
+  html:not(.is-native-host) .done-count {
     width: auto;
     min-width: 0;
     min-height: 36px;
@@ -2615,33 +2615,33 @@ h2 {
     white-space: nowrap;
   }
 
-  .rail-line {
+  html:not(.is-native-host) .rail-line {
     width: 100%;
     min-height: 1px;
     height: 1px;
     background: linear-gradient(to right, transparent, var(--subtle), transparent);
   }
 
-  .rail-caption {
+  html:not(.is-native-host) .rail-caption {
     writing-mode: horizontal-tb;
     justify-self: end;
   }
 
-  .view-toggle {
+  html:not(.is-native-host) .view-toggle {
     width: 100%;
   }
 
-  .panel-heading {
+  html:not(.is-native-host) .panel-heading {
     flex-direction: column;
     align-items: stretch;
     gap: 12px;
   }
 
-  .panel-heading .view-toggle {
+  html:not(.is-native-host) .panel-heading .view-toggle {
     width: 100%;
   }
 
-  .task-detail {
+  html:not(.is-native-host) .task-detail {
     order: 99;
   }
 }
@@ -3034,4 +3034,48 @@ html.is-native-host .floating-note-shell {
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+
+@media (max-width: 1100px) {
+  html.is-native-host .workspace {
+    grid-template-columns: minmax(0, 1fr) 68px minmax(0, 1fr);
+  }
+
+  html.is-native-host .workspace.has-detail:not(.is-board-view) {
+    grid-template-columns: minmax(0, 1fr) 64px minmax(360px, 1fr);
+  }
+
+  html.is-native-host .workspace.has-detail:not(.is-board-view) .summary-panel {
+    display: none;
+  }
+
+  html.is-native-host .workspace.is-board-view {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  html.is-native-host .workspace.is-board-view.has-detail {
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 44%);
+  }
+
+  html.is-native-host .task-panel,
+  html.is-native-host .summary-panel {
+    padding-inline: 20px;
+  }
+
+  html.is-native-host .task-panel .brand-row {
+    margin-inline-start: -20px;
+  }
+
+  html.is-native-host .summary-top {
+    align-items: stretch;
+  }
+
+  html.is-native-host .new-task-form {
+    margin: 24px 0 20px;
+  }
+
+  html.is-native-host .flow-rail {
+    padding-inline: 6px;
+  }
+
 }
