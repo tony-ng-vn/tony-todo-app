@@ -7,20 +7,26 @@ final class MenuBarController: NSObject {
   private let contextMenu: NSMenu
   private let fullAppWindowController: FullAppWindowController
   private let webViewController: MenuBarWebViewController
+  private let updateChecker: any AppUpdateChecking
   private let loginItemManager: LoginItemManager
   private let launchAtLoginItem: NSMenuItem
   private var floatingNoteWindows: [String: FloatingNoteWindowController] = [:]
 
-  init(url: URL) {
+  init(url: URL, updateChecker: any AppUpdateChecking) {
     statusItem = NSStatusBar.system.statusItem(
       withLength: NSStatusItem.squareLength
     )
     popover = NSPopover()
     contextMenu = NSMenu()
     fullAppWindowController = FullAppWindowController(
-      url: MenuBarConfiguration.fullAppURL(for: url)
+      url: MenuBarConfiguration.fullAppURL(for: url),
+      updateChecker: updateChecker
     )
-    webViewController = MenuBarWebViewController(homeURL: url)
+    webViewController = MenuBarWebViewController(
+      homeURL: url,
+      updateChecker: updateChecker
+    )
+    self.updateChecker = updateChecker
     loginItemManager = LoginItemManager()
     launchAtLoginItem = NSMenuItem()
     super.init()
@@ -75,7 +81,13 @@ final class MenuBarController: NSObject {
       return
     }
 
-    let controller = FloatingNoteWindowController(url: url) { [weak self] in
+    let controller = FloatingNoteWindowController(
+      url: url,
+      updateChecker: updateChecker,
+      onShowMenuBar: { [weak self] in
+        self?.showPopover()
+      }
+    ) { [weak self] in
       self?.floatingNoteWindows[key] = nil
     }
     floatingNoteWindows[key] = controller

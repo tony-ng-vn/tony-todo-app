@@ -13,9 +13,18 @@ let package = Package(
             targets: ["DoneLogMenuBar"]
         ),
     ],
+    dependencies: [
+        .package(
+            url: "https://github.com/sparkle-project/Sparkle",
+            exact: "2.9.5"
+        ),
+    ],
     targets: [
         .executableTarget(
-            name: "DoneLogMenuBar"
+            name: "DoneLogMenuBar",
+            dependencies: [
+                .product(name: "Sparkle", package: "Sparkle"),
+            ]
         ),
         .testTarget(
             name: "DoneLogMenuBarTests",

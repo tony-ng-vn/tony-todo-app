@@ -1,6 +1,7 @@
 <script>
   import { onMount, tick } from 'svelte';
   import { expandTodoCommand, parseNoteTodos, toggleNoteTodo } from '../../noteTodos.js';
+  import { canShowNativeMenuBar, requestNativeMenuBar } from '../../nativeMenuBar.js';
   import { getTextareaCaretRestore, getTextareaKeyEdit } from '../../textareaEditing.js';
 
   export let todo;
@@ -13,8 +14,10 @@
   let noteShell;
   let panelStyle = '';
   let dragState = null;
+  let canReturnToMenuBar = false;
 
   onMount(() => {
+    canReturnToMenuBar = canShowNativeMenuBar(window);
     noteInput?.focus();
   });
 
@@ -101,6 +104,10 @@
       dragState = null;
     }
   }
+
+  function returnToMenuBar() {
+    requestNativeMenuBar(window);
+  }
 </script>
 
 <main
@@ -123,7 +130,12 @@
       <p>Task note</p>
       <h1 class="floating-note-title">{todo.title}</h1>
     </div>
-    <button type="button" on:click={onClose}>Close</button>
+    <div class="floating-note-actions">
+      {#if canReturnToMenuBar}
+        <button type="button" on:click={returnToMenuBar}>Mini todos</button>
+      {/if}
+      <button type="button" on:click={onClose}>Close</button>
+    </div>
   </header>
 
   <textarea
@@ -216,6 +228,12 @@
 
   .floating-note-header div {
     min-width: 0;
+  }
+
+  .floating-note-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 6px;
   }
 
   .floating-note-header p {

@@ -55,7 +55,8 @@ if [[ -d "$INSTALLED_APP" ]]; then
       raw \
       "$INSTALLED_APP/Contents/Info.plist"
   )"
-  if [[ "$INSTALLED_IDENTIFIER" != "com.tonynguyen.donelog" ]]; then
+  if [[ "$INSTALLED_IDENTIFIER" != "com.tonynguyen.donelog" ]] \
+    && [[ "$INSTALLED_IDENTIFIER" != "com.tonynguyen.donelog.macos" ]]; then
     echo "refusing to replace an app with another bundle identifier" >&2
     exit 1
   fi

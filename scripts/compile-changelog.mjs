@@ -122,6 +122,14 @@ export function computeNextVersion(currentVersion, bump) {
   return `${major}.${minor}.${patch}`;
 }
 
+export function computeNextBuildVersion(currentBuildVersion) {
+  if (!/^\d+$/.test(currentBuildVersion)) {
+    throw new Error(`Cannot parse native build number "${currentBuildVersion}"`);
+  }
+
+  return String(Number(currentBuildVersion) + 1);
+}
+
 function todayDate() {
   return new Date().toISOString().slice(0, 10);
 }
@@ -149,11 +157,20 @@ function bumpPackageJsonVersion(nextVersion) {
 
 function bumpInfoPlistVersion(nextVersion) {
   const plist = readFileSync(INFO_PLIST_PATH, 'utf8');
-  const pattern = /(<key>CFBundleShortVersionString<\/key>\s*<string>)[^<]+(<\/string>)/;
-  if (!pattern.test(plist)) {
+  const shortVersionPattern =
+    /(<key>CFBundleShortVersionString<\/key>\s*<string>)[^<]+(<\/string>)/;
+  const buildVersionPattern = /(<key>CFBundleVersion<\/key>\s*<string>)([^<]+)(<\/string>)/;
+  const buildVersionMatch = plist.match(buildVersionPattern);
+  if (!shortVersionPattern.test(plist) || !buildVersionMatch) {
     throw new Error('CFBundleShortVersionString not found in native/App/Info.plist');
   }
-  writeFileSync(INFO_PLIST_PATH, plist.replace(pattern, `$1${nextVersion}$2`));
+  const nextBuildVersion = computeNextBuildVersion(buildVersionMatch[2]);
+  writeFileSync(
+    INFO_PLIST_PATH,
+    plist
+      .replace(shortVersionPattern, `$1${nextVersion}$2`)
+      .replace(buildVersionPattern, `$1${nextBuildVersion}$3`),
+  );
 }
 
 // IO wrapper: reads changelog.d/, package.json, and native/App/Info.plist,

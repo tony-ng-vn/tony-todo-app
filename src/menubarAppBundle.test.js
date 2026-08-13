@@ -20,6 +20,20 @@ describe('menu bar app bundle', () => {
         `<key>CFBundleShortVersionString<\\/key>\\s*<string>${packageJson.version}<\\/string>`,
       ),
     );
+    expect(plist).toContain('<key>SUFeedURL</key>');
+    expect(plist).toContain(
+      '<string>https://github.com/tony-ng-vn/tony-todo-app/releases/latest/download/appcast.xml</string>',
+    );
+    expect(plist).toMatch(/<key>SUPublicEDKey<\/key>\s*<string>[^<]+<\/string>/);
+    expect(plist).toMatch(/<key>SUVerifyUpdateBeforeExtraction<\/key>\s*<true\/>/);
+  });
+
+  it('links the native app to the pinned Sparkle updater', () => {
+    const manifest = readFileSync(path.join(repoRoot, 'native/Package.swift'), 'utf8');
+
+    expect(manifest).toContain('https://github.com/sparkle-project/Sparkle');
+    expect(manifest).toContain('exact: "2.9.5"');
+    expect(manifest).toContain('.product(name: "Sparkle", package: "Sparkle")');
   });
 
   it('exposes bundle and install commands', () => {
@@ -74,6 +88,34 @@ describe('menu bar app bundle', () => {
     expect(buildScript).toContain('DONE_LOG_CODESIGN_IDENTITY');
     expect(buildScript).toContain('security find-identity -v -p codesigning');
     expect(buildScript).toContain('--sign "$CODE_SIGN_IDENTITY"');
+    expect(buildScript).toContain('Contents/Frameworks/Sparkle.framework');
+    expect(buildScript).toContain('@executable_path/../Frameworks');
+    expect(buildScript).not.toContain(
+      'if [[ "$CODE_SIGN_IDENTITY" != "-" ]]; then\n  /usr/bin/codesign "${SIGNING_OPTIONS[@]}"',
+    );
+    expect(buildScript).not.toMatch(/codesign\s+\\\n\s+--force\s+\\\n\s+--deep/);
+  });
+
+  it('publishes notarized and signed native releases', () => {
+    const workflow = readFileSync(
+      path.join(repoRoot, '.github/workflows/native-release.yml'),
+      'utf8',
+    );
+
+    expect(workflow).toContain('xcrun notarytool submit');
+    expect(workflow).toContain('xcrun stapler staple');
+    expect(workflow).toContain('generate_appcast');
+    expect(workflow).toContain('Curve25519.Signing.PrivateKey');
+    expect(workflow).toContain('embedded Sparkle public key does not match');
+    expect(workflow).toContain('sign_update');
+    expect(workflow).toContain('sparkle:edSignature=');
+    expect(workflow).toContain('SPARKLE_PRIVATE_KEY');
+    expect(workflow).toContain('Done-Log.dmg');
+    expect(workflow).toContain('appcast.xml');
+    expect(workflow).toContain('fetch-depth: 0');
+    expect(workflow).toContain('git merge-base --is-ancestor "$GITHUB_SHA" origin/main');
+    expect(workflow).toContain('environment: native-release');
+    expect(workflow).toContain('native build version must exceed the published Sparkle build');
   });
 
   it('keeps task notes in a draggable native window', () => {
@@ -81,13 +123,25 @@ describe('menu bar app bundle', () => {
       path.join(repoRoot, 'native/Sources/DoneLogMenuBar/FloatingNoteWindowController.swift'),
       'utf8',
     );
+    const menuBarController = readFileSync(
+      path.join(repoRoot, 'native/Sources/DoneLogMenuBar/MenuBarController.swift'),
+      'utf8',
+    );
+    const note = readFileSync(
+      path.join(repoRoot, 'src/lib/components/FloatingTaskNote.svelte'),
+      'utf8',
+    );
 
     expect(controller).toContain('NSPanel');
     expect(controller).toContain('window.level = .floating');
+    expect(controller).toContain('window.hidesOnDeactivate = false');
     expect(controller).toContain('NativeWindowPolicy.applyChrome');
     expect(controller).toContain('usesWindowChrome: true');
     expect(controller).toContain('window.contentMinSize');
     expect(controller).toContain('contentController.onCloseWindow');
+    expect(menuBarController).toContain('onShowMenuBar:');
+    expect(note).toContain('requestNativeMenuBar(window)');
+    expect(note).toContain('Mini todos');
   });
 
   it('keeps floating-note activation from opening the full app', () => {
@@ -162,6 +216,7 @@ describe('menu bar app bundle', () => {
     expect(installer).not.toContain('"$INSTALLED_BINARY" --register-login-item');
     expect(installer).not.toContain('/usr/bin/open -n');
     expect(installer).toContain('Open it from Applications when you are ready');
+    expect(installer).toContain('com.tonynguyen.donelog.macos');
   });
 
   it('refuses to replace a newer installed app with an older build', () => {
