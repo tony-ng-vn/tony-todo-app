@@ -1,3 +1,45 @@
+export function textareaScrollTopForCursor({
+  cursor,
+  value,
+  scrollTop,
+  clientHeight,
+  lineHeight,
+  paddingTop,
+  paddingBottom,
+}) {
+  const lineCount = value.slice(0, cursor).split('\n').length;
+  const caretTop = paddingTop + (lineCount - 1) * lineHeight;
+  const caretBottom = caretTop + lineHeight;
+  const viewBottom = scrollTop + clientHeight - paddingBottom;
+
+  if (caretBottom > viewBottom) {
+    return Math.max(0, caretBottom - clientHeight + paddingBottom);
+  }
+
+  if (caretTop < scrollTop) {
+    return Math.max(0, caretTop - paddingTop);
+  }
+
+  return scrollTop;
+}
+
+export function restoreTextareaCaret(textarea, cursor) {
+  textarea.setSelectionRange(cursor, cursor);
+  const style = getComputedStyle(textarea);
+  const fontSize = Number.parseFloat(style.fontSize) || 14;
+  const parsedLineHeight = Number.parseFloat(style.lineHeight);
+  const lineHeight = Number.isFinite(parsedLineHeight) ? parsedLineHeight : fontSize * 1.45;
+  textarea.scrollTop = textareaScrollTopForCursor({
+    cursor,
+    value: textarea.value,
+    scrollTop: textarea.scrollTop,
+    clientHeight: textarea.clientHeight,
+    lineHeight,
+    paddingTop: Number.parseFloat(style.paddingTop) || 0,
+    paddingBottom: Number.parseFloat(style.paddingBottom) || 0,
+  });
+}
+
 export function getTextareaKeyEdit({
   value,
   selectionStart,

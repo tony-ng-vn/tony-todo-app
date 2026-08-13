@@ -2,7 +2,7 @@
   import { tick } from 'svelte';
   import { getStandaloneWebUrl, shortenLinksText } from '../../linkify.js';
   import { expandTodoCommand, parseNoteTodos, toggleNoteTodo } from '../../noteTodos.js';
-  import { getTextareaKeyEdit } from '../../textareaEditing.js';
+  import { getTextareaKeyEdit, restoreTextareaCaret } from '../../textareaEditing.js';
   import {
     formatDueDate,
     formatDuration,
@@ -224,7 +224,7 @@
     event.preventDefault();
     updateDraft(edit.value);
 
-    requestAnimationFrame(() => textarea.setSelectionRange(edit.cursor, edit.cursor));
+    requestAnimationFrame(() => restoreTextareaCaret(textarea, edit.cursor));
   }
 
   function updateNoteDraft(nextNote) {
@@ -240,10 +240,11 @@
     );
     updateNoteDraft(expanded.value);
 
-    if (expanded.changed) {
-      await tick();
-      textarea.setSelectionRange(expanded.cursor, expanded.cursor);
-    }
+    await tick();
+    restoreTextareaCaret(
+      textarea,
+      expanded.changed ? expanded.cursor : (textarea.selectionStart ?? textarea.value.length),
+    );
   }
 
   function handleTodoToggle(item) {
