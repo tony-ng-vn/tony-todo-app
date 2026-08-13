@@ -1,5 +1,15 @@
 # Changelog
 
+## v0.11.1
+
+2026-08-13
+
+**Web App**
+
+- Pressing Enter at the bottom of a long task note now keeps the caret in view instead of leaving you looking at earlier lines.
+
+---
+
 ## v0.11.0
 
 2026-08-13

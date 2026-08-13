@@ -3,7 +3,7 @@
   import CalendarPicker from './CalendarPicker.svelte';
   import { linkifyText } from '../../linkify.js';
   import { expandTodoCommand, parseNoteTodos, toggleNoteTodo } from '../../noteTodos.js';
-  import { getTextareaKeyEdit } from '../../textareaEditing.js';
+  import { getTextareaCaretRestore, getTextareaKeyEdit } from '../../textareaEditing.js';
   import {
     formatTaskTimestamp,
     getEditableTaskTimeSegments,
@@ -178,13 +178,12 @@
 
   async function handleNoteTextareaInput(event) {
     const textarea = event.currentTarget;
+    const restoreCaret = getTextareaCaretRestore(textarea);
     const expanded = expandTodoCommand(textarea.value, textarea.selectionStart ?? textarea.value.length);
     onNoteInput(expanded.value);
 
-    if (expanded.changed) {
-      await tick();
-      textarea.setSelectionRange(expanded.cursor, expanded.cursor);
-    }
+    await tick();
+    restoreCaret(expanded.cursor);
   }
 
   async function handleTextareaKeydown(event, onInput) {
@@ -207,10 +206,11 @@
     }
 
     event.preventDefault();
+    const restoreCaret = getTextareaCaretRestore(textarea);
     onInput(edit.value);
 
     await tick();
-    textarea.setSelectionRange(edit.cursor, edit.cursor);
+    restoreCaret(edit.cursor);
   }
 
   function handleNoteTextareaKeydown(event) {
