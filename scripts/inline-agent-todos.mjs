@@ -9,8 +9,15 @@ const GENERATED_PATH = join(ROOT, 'functions/agent-todos.ts');
 const MARKER = "import './todoCommands.js';";
 
 // Matches one `import ... from '<specifier>';` statement (plus its trailing
-// newline, so removing it doesn't leave a blank line behind).
-const IMPORT_STATEMENT = /import\s+[\s\S]*?\s+from\s+['"]([^'"]+)['"];?\n?/g;
+// newline, so removing it doesn't leave a blank line behind). Anchored to
+// the start of a line (leading whitespace allowed) and bounded to never
+// cross a semicolon, so an "import" keyword sitting inside a comment or
+// string cannot walk forward through real code looking for the next "from"
+// and delete everything in between.
+const IMPORT_STATEMENT = /^[\t ]*import\s+[^;]*?\s+from\s+['"]([^'"]+)['"];?\n?/gm;
+// Side-effect imports ("import './x.js';", no bindings, no "from") - same
+// anchoring rationale as IMPORT_STATEMENT above.
+const SIDE_EFFECT_IMPORT = /^[\t ]*import\s+['"]([^'"]+)['"];?\n?/gm;
 const RELATIVE_SPECIFIER = /^\.\.?\//;
 const LOCAL_REEXPORT_LINE = /^export \{[^}]*\};?\s*$/gm;
 
@@ -43,11 +50,13 @@ export function inlineAgentTodos({ check = false } = {}) {
 
 // Deno functions deploy as a single file, so every local module reachable
 // from src/todoCommands.js (e.g. noteEntries.js, sanFranciscoTime.js) gets
-// flattened into one script: relative imports are resolved and inlined
-// depth-first (each module included once, dependencies before dependents),
-// external package imports are hoisted to the top and deduped, and `export`
-// keywords are stripped since the bundle has no module boundaries left.
-function bundleDomainSource(entryPath) {
+// flattened into one script: relative imports - including side-effect-only
+// ones - are resolved and inlined depth-first (each module included once,
+// dependencies before dependents), external package imports are hoisted to
+// the top and deduped, and `export` keywords are stripped since the bundle
+// has no module boundaries left. Exported for direct testing of the import
+// matching, since none of these shapes exist in the real module graph.
+export function bundleDomainSource(entryPath) {
   const externalImports = [];
   const seenExternalImports = new Set();
   const bodies = [];
@@ -61,10 +70,20 @@ function bundleDomainSource(entryPath) {
 
     const source = readFileSync(path, 'utf8');
     const dir = dirname(path);
+    const matches = [...source.matchAll(IMPORT_STATEMENT), ...source.matchAll(SIDE_EFFECT_IMPORT)].sort(
+      (a, b) => a.index - b.index,
+    );
+
     let body = '';
     let lastIndex = 0;
 
-    for (const match of source.matchAll(IMPORT_STATEMENT)) {
+    for (const match of matches) {
+      if (match.index < lastIndex) {
+        // Already covered by a previously processed match; skip defensively
+        // rather than slicing backwards.
+        continue;
+      }
+
       const [statement, specifier] = match;
       body += source.slice(lastIndex, match.index);
       lastIndex = match.index + statement.length;
@@ -74,8 +93,9 @@ function bundleDomainSource(entryPath) {
         continue;
       }
 
-      if (!seenExternalImports.has(statement)) {
-        seenExternalImports.add(statement);
+      const canonical = canonicalizeExternalImport(statement);
+      if (!seenExternalImports.has(canonical)) {
+        seenExternalImports.add(canonical);
         externalImports.push(statement.trimEnd());
       }
     }
@@ -96,6 +116,14 @@ function bundleDomainSource(entryPath) {
 
   const bundled = header ? `${header}\n\n${bodies.join('\n\n')}` : bodies.join('\n\n');
   return bundled.replace(/\n{3,}/g, '\n\n');
+}
+
+// Two occurrences of the same external import can differ only in a trailing
+// semicolon or trailing whitespace depending on where they sit in their
+// file; canonicalizing before the dedup check treats them as the same
+// import instead of emitting the line twice.
+function canonicalizeExternalImport(statement) {
+  return statement.trim().replace(/;+$/, '').trim();
 }
 
 function stripExports(source) {
