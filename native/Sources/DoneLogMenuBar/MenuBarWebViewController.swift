@@ -7,7 +7,7 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
   private let readySelector: String?
   private let initialSize: NSSize
   private let usesWindowChrome: Bool
-  private var webView: WKWebView!
+  private var webView: NativeChromeWebView!
   private var didCompleteInitialLoad = false
   private var isValidatingInitialLoad = false
   private var initialLoadValidationDeadline: Date?
@@ -45,7 +45,7 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     )
     configuration.userContentController.addUserScript(nativeHostScript)
 
-    webView = WKWebView(
+    webView = NativeChromeWebView(
       frame: NSRect(origin: .zero, size: initialSize),
       configuration: configuration
     )
@@ -57,6 +57,13 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     view = webView
 
     webView.load(MenuBarConfiguration.makeHomeRequest(for: homeURL))
+  }
+
+  override func viewDidAppear() {
+    super.viewDidAppear()
+    if let window = view.window {
+      syncNativeChrome(from: window)
+    }
   }
 
   func webView(
@@ -101,7 +108,23 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
   }
 
   func webView(_ webView: WKWebView, didFinish navigation: WKNavigation!) {
+    if let window = webView.window {
+      syncNativeChrome(from: window)
+    }
     validateInitialLoad(in: webView)
+  }
+
+  func syncNativeChrome(from window: NSWindow) {
+    guard usesWindowChrome else {
+      return
+    }
+
+    let inset = NativeWindowPolicy.titlebarInset(in: webView, window: window)
+    webView.titlebarPassthroughHeight = inset
+    let cssValue = NativeWindowPolicy.titlebarInsetCSSValue(inset)
+    webView.evaluateJavaScript(
+      "document.documentElement.style.setProperty('--native-titlebar-inset', '\(cssValue)');"
+    )
   }
 
   func webView(
@@ -200,6 +223,27 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     window.__doneLogNativeChrome = \(chromeFlag);
     if (\(chromeFlag)) {
       document.documentElement.classList.add('is-native-host');
+      document.documentElement.style.setProperty('--native-titlebar-inset', '28px');
+      const nativeChromeStyle = document.createElement('style');
+      nativeChromeStyle.textContent = `
+        html.is-native-host .workspace,
+        html.is-native-host .workspace.has-detail,
+        html.is-native-host .workspace.is-board-view,
+        html.is-native-host .workspace.is-board-view.has-detail {
+          padding-top: var(--native-titlebar-inset) !important;
+        }
+        html.is-native-host .task-panel,
+        html.is-native-host .summary-panel,
+        html.is-native-host .flow-rail,
+        html.is-native-host .task-detail {
+          padding-top: clamp(24px, 4vw, 42px) !important;
+        }
+        html.is-native-host .brand-row {
+          padding-inline-start: 0 !important;
+          align-items: flex-start !important;
+        }
+      `;
+      document.documentElement.appendChild(nativeChromeStyle);
     }
     """
   }

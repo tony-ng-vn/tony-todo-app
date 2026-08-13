@@ -69,6 +69,7 @@ struct NativeWindowPolicyTests {
     #expect(window.standardWindowButton(.closeButton)?.isHidden != true)
     #expect(window.standardWindowButton(.miniaturizeButton)?.isHidden != true)
     #expect(window.standardWindowButton(.zoomButton)?.isHidden != true)
+    #expect(window.contentView is NativeChromeWebView)
     #expect(!(window.contentView is NSVisualEffectView))
   }
 
@@ -88,5 +89,44 @@ struct NativeWindowPolicyTests {
     window.performZoom(nil)
 
     #expect(window.frame == visibleFrame)
+  }
+
+  @Test("Leaves the title bar strip for native drag and zoom")
+  func passesTitlebarHitsThrough() {
+    let bounds = NSRect(x: 0, y: 0, width: 1_200, height: 800)
+
+    #expect(
+      NativeWindowPolicy.isTitlebarPassthroughPoint(
+        NSPoint(x: 24, y: 790),
+        in: bounds,
+        titlebarInset: 28
+      )
+    )
+    #expect(
+      !NativeWindowPolicy.isTitlebarPassthroughPoint(
+        NSPoint(x: 24, y: 740),
+        in: bounds,
+        titlebarInset: 28
+      )
+    )
+  }
+
+  @Test("Measures the real title bar inset after chrome is applied")
+  @MainActor
+  func measuresTitlebarInset() throws {
+    let controller = FullAppWindowController(
+      url: try #require(URL(string: "https://example.com/"))
+    )
+    let window = try #require(controller.window)
+    let contentView = try #require(window.contentView)
+    window.setFrame(
+      NSRect(x: 80, y: 80, width: 1_200, height: 800),
+      display: false
+    )
+
+    let inset = NativeWindowPolicy.titlebarInset(in: contentView, window: window)
+
+    #expect(inset >= 28)
+    #expect(inset < 80)
   }
 }
