@@ -1,54 +1,9 @@
+import { fromRemoteRecord, toRemoteRecord } from './todoCommands.js';
+
+export { fromRemoteRecord, toRemoteRecord };
+
 const TODO_SELECT_COLUMNS =
   'id,title,created_at,completed_at,someday_at,due_date,note,source,notion_page_id,notion_database_id,notion_status,first_started_at,active_started_at,tracked_seconds,time_segments,is_progressive,parent_task_id,is_progress_session,progress_label';
-
-export function toRemoteRecord(todo, userId) {
-  return {
-    id: todo.id,
-    user_id: userId,
-    title: todo.title,
-    created_at: todo.createdAt,
-    completed_at: todo.completedAt,
-    someday_at: todo.somedayAt ?? null,
-    due_date: todo.dueDate ?? null,
-    note: todo.note ?? '',
-    source: todo.source ?? 'app',
-    notion_page_id: todo.notionPageId ?? null,
-    notion_database_id: todo.notionDatabaseId ?? null,
-    notion_status: todo.notionStatus ?? null,
-    first_started_at: todo.firstStartedAt ?? null,
-    active_started_at: todo.activeStartedAt ?? null,
-    tracked_seconds: normalizeTrackedSeconds(todo.trackedSeconds),
-    time_segments: normalizeTimeSegments(todo.timeSegments),
-    is_progressive: Boolean(todo.isProgressive),
-    parent_task_id: todo.parentTaskId ?? null,
-    is_progress_session: Boolean(todo.isProgressSession),
-    progress_label: todo.progressLabel ?? '',
-  };
-}
-
-export function fromRemoteRecord(record) {
-  return {
-    id: record.id,
-    title: record.title,
-    createdAt: record.created_at,
-    completedAt: record.completed_at,
-    somedayAt: record.someday_at ?? null,
-    dueDate: record.due_date ?? null,
-    note: record.note ?? '',
-    source: record.source ?? 'app',
-    notionPageId: record.notion_page_id ?? null,
-    notionDatabaseId: record.notion_database_id ?? null,
-    notionStatus: record.notion_status ?? null,
-    firstStartedAt: record.first_started_at ?? null,
-    activeStartedAt: record.active_started_at ?? null,
-    trackedSeconds: normalizeTrackedSeconds(record.tracked_seconds),
-    timeSegments: normalizeTimeSegments(record.time_segments),
-    isProgressive: Boolean(record.is_progressive),
-    parentTaskId: record.parent_task_id ?? null,
-    isProgressSession: Boolean(record.is_progress_session),
-    progressLabel: record.progress_label ?? '',
-  };
-}
 
 export async function loadRemoteTodos(client, userId) {
   const { data, error } = await client.database
