@@ -90,6 +90,9 @@ describe('menu bar app bundle', () => {
     expect(buildScript).toContain('--sign "$CODE_SIGN_IDENTITY"');
     expect(buildScript).toContain('Contents/Frameworks/Sparkle.framework');
     expect(buildScript).toContain('@executable_path/../Frameworks');
+    expect(buildScript).not.toContain(
+      'if [[ "$CODE_SIGN_IDENTITY" != "-" ]]; then\n  /usr/bin/codesign "${SIGNING_OPTIONS[@]}"',
+    );
     expect(buildScript).not.toMatch(/codesign\s+\\\n\s+--force\s+\\\n\s+--deep/);
   });
 

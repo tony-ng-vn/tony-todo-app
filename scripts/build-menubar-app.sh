@@ -112,13 +112,11 @@ if [[ "$CODE_SIGN_IDENTITY" != "-" ]]; then
 fi
 
 SPARKLE_FRAMEWORK="$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
-if [[ "$CODE_SIGN_IDENTITY" != "-" ]]; then
-  /usr/bin/codesign "${SIGNING_OPTIONS[@]}" \
-    "$SPARKLE_FRAMEWORK/Versions/B/Autoupdate"
-  /usr/bin/codesign "${SIGNING_OPTIONS[@]}" \
-    "$SPARKLE_FRAMEWORK/Versions/B/Updater.app"
-  /usr/bin/codesign "${SIGNING_OPTIONS[@]}" "$SPARKLE_FRAMEWORK"
-fi
+/usr/bin/codesign "${SIGNING_OPTIONS[@]}" \
+  "$SPARKLE_FRAMEWORK/Versions/B/Autoupdate"
+/usr/bin/codesign "${SIGNING_OPTIONS[@]}" \
+  "$SPARKLE_FRAMEWORK/Versions/B/Updater.app"
+/usr/bin/codesign "${SIGNING_OPTIONS[@]}" "$SPARKLE_FRAMEWORK"
 /usr/bin/codesign "${SIGNING_OPTIONS[@]}" \
   --identifier "$BUNDLE_IDENTIFIER" \
   "$APP_BUNDLE"
