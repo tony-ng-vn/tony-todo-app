@@ -165,6 +165,7 @@ export function getDaySummary(state, dayKey) {
       startedAt: todo.firstStartedAt ?? null,
       completedAt: todo.completedAt,
       note: todo.note ?? '',
+      notes: toNoteViews(todo),
       durationSeconds: normalizedTrackedSeconds(todo),
       durationLabel: formatDuration(normalizedTrackedSeconds(todo)),
       outcome: todo.notionStatus === 'Failed' ? 'failed' : 'done',
@@ -412,6 +413,7 @@ export function fromRemoteRecord(record) {
     parentTaskId: record.parent_task_id ?? null,
     isProgressSession: Boolean(record.is_progress_session),
     progressLabel: record.progress_label ?? '',
+    updatedAt: record.updated_at ?? null,
   };
 }
 
@@ -425,6 +427,49 @@ export function toRemoteCompletionFields(todo) {
     tracked_seconds: normalizedTrackedSeconds(todo),
     time_segments: normalizeTimeSegments(todo.timeSegments),
   };
+}
+
+const NOTE_STAMP_PATTERN = /^@ (\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2})\s*$/;
+
+export function formatNoteAtLocal(date) {
+  const parts = getSanFranciscoDateTimeParts(new Date(date));
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
+}
+
+export function parseNoteEntries(note) {
+  const raw = String(note ?? '').replace(/\s+$/, '');
+  if (!raw) {
+    return [];
+  }
+
+  const lines = raw.split('\n');
+  const hasStamp = lines.some((line) => NOTE_STAMP_PATTERN.test(line));
+  const entries = hasStamp ? parseStampedNoteEntries(lines) : splitNoteParagraphs(raw, null);
+
+  return entries.flatMap((entry) => splitNoteParagraphs(entry.text, entry.at));
+}
+
+export function applyTodoNote(previousNote, nextNote, now = new Date()) {
+  const nextEntries = parseNoteEntries(nextNote);
+  if (nextEntries.length === 0) {
+    return '';
+  }
+
+  const previousEntries = parseNoteEntries(previousNote);
+  const stamped = nextEntries.map((entry, index) => {
+    if (entry.at) {
+      return entry;
+    }
+
+    const previous = previousEntries[index];
+    if (previous?.at) {
+      return { ...entry, at: previous.at };
+    }
+
+    return { ...entry, at: now.toISOString() };
+  });
+
+  return serializeNoteEntries(stamped);
 }
 
 export function parseTodoCommand(body) {
@@ -442,6 +487,8 @@ export function parseTodoCommand(body) {
       return { ok: true, command: { kind: 'create', title: body.title } };
     case 'complete':
       return parseCompleteCommand(body);
+    case 'appendNote':
+      return parseAppendNoteCommand(body);
     case 'daySummary':
       return parseDaySummaryCommand(body);
     default:
@@ -452,11 +499,13 @@ export function parseTodoCommand(body) {
 export function runTodoCommand(state, command, now) {
   switch (command.kind) {
     case 'list':
-      return runListCommand(state);
+      return runListCommand(state, now);
     case 'create':
       return runCreateCommand(state, command.title, now);
     case 'complete':
       return runCompleteCommand(state, command.target, now);
+    case 'appendNote':
+      return runAppendNoteCommand(state, command.target, command.text, now);
     case 'daySummary':
       return runDaySummaryCommand(state, command.day, now);
     default:
@@ -464,18 +513,43 @@ export function runTodoCommand(state, command, now) {
   }
 }
 
+function parseAppendNoteCommand(body) {
+  if (typeof body.text !== 'string' || !body.text.trim()) {
+    return invalidCommand('appendNote requires a text string');
+  }
+
+  const target = parseTaskTarget(body, 'appendNote');
+  if (!target.ok) {
+    return target;
+  }
+
+  return {
+    ok: true,
+    command: { kind: 'appendNote', target: target.target, text: body.text.trim() },
+  };
+}
+
 function parseCompleteCommand(body) {
+  const target = parseTaskTarget(body, 'complete');
+  if (!target.ok) {
+    return target;
+  }
+
+  return { ok: true, command: { kind: 'complete', target: target.target } };
+}
+
+function parseTaskTarget(body, commandName) {
   const hasId = typeof body.id === 'string' && body.id.length > 0;
   const hasTitle = typeof body.title === 'string' && body.title.length > 0;
   if (hasId === hasTitle) {
-    return invalidCommand('complete requires id or title, not both');
+    return invalidCommand(`${commandName} requires id or title, not both`);
   }
 
   if (hasId) {
-    return { ok: true, command: { kind: 'complete', target: { by: 'id', id: body.id } } };
+    return { ok: true, target: { by: 'id', id: body.id } };
   }
 
-  return { ok: true, command: { kind: 'complete', target: { by: 'title', title: body.title } } };
+  return { ok: true, target: { by: 'title', title: body.title } };
 }
 
 function parseDaySummaryCommand(body) {
@@ -490,11 +564,13 @@ function parseDaySummaryCommand(body) {
   return { ok: true, command: { kind: 'daySummary', day: body.day } };
 }
 
-function runListCommand(state) {
+function runListCommand(state, now) {
   return {
     ok: true,
     view: {
       kind: 'list',
+      now: now.toISOString(),
+      nowLocal: formatNoteAtLocal(now),
       tasks: getPendingTodos(state).map(toOpenTaskView),
     },
     persist: { kind: 'none' },
@@ -555,6 +631,26 @@ function runCompleteCommand(state, target, now) {
   return {
     ok: true,
     view: { kind: 'complete', task: toCompletedTaskView(updated) },
+    persist: { kind: 'update', todo: updated },
+  };
+}
+
+function runAppendNoteCommand(state, target, text, now) {
+  const resolved = resolveCompleteTarget(state, target);
+  if (!resolved.ok) {
+    return resolved;
+  }
+
+  const todo = resolved.todo;
+  const nextNote = todo.note?.trim() ? `${todo.note.trimEnd()}\n\n${text}` : text;
+  const updated = {
+    ...todo,
+    note: applyTodoNote(todo.note ?? '', nextNote, now),
+  };
+
+  return {
+    ok: true,
+    view: { kind: 'appendNote', task: toOpenTaskView(updated) },
     persist: { kind: 'update', todo: updated },
   };
 }
@@ -624,6 +720,8 @@ function toOpenTaskView(todo) {
     source: todo.source ?? 'app',
     status: status === 'done' ? 'not_started' : status,
     completable: !todo.isProgressive,
+    note: todo.note ?? '',
+    notes: toNoteViews(todo),
   };
 }
 
@@ -772,6 +870,69 @@ function getSanFranciscoSunrise(dayKey) {
   }
 
   return dateAtSanFranciscoTime(dayKey, DEFAULT_SUNRISE_HOUR * 60);
+}
+
+function toNoteViews(todo) {
+  return parseNoteEntries(todo.note ?? '').map((entry) => {
+    const at = entry.at ?? todo.updatedAt ?? todo.createdAt ?? null;
+    return {
+      at,
+      atLocal: at ? formatNoteAtLocal(at) : null,
+      text: entry.text,
+    };
+  });
+}
+
+function serializeNoteEntries(entries) {
+  return entries
+    .filter((entry) => entry.text.trim())
+    .map((entry) => {
+      if (!entry.at) {
+        return entry.text;
+      }
+
+      return `@ ${formatNoteAtLocal(entry.at)}\n${entry.text}`;
+    })
+    .join('\n\n');
+}
+
+function parseStampedNoteEntries(lines) {
+  const entries = [];
+  let current = { at: null, lines: [] };
+
+  function flush() {
+    const text = current.lines.join('\n').replace(/^\n+|\n+$/g, '');
+    if (current.at || text.trim()) {
+      entries.push({ at: current.at, text });
+    }
+    current = { at: null, lines: [] };
+  }
+
+  for (const line of lines) {
+    const match = line.match(NOTE_STAMP_PATTERN);
+    if (match) {
+      flush();
+      current.at = dateAtSanFranciscoTime(match[1], Number(match[2]) * 60 + Number(match[3])).toISOString();
+      continue;
+    }
+
+    current.lines.push(line);
+  }
+
+  flush();
+  return entries;
+}
+
+function splitNoteParagraphs(text, at) {
+  const chunks = String(text ?? '')
+    .split(/\n{2,}/)
+    .map((chunk) => chunk.replace(/^\n+|\n+$/g, ''))
+    .filter((chunk) => chunk.trim());
+
+  return chunks.map((chunk, index) => ({
+    at: index === 0 ? at : null,
+    text: chunk,
+  }));
 }
 
 function getSanFranciscoDateTimeParts(date) {

@@ -163,6 +163,7 @@ describe('todo remote mapping', () => {
       parentTaskId: null,
       isProgressSession: false,
       progressLabel: 'Chapter 4',
+      updatedAt: null,
     });
   });
 

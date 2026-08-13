@@ -51,7 +51,9 @@ describe('buildAgentSetupPrompt', () => {
     expect(prompt).toContain('{"command":"list"}');
     expect(prompt).toContain('{"command":"create","title":"..."}');
     expect(prompt).toContain('{"command":"complete","id":"..."}');
+    expect(prompt).toContain('{"command":"appendNote","id":"...","text":"..."}');
     expect(prompt).toContain('{"command":"daySummary"}');
+    expect(prompt).toContain('notes[]');
     expect(prompt).not.toMatch(/"ownerUserId"/);
     expect(prompt).not.toContain('INGEST_FUNCTION_TOKEN');
   });

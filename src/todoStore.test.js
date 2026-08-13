@@ -47,6 +47,7 @@ import {
   updateTodoTitle,
   updateTodoNote,
 } from './todoStore.js';
+import { formatNoteAtLocal } from './todoCommands.js';
 
 describe('day navigation', () => {
   it('moves one local calendar day in either direction', () => {
@@ -384,6 +385,7 @@ describe('todo day summary', () => {
           startedAt: null,
           completedAt: doneAt.toISOString(),
           note: '',
+          notes: [],
           durationSeconds: 0,
           durationLabel: '0m',
           outcome: 'done',
@@ -519,11 +521,12 @@ describe('todo day summary', () => {
     state = addTodo(state, 'Call school', new Date('2026-06-08T08:00:00'));
     const todo = state.todos[0];
 
-    state = updateTodoNote(state, todo.id, 'Ask about the scholarship deadline.');
+    const now = new Date('2026-06-08T15:00:00.000Z');
+    state = updateTodoNote(state, todo.id, 'Ask about the scholarship deadline.', now);
 
     expect(state.todos[0]).toEqual({
       ...todo,
-      note: 'Ask about the scholarship deadline.',
+      note: `@ ${formatNoteAtLocal(now)}\nAsk about the scholarship deadline.`,
     });
   });
 
