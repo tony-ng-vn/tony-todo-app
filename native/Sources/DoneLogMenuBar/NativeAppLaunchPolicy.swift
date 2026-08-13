@@ -38,6 +38,8 @@ enum NativeAppLaunchPolicy {
       : .initial(.launchServices)
   }
 
+  static let statusItemHostTimeout: TimeInterval = 4
+
   static func action(for intent: Intent) -> Action {
     switch intent {
     case .initial(.launchServices), .reopen(.user):
@@ -46,6 +48,31 @@ enum NativeAppLaunchPolicy {
       .reopen(.floatingNoteActivation):
       return .keepCurrentWindows
     }
+  }
+
+  static func shouldOpenFullAppNow(
+    action: Action,
+    statusItemIsReady: Bool
+  ) -> Bool {
+    action == .openFullApp && statusItemIsReady
+  }
+
+  static func shouldKeepWaitingForStatusItem(
+    statusItemIsReady: Bool,
+    elapsed: TimeInterval
+  ) -> Bool {
+    !statusItemIsReady && elapsed < statusItemHostTimeout
+  }
+
+  static func shouldRecreateStatusItem(
+    statusItemIsReady: Bool,
+    alreadyRecreated: Bool,
+    elapsed: TimeInterval
+  ) -> Bool {
+    !statusItemIsReady
+      && !alreadyRecreated
+      && elapsed >= 0.4
+      && elapsed < statusItemHostTimeout
   }
 
   @MainActor

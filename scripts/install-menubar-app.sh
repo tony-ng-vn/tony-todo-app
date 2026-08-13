@@ -30,6 +30,23 @@ unset DONE_LOG_BUNDLE_DISPLAY_NAME || true
 
 bash "$SCRIPT_DIR/build-menubar-app.sh"
 
+SOURCE_IDENTIFIER="$(
+  /usr/bin/plutil \
+    -extract CFBundleIdentifier \
+    raw \
+    "$SOURCE_APP/Contents/Info.plist"
+)"
+if [[ "$SOURCE_IDENTIFIER" != "com.tonynguyen.donelog" ]] \
+  && [[ "$SOURCE_IDENTIFIER" != "com.tonynguyen.donelog.macos" ]]; then
+  echo "refusing to install a development Done Log ($SOURCE_IDENTIFIER)" >&2
+  exit 1
+fi
+
+if [[ ! -d "$SOURCE_APP/Contents/Frameworks/Sparkle.framework" ]]; then
+  echo "refusing to replace Done Log with a build that is missing Sparkle" >&2
+  exit 1
+fi
+
 SOURCE_VERSION="$(
   /usr/bin/plutil \
     -extract CFBundleShortVersionString \

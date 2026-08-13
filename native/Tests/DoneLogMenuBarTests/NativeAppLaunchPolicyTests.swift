@@ -56,4 +56,77 @@ struct NativeAppLaunchPolicyTests {
     #expect(activationAction == .keepCurrentWindows)
     #expect(NativeAppLaunchPolicy.reopenAction == .openFullApp)
   }
+
+  @Test("Waits until the status extra is hosted before opening the full window")
+  func waitsForHostedStatusItem() {
+    #expect(
+      NativeAppLaunchPolicy.shouldKeepWaitingForStatusItem(
+        statusItemIsReady: false,
+        elapsed: 0.2
+      )
+    )
+    #expect(
+      !NativeAppLaunchPolicy.shouldOpenFullAppNow(
+        action: .openFullApp,
+        statusItemIsReady: false
+      )
+    )
+  }
+
+  @Test("Opens the full window once the status extra is in the menu bar")
+  func opensFullAppAfterStatusItemIsReady() {
+    #expect(
+      NativeAppLaunchPolicy.shouldOpenFullAppNow(
+        action: .openFullApp,
+        statusItemIsReady: true
+      )
+    )
+    #expect(
+      !NativeAppLaunchPolicy.shouldKeepWaitingForStatusItem(
+        statusItemIsReady: true,
+        elapsed: 0.2
+      )
+    )
+  }
+
+  @Test("Does not open the full window if the status extra never hosts")
+  func doesNotOpenFullAppWhenStatusItemNeverHosts() {
+    #expect(
+      !NativeAppLaunchPolicy.shouldOpenFullAppNow(
+        action: .openFullApp,
+        statusItemIsReady: false
+      )
+    )
+    #expect(
+      !NativeAppLaunchPolicy.shouldKeepWaitingForStatusItem(
+        statusItemIsReady: false,
+        elapsed: 4
+      )
+    )
+  }
+
+  @Test("Recreates an unhosted status extra once during launch")
+  func recreatesUnhostedStatusItemOnce() {
+    #expect(
+      NativeAppLaunchPolicy.shouldRecreateStatusItem(
+        statusItemIsReady: false,
+        alreadyRecreated: false,
+        elapsed: 0.5
+      )
+    )
+    #expect(
+      !NativeAppLaunchPolicy.shouldRecreateStatusItem(
+        statusItemIsReady: false,
+        alreadyRecreated: true,
+        elapsed: 0.5
+      )
+    )
+    #expect(
+      !NativeAppLaunchPolicy.shouldRecreateStatusItem(
+        statusItemIsReady: true,
+        alreadyRecreated: false,
+        elapsed: 0.5
+      )
+    )
+  }
 }
