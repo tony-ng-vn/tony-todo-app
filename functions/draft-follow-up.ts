@@ -4,8 +4,9 @@
 // only returns text -- there is no email/Slack API call anywhere in it.
 //
 // Auth mirrors functions/ingest-granola-loops.ts: a shared secret for
-// internal/testing use (explicit ownerUserId), or a real user's session
-// token (ownerUserId derived from the verified token, never from the
+// internal/testing use (explicit ownerUserId), or the owner's own session
+// token (verified email must match OWNER_EMAIL / FEEDBACK_OWNER_EMAIL;
+// ownerUserId derived from the verified token, never from the
 // client-supplied body).
 import { createAdminClient, createClient } from 'npm:@insforge/sdk';
 
@@ -35,6 +36,13 @@ export default async function (req: Request): Promise<Response> {
       accessToken: providedToken,
     });
     const { data } = await userClient.auth.getCurrentUser();
+    // Drafting burns shared OpenRouter quota and only owner-ingested loops
+    // exist to draft against, so it is owner-only like ingest.
+    const ownerEmail = Deno.env.get('OWNER_EMAIL') ?? Deno.env.get('FEEDBACK_OWNER_EMAIL');
+    const email = data?.user?.email ?? null;
+    if (!ownerEmail || !email || email !== ownerEmail) {
+      return json({ error: 'Forbidden' }, 403);
+    }
     verifiedUserId = data?.user?.id ?? null;
   }
 

@@ -87,11 +87,12 @@ export default async function (req: Request): Promise<Response> {
   // ownerUserId differently:
   //   1. The shared secret (schedule/internal use): the caller declares
   //      ownerUserId explicitly in the body.
-  //   2. A real signed-in user's own access token (the app's "check for
-  //      new loops" button, via client.functions.invoke which forwards it
-  //      automatically): ownerUserId is derived from the verified token
-  //      and any client-supplied ownerUserId is ignored, so a user can
-  //      never trigger ingestion into someone else's account.
+  //   2. The owner's own access token (the app's "check for new loops"
+  //      button, via the same-origin proxy): the verified email must match
+  //      OWNER_EMAIL (falling back to FEEDBACK_OWNER_EMAIL), because the
+  //      Granola keys are project-wide and their content belongs to the
+  //      owner only. ownerUserId is derived from the verified token and
+  //      any client-supplied ownerUserId is ignored.
   const providedToken = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
   const expectedToken = Deno.env.get('INGEST_FUNCTION_TOKEN');
   const isTrustedInternalCaller = Boolean(expectedToken) && providedToken === expectedToken;
@@ -103,6 +104,14 @@ export default async function (req: Request): Promise<Response> {
       accessToken: providedToken,
     });
     const { data } = await userClient.auth.getCurrentUser();
+    // The Granola API keys below are project-wide secrets, so meeting
+    // content must only ever flow to the owner's account. Any other
+    // signed-in user is rejected outright (mirrors feedback-admin.ts).
+    const ownerEmail = Deno.env.get('OWNER_EMAIL') ?? Deno.env.get('FEEDBACK_OWNER_EMAIL');
+    const email = data?.user?.email ?? null;
+    if (!ownerEmail || !email || email !== ownerEmail) {
+      return json({ error: 'Forbidden' }, 403);
+    }
     verifiedUserId = data?.user?.id ?? null;
   }
 
