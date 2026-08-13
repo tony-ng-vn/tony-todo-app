@@ -52,7 +52,8 @@ export function stripLiveFunctionSource(output) {
 export function normalizeFunctionSource(source) {
   return String(source ?? '')
     .replaceAll('\r\n', '\n')
-    .replace(/^\uFEFF/, '');
+    .replace(/^\uFEFF/, '')
+    .replace(/\n+$/, '\n');
 }
 
 export function sourcesMatch(localSource, liveOutput) {
