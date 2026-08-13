@@ -59,7 +59,7 @@ jobs:
           INSFORGE_USER_API_KEY: ${{ secrets.INSFORGE_USER_API_KEY }}
         run: |
           if [ -z "$INSFORGE_USER_API_KEY" ]; then
-            echo "Add repository secret INSFORGE_USER_API_KEY from InsForge Profile → API Keys (a uak_ key)."
+            echo "Add repository secret INSFORGE_USER_API_KEY from InsForge Profile -> API Keys (a uak_ key)."
             echo "GitHub, not a laptop or cloud agent, is what deploys functions after CI is green on main."
             exit 1
           fi

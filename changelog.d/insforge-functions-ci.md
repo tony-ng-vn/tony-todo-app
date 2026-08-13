@@ -1,6 +1,8 @@
 **CI & Tooling**
 
 - Merging a function change to main now deploys it from GitHub after tests pass, and the job fails if live source still does not match the repo.
+- Manual runs are limited to `main`, and the locked InsForge CLI is installed before deployment credentials are exposed.
+- Function deletion and migration-order conflicts now stop before any production function is changed.
 
 **Docs**
 

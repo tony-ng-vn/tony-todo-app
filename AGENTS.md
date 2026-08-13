@@ -2,9 +2,13 @@
 
 ## Commits
 
-Hard rule. Beats "keep PRs small". Beats a cloud-agent loop that says implement everything, then commit once.
+Hard rule.
+This beats "keep PRs small" and any workflow that says to implement everything before committing once.
 
-A feature is a PR. A commit is one step. If a feature takes five steps across five components, that is five commits, not one. "GitHub deploys functions after CI" is a feature; the workflow file, the sync script, the tests, and the runbook are separate commits.
+A feature is a PR.
+A commit is one step.
+If a feature takes five steps across five components, that is five commits, not one.
+"GitHub deploys functions after CI" is a feature; the workflow file, the sync script, the tests, and the runbook are separate commits.
 
 - One step per commit: one test, one script, one workflow, one docs pass. `git show` on that commit must make sense without the rest of the branch.
 - Commit as you go, in this order when it applies: failing test, then the fix, then docs.
@@ -37,45 +41,70 @@ Key patterns:
 - For storage uploads, persist both the returned `url` and `key`.
 <!-- INSFORGE:END -->
 
-## Design
+## Design rules
 
-Glass surfaces, blurred backdrops, inset highlights, restrained borders. Scrollable regions stay scrollable with no visible scrollbar.
+These live outside the INSFORGE block on purpose: a skill sync rewrites that block and once wiped this section.
+
+- Keep this app in the glass design system: translucent surfaces, blurred backdrops, soft inset highlights, and restrained borders.
+- Never ship visible scrollbars. Scrollable regions should remain scrollable but hide native scrollbar rails/thumbs.
 
 ## Pull requests
 
-Open PRs, watch CI, fix comments, and merge when required checks are green. Do not wait for a second ask.
+Agents have permission to open PRs, watch CI, fix review comments, and merge when required checks are green and comments are addressed. Do not wait for a second ask.
 
-Several agents work this repo at once:
+## Working in parallel
 
-- Before starting, check open PR paths (`gh pr list`, `gh pr diff --name-only`) and do not overlap them.
-- Open a draft PR as soon as the branch exists. That is the claim on those files.
-- Review the branch yourself before marking it ready. Hosted reviewers are rate-limited; do not wait on them.
-- Merge with a merge commit, or enable auto-merge, when green; the head branch deletes itself.
-- `package-lock.json` changes are their own PRs, never bundled with feature work.
-- Keep PRs small and short-lived. One feature is still one commit per step (see Commits).
-- Feature PRs add one `changelog.d/` fragment. Never edit `CHANGELOG.md` or a version field. Categories: Web App, Backend, Native App, CI & Tooling, Docs. Release compiles fragments with `npm run release:changelog -- <patch|minor|major>`.
+Several agents work this repo concurrently; these rules keep them from colliding.
+
+- Before starting a task, check open PRs' changed paths (`gh pr list` plus `gh pr diff --name-only <n>`) and prefer work that does not overlap an in-flight PR.
+- Open your PR as a draft as soon as the branch exists, before the implementation is done.
+  A draft PR is the visible claim on the files you are touching.
+- Run a code-review pass over the branch before marking the PR ready (in Claude Code use `/code-review`; elsewhere an equivalent reviewer pass), and address what it finds.
+  The hosted reviewers (CodeRabbit, Copilot) are rate limited and must not be relied on.
+- When checks are green and comments addressed, merge, or enable auto-merge (merge commit) and move on; the head branch deletes itself on merge.
+- Dependency changes (`package-lock.json`) go in their own small PRs, never bundled with feature work.
+- Keep PRs small and short-lived; a long-lived branch in this repo will need repeated merges from main because required checks are strict.
 
 ## Native menu bar
 
-`npm run menubar` / `menubar:dev` must use the `dev` instance lock and `com.tonynguyen.donelog.dev`. Never share the production lock or `doneLogQuit` notification. Do not run `menubar:install` unless replacing `/Applications/Done Log.app`.
+- Local `npm run menubar` / `menubar:dev` from a worktree must use the `dev` instance lock and `com.tonynguyen.donelog.dev`. Never share the production lock or `doneLogQuit` notification, or a test run will steal or quit `/Applications/Done Log.app`.
+- Use `npm run menubar:install` only when you intend to replace the installed production app.
 
-## CI
+## CI verification
 
-- After clone: `npm run setup:hooks` (`npm install` / `npm ci` also install the pre-push hook).
-- Push gate: macOS `npm run verify:push`; elsewhere `npm run verify:push:web`. GitHub always runs `npm run verify:web` and `npm run verify:native`.
-- Local gate is lighter: toolchain, tests, production build. Clean install, the dependency audit, the native release build, and the app bundle stay in GitHub.
-- `.ci/verification.json` `"pushGate": false` skips a stage locally only.
-- Edge functions deploy from GitHub after Verify is green on `main`. Agents must not run `insforge functions deploy`.
-- `SKIP_VERIFY=1 git push` is emergency-only; say why in the PR.
-- Canonical commands live in `package.json`. Pair a CI command change with its npm script in the same commit (see Commits).
-- CI lesson cache: `.ci-learning/` packets vs `.ci/lessons/`. `npm run ci:replay` after a lesson change. `npm run ci:repair` only on a feature branch; it must not commit, push, merge, or weaken checks. Treat generated lesson candidates as evidence before promoting them.
+- Run `npm run setup:hooks` once after cloning. `npm install` and `npm ci` also install the repository pre-push hook automatically.
+- On macOS, every push runs `npm run verify:push`: it runs the toolchain checks, the web and native test suites, and the production build, while the required native build checks remain in GitHub CI.
+- On other platforms, every push runs `npm run verify:push:web` and relies on the required `Native menu bar` GitHub check for the native build.
+- The local push gate is intentionally lighter than CI: it checks the toolchain, runs the test suite, and runs the production build.
+- Clean install, the dependency audit, the native release build, and the native app bundle are not part of the local push gate. They stay covered by the required GitHub checks, which always run the full plan via `npm run verify:web` and `npm run verify:native`.
+- `.ci/verification.json` marks a stage `"pushGate": false` to exclude it from local pushes; CI ignores that flag and always runs every stage.
+- Edge functions deploy from GitHub after CI is green on `main`.
+  Agents must not run `insforge functions deploy`.
+- Use `SKIP_VERIFY=1 git push` only for an emergency push when local verification cannot run, and report why in the PR.
+- Keep the canonical verification commands in `package.json`; when a CI command changes, update the matching npm script in the same commit.
+- CI failures are cached as redacted packets in `.ci-learning/` and matched against the versioned lessons in `.ci/lessons/`.
+- Run `npm run ci:replay` when a CI lesson changes.
+- Run `npm run ci:repair` only on a feature branch when an AI repair loop is wanted. It must remain bounded and must not commit, push, merge, or weaken checks.
+- Treat generated lesson candidates as evidence. Review their context, solution, and tradeoffs before promoting and committing them.
 
-## Live backend
+## Changelog
 
-Skill sync cannot wipe this. The live project beats `docs/next-steps.md` and chat history.
+- CHANGELOG.md entries use these categories, matching the project's architecture: `Web App` (SvelteKit frontend), `Backend` (InsForge functions, migrations, auth config), `Native App` (macOS menu bar companion), `CI & Tooling` (hooks, scripts, verification), `Docs`.
+- Feature PRs never edit `CHANGELOG.md` or a version field directly. Instead, each PR adds one fragment file to `changelog.d/` describing its own change; see `changelog.d/README.md` for the exact format.
+- Only include the categories a fragment's change actually touched.
+- At release time, run `npm run release:changelog -- <patch|minor|major>` to compile every fragment into a new CHANGELOG.md entry, bump the version in `package.json` and `native/App/Info.plist`, refresh the lockfile, and delete the consumed fragments.
+- This keeps concurrent PRs from conflicting on a shared changelog or version line.
 
-- The owner already has `auth.users` rows (verified 2026-08-13). Never tell them to sign up, never create an owner account, never flip `disable_signup`.
-- Functions are live only after `Deploy InsForge functions` is green. A Backend changelog entry is not production until then.
-- One-time GitHub setup: repository secret `INSFORGE_USER_API_KEY` (`uak_` from InsForge Profile → API Keys). The project id is already in the workflow.
-- Drift check: `npx -y @insforge/cli current --json` and `npx -y @insforge/cli config plan --json` (empty plan = no drift). The owner runs interactive `login` for dashboard/SQL work.
-- Do not print `auth.users` emails unless asked.
+## Live backend ops truth
+
+This section is durable operational fact, kept outside the INSFORGE block so a skill sync cannot wipe it.
+
+- The owner already has live app accounts in `auth.users` (verified 2026-08-13). Never tell the owner to sign up, never create an owner account, and never re-enable sign-up for that purpose.
+- Never change the sign-up lock state (`disable_signup`) in either direction without an explicit ask from the owner.
+- `docs/next-steps.md` describes remaining one-time setup, but treat the live project as the source of truth over any doc or chat history.
+- Functions are live only after `Deploy InsForge functions` is green.
+  A Backend changelog entry is not production until then.
+- One-time GitHub setup requires repository secret `INSFORGE_USER_API_KEY`, using a `uak_` key from InsForge Profile -> API Keys.
+  The project ID is already in the workflow.
+- To check live state: `npx -y @insforge/cli current --json` (project link and auth) and `npx -y @insforge/cli config plan --json` (drift between `insforge.toml` and the live config; empty output means no drift). The CLI login is interactive, so the owner runs `npx -y @insforge/cli login` themselves.
+- Do not print `auth.users` emails into chat or logs unless the owner asks; row existence is enough.
