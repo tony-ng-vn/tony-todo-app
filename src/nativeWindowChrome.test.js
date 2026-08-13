@@ -39,7 +39,7 @@ describe('native window chrome', () => {
     expect(isNativeWindowDragTarget({})).toBe(false);
   });
 
-  it('asks the native shell to zoom on a header double-click', () => {
+  it('asks the native shell to drag and zoom from empty header space', () => {
     const listeners = new Map();
     const posted = [];
     const targetWindow = {
@@ -61,6 +61,20 @@ describe('native window chrome', () => {
 
     installNativeWindowChrome(targetWindow);
     installNativeWindowChrome(targetWindow);
+    listeners.get('mousedown')({
+      button: 0,
+      target: element({
+        [NATIVE_WINDOW_DRAG_SELECTOR]: true,
+        [NATIVE_WINDOW_NO_DRAG_SELECTOR]: false,
+      }),
+    });
+    listeners.get('mousedown')({
+      button: 1,
+      target: element({
+        [NATIVE_WINDOW_DRAG_SELECTOR]: true,
+        [NATIVE_WINDOW_NO_DRAG_SELECTOR]: false,
+      }),
+    });
     listeners.get('dblclick')({
       target: element({
         [NATIVE_WINDOW_DRAG_SELECTOR]: true,
@@ -74,6 +88,6 @@ describe('native window chrome', () => {
       }),
     });
 
-    expect(posted).toEqual([{ command: 'zoom' }]);
+    expect(posted).toEqual([{ command: 'drag' }, { command: 'zoom' }]);
   });
 });
