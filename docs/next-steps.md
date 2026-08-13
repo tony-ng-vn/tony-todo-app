@@ -3,16 +3,16 @@
 Everything in this doc is something only you can do -- an agent can't complete any of it (account creation, real credentials, and dashboard config are all outside what an agent should touch).
 Do them in this order; each one only unblocks what it says it unblocks, nothing more.
 
-## 1. Sign up for your real account
+## 1. Confirm which account is the owner account
 
-This is the one to do first. It unblocks the most: your original 8 todos (still sitting under the old anonymous ID) and the recurring ingestion schedule both need a real account to exist before anything else can move.
+Your owner account already exists in the live app (verified 2026-08-13), so there is nothing to sign up for.
+Do not create a new account and do not re-enable sign-up for this step.
 
-1. Public sign-up is now disabled (`disable_signup = true` in `insforge.toml`), so the sign-up form on the live app will not work.
-2. When you are ready, either create your account directly in the InsForge dashboard (Authentication -> Users -> Add user), or tell me and I will temporarily re-enable sign-up, wait for you to register, and lock it again.
-3. Tell me once it is done, and give me the email you used.
-4. I will reassign the 8 original pre-auth todos to your new account with a one-time database update, set the `OWNER_EMAIL` secret to your email, and set up the recurring Granola ingestion schedule pointed at your account.
+1. Tell me which email is your owner account.
+2. I will reassign the original pre-auth todos (still sitting under the old anonymous ID) to that account with a one-time database update.
+3. I will set the `OWNER_EMAIL` secret to that email (until then the `FEEDBACK_OWNER_EMAIL` fallback applies) and set up the recurring Granola ingestion schedule pointed at your account.
 
-Note: `require_email_verification` stays off until SMTP exists (step 3 below), which is fine while sign-up is disabled.
+Note: public sign-up is disabled (`disable_signup = true` in `insforge.toml`) and `require_email_verification` stays off until SMTP exists (step 3 below), which is fine while sign-up is disabled.
 
 ## 2. Google Cloud OAuth setup (only if you want Gmail + Calendar)
 

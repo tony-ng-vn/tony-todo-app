@@ -20,6 +20,6 @@
 
 **Docs**
 
-- The owner onboarding guide now explains how to create the owner account while sign-up is locked.
+- The owner onboarding guide now reflects that the owner account already exists: the remaining work is pointing the app at it, not signing up.
 
 ---
