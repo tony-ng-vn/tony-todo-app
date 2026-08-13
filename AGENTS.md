@@ -40,3 +40,9 @@ Design rules:
 - Run `npm run ci:replay` when a CI lesson changes.
 - Run `npm run ci:repair` only on a feature branch when an AI repair loop is wanted. It must remain bounded and must not commit, push, merge, or weaken checks.
 - Treat generated lesson candidates as evidence. Review their context, solution, and tradeoffs before promoting and committing them.
+
+## Changelog
+
+- CHANGELOG.md entries use these categories, matching the project's architecture: `Web App` (SvelteKit frontend), `Backend` (InsForge functions, migrations, auth config), `Native App` (macOS menu bar companion), `CI & Tooling` (hooks, scripts, verification), `Docs`.
+- Only include the categories a release actually touched.
+- Keep the newest entry first, keep `package.json` version in sync with the newest entry, and update the changelog in the same commit as the change that prompted it.
