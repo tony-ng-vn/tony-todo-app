@@ -17,6 +17,7 @@
   } from '../theme.js';
   import HistoryPanel from '../lib/components/HistoryPanel.svelte';
   import MeetingsPanel from '../lib/components/MeetingsPanel.svelte';
+  import ProjectsPanel from '../lib/components/ProjectsPanel.svelte';
   import SettingsPanel from '../lib/components/SettingsPanel.svelte';
   import SummaryPanel from '../lib/components/SummaryPanel.svelte';
   import TaskDetail from '../lib/components/TaskDetail.svelte';
@@ -39,11 +40,13 @@
     getMillisecondsUntilNextDay,
     getOpenTodoSections,
     getProgressSessions,
+    getProjectTodos,
     logProgressSession,
     moveCompletedTodoToSummaryBucket,
     moveTodoToBoardColumn,
     pauseTodoTimer,
     partitionTaskFlowTodos,
+    promoteTodoToTask,
     reopenTodo,
     restoreTodoFromSomeday,
     setTodoDueDate,
@@ -116,6 +119,7 @@
   let authError = '';
   let authLoading = false;
   let titleDraft = '';
+  let composerKind = 'task';
   let dueDateDraft = formatDayKey(new Date());
   let lastSelectedDayForDraft = dueDateDraft;
   let draftTitle = '';
@@ -169,6 +173,7 @@
   );
   $: summary = getDaySummary(state, selectedDay);
   $: boardColumns = getBoardColumns(state, { dayKey: selectedDay, dueFilter: boardDueFilter });
+  $: projectTodos = getProjectTodos(state);
   $: calendarMonthData = getCalendarMonth(state, { year: calendarYear, month: calendarMonth });
   $: completedToday = summary.reduce(
     (total, section) => total + section.items.filter((item) => item.outcome !== 'failed').length,
@@ -245,8 +250,10 @@
     }
 
     const existingIds = new Set(state.todos.map((todo) => todo.id));
+    const kind = composerKind === 'project' ? 'project' : 'task';
     state = addTodo(state, titleDraft, new Date(), {
-      dueDate: dueDateInputToIso(dueDateDraft || selectedDay),
+      kind,
+      dueDate: kind === 'project' ? null : dueDateInputToIso(dueDateDraft || selectedDay),
     });
     const createdTodo = state.todos.find((todo) => !existingIds.has(todo.id));
 
@@ -257,6 +264,7 @@
     newlyAddedTodoId = createdTodo.id;
     draftTitle = '';
     titleDraft = '';
+    composerKind = 'task';
     dueDateDraft = selectedDay;
     lastSelectedDayForDraft = selectedDay;
     saveLocalState(state);
@@ -265,6 +273,10 @@
         newlyAddedTodoId = null;
       }
     }, 700);
+
+    if (kind === 'project') {
+      setViewMode('projects');
+    }
 
     await syncRemoteChange('Saving', () => persistNewTodo(createdTodo));
   }
@@ -416,7 +428,7 @@
     }
 
     saveLocalState(state);
-    await syncRemoteChange(moveToSomeday ? 'Moving to Someday' : 'Returning to active tasks', () =>
+    await syncRemoteChange(moveToSomeday ? 'Moving to Stall' : 'Returning to active tasks', () =>
       persistTodoWorkflow(after),
     );
   }
@@ -581,7 +593,7 @@
     const existingIds = new Set(state.todos.map((todo) => todo.id));
     state = addTodo(state, title, new Date(), { dueDate: dueDateInputToIso(selectedDay) });
 
-    if (columnId === 'in_progress' || columnId === 'someday' || columnId === 'done') {
+    if (columnId === 'in_progress' || columnId === 'stall' || columnId === 'done') {
       const created = state.todos.find((todo) => !existingIds.has(todo.id));
       if (created) {
         state = moveTodoToBoardColumn(state, created.id, columnId);
@@ -849,6 +861,24 @@
     }
     saveLocalState(state);
     await syncRemoteChange('Deleting task', () => persistDeletedTodos(deletedIds));
+  }
+
+  async function handleProjectSubmit() {
+    composerKind = 'project';
+    await handleSubmit();
+  }
+
+  async function handlePromoteProject(todoId) {
+    const before = findTodo(todoId);
+    if (!before || before.kind !== 'project') {
+      return;
+    }
+
+    state = promoteTodoToTask(state, todoId);
+    const after = findTodo(todoId);
+    saveLocalState(state);
+    setViewMode('flow');
+    await syncRemoteChange('Moving to tasks', () => persistTodoWorkflow(after));
   }
 
   function handleDragStart(event, todoId) {
@@ -1305,10 +1335,23 @@
 <main
   class="workspace"
   class:has-detail={selectedTask}
-  class:is-board-view={viewMode === 'agenda' || viewMode === 'board' || viewMode === 'calendar' || viewMode === 'inbox' || viewMode === 'waiting' || viewMode === 'history' || viewMode === 'meetings' || viewMode === 'settings'}
+  class:is-board-view={viewMode === 'agenda' || viewMode === 'projects' || viewMode === 'board' || viewMode === 'calendar' || viewMode === 'inbox' || viewMode === 'waiting' || viewMode === 'history' || viewMode === 'meetings' || viewMode === 'settings'}
   aria-label="Done Log todo app"
 >
-  {#if viewMode === 'agenda'}
+  {#if viewMode === 'projects'}
+    <ProjectsPanel
+      projects={projectTodos}
+      inboxCount={inboxLoops.length}
+      waitingCount={waitingLoops.length}
+      bind:titleDraft
+      onSubmit={handleProjectSubmit}
+      onDraftInput={handleDraftInput}
+      onOpenTask={openTask}
+      onPromote={handlePromoteProject}
+      onDelete={handleDeleteTask}
+      onViewChange={setViewMode}
+    />
+  {:else if viewMode === 'agenda'}
     <AgendaPanel
       {syncMessage}
       groups={agendaGroups}
@@ -1417,6 +1460,7 @@
       {openCount}
       bind:titleDraft
       bind:dueDateDraft
+      bind:composerKind
       {draftTitle}
       {editingTaskId}
       {newlyAddedTodoId}

@@ -18,6 +18,7 @@
   export let openCount = 0;
   export let titleDraft = '';
   export let dueDateDraft = '';
+  export let composerKind = 'task';
   export let draftTitle = '';
   export let editingTaskId = null;
   export let newlyAddedTodoId = null;
@@ -72,27 +73,43 @@
   <WorkspaceTabs currentView={viewMode} {inboxCount} {waitingCount} {onViewChange} />
 
   <form class="new-task-form" id="new-task-form" on:submit|preventDefault={onSubmit}>
-    <label for="todo-title">New task - assigned to the selected date</label>
+    <label for="todo-title">
+      {composerKind === 'project' ? 'New project idea' : 'New task - assigned to the selected date'}
+    </label>
+    <div class="composer-kind" role="radiogroup" aria-label="Capture as">
+      <label class:is-active={composerKind === 'task'}>
+        <input type="radio" name="composer-kind" value="task" bind:group={composerKind} />
+        Task
+      </label>
+      <label class:is-active={composerKind === 'project'}>
+        <input type="radio" name="composer-kind" value="project" bind:group={composerKind} />
+        Project
+      </label>
+    </div>
     <div class="input-row">
       <input
         id="todo-title"
         name="title"
         type="text"
         autocomplete="off"
-        placeholder="+ Add task and press Enter"
+        placeholder={composerKind === 'project'
+          ? '+ Add a project idea and press Enter'
+          : '+ Add task and press Enter'}
         bind:value={titleDraft}
         on:input={onDraftInput}
       />
-      <div class="new-task-calendar">
-        <CalendarPicker
-          id="todo-due-date"
-          value={dueDateDraft}
-          label="Assigned date"
-          triggerClass="new-task-due"
-          allowClear={true}
-          onChange={(nextDate) => (dueDateDraft = nextDate)}
-        />
-      </div>
+      {#if composerKind === 'task'}
+        <div class="new-task-calendar">
+          <CalendarPicker
+            id="todo-due-date"
+            value={dueDateDraft}
+            label="Assigned date"
+            triggerClass="new-task-due"
+            allowClear={true}
+            onChange={(nextDate) => (dueDateDraft = nextDate)}
+          />
+        </div>
+      {/if}
       <button type="submit">Add</button>
     </div>
   </form>

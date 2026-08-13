@@ -306,7 +306,7 @@
     {#if !selectedTask.completedAt}
       <div class:someday-active={selectedTask.somedayAt} class="detail-someday-state">
         <span>
-          <strong>{selectedTask.somedayAt ? 'Someday' : 'Active task'}</strong>
+          <strong>{selectedTask.somedayAt ? 'Stall' : 'Active task'}</strong>
           <small>
             {selectedTask.somedayAt
               ? 'Paused with no return date. It stays out of your active task list.'
@@ -318,7 +318,7 @@
           class="detail-someday-button"
           on:click={() => onSomedayChange(selectedTask.id, !selectedTask.somedayAt)}
         >
-          {selectedTask.somedayAt ? 'Return to active' : 'Move to Someday'}
+          {selectedTask.somedayAt ? 'Return to active' : 'Move to Stall'}
         </button>
       </div>
     {/if}

@@ -539,7 +539,7 @@
 
     expandedTaskId = null;
     saveLocalState(state);
-    await syncRemoteChange(moveToSomeday ? 'Moving to Someday' : 'Returning to active tasks', () =>
+    await syncRemoteChange(moveToSomeday ? 'Moving to Stall' : 'Returning to active tasks', () =>
       persistTodoWorkflow(after),
     );
   }
@@ -849,7 +849,7 @@
       {#if somedayTodos.length}
         <section data-menubar-section="someday" aria-labelledby="menubar-someday-heading">
           <div class="menubar-section-heading">
-            <h2 id="menubar-someday-heading">Someday</h2>
+            <h2 id="menubar-someday-heading">Stall</h2>
             <span>{somedayTodos.length} parked</span>
           </div>
           <div class="menubar-section-list">
