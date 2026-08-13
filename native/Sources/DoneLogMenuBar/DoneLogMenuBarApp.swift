@@ -64,21 +64,25 @@ final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
       return
     }
 
-    didFinishSmokeCheck = true
-    smokeTimeout?.cancel()
-
     switch result {
     case .success where controller.isReady:
+      didFinishSmokeCheck = true
+      smokeTimeout?.cancel()
       FileHandle.standardOutput.write(
         Data("MENUBAR_NATIVE_READY\n".utf8)
       )
       NSApp.terminate(nil)
     case .success:
-      FileHandle.standardError.write(
-        Data("MENUBAR_NATIVE_FAILED status item is not ready\n".utf8)
-      )
-      exit(1)
+      DispatchQueue.main.asyncAfter(deadline: .now() + 0.1) {
+        [weak self, weak controller] in
+        guard let controller else {
+          return
+        }
+        self?.finishSmokeCheck(result: .success(()), controller: controller)
+      }
     case .failure(let error):
+      didFinishSmokeCheck = true
+      smokeTimeout?.cancel()
       FileHandle.standardError.write(
         Data("MENUBAR_NATIVE_FAILED \(error.localizedDescription)\n".utf8)
       )
