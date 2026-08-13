@@ -447,7 +447,7 @@
       }
 
       const saved = await syncRemoteChange('Saving note', () =>
-        persistTodoNote({ ...todo, note: edit.note }),
+        persistTodoNote(todo),
       );
       if (saved) {
         markNoteEditSynced(todoId, edit.revision);

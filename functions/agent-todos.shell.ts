@@ -136,6 +136,7 @@ async function persistTodoCommand(client, ownerUserId, persist) {
     .from('todos')
     .update({
       ...toRemoteCompletionFields(persist.todo),
+      note: persist.todo.note ?? '',
       updated_at: new Date().toISOString(),
     })
     .eq('id', persist.todo.id)
