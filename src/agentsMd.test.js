@@ -35,8 +35,15 @@ describe('AGENTS.md commit rule', () => {
 
   it('forbids squashing a whole PR into one commit', () => {
     const commits = sectionAfter('## Commits');
-    expect(commits).toContain('One idea per commit');
     expect(commits).toContain('Never implement the whole PR');
     expect(commits).toContain('single commit');
+  });
+
+  it('treats a feature as a PR and each step as its own commit', () => {
+    const commits = sectionAfter('## Commits');
+    expect(commits).toContain('A feature is a PR');
+    expect(commits).toContain('five steps');
+    expect(commits).toContain('five commits');
+    expect(commits).toContain('One step per commit');
   });
 });
