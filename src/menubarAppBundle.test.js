@@ -84,7 +84,8 @@ describe('menu bar app bundle', () => {
 
     expect(controller).toContain('NSPanel');
     expect(controller).toContain('window.level = .floating');
-    expect(controller).toContain('window.isMovableByWindowBackground = true');
+    expect(controller).toContain('NativeWindowPolicy.applyChrome');
+    expect(controller).toContain('usesWindowChrome: true');
     expect(controller).toContain('window.contentMinSize');
     expect(controller).toContain('contentController.onCloseWindow');
   });
@@ -167,5 +168,7 @@ describe('menu bar app bundle', () => {
     expect(styles).toContain('--native-traffic-lights-inset');
     expect(styles).not.toContain('padding: var(--native-titlebar-inset) 0 0');
     expect(styles).toContain('flex-wrap: wrap;');
+    expect(styles).toContain('html.is-native-host .floating-note-shell');
+    expect(styles).toContain('padding-top: calc(18px + var(--native-titlebar-inset));');
   });
 });

@@ -14,6 +14,8 @@ struct NativeWindowPolicyTests {
     #expect(style.contains(.miniaturizable))
     #expect(style.contains(.resizable))
     #expect(style.contains(.fullSizeContentView))
+    #expect(NativeWindowPolicy.floatingNoteStyleMask == style)
+    #expect(!NativeWindowPolicy.floatingNoteStyleMask.contains(.utilityWindow))
     #expect(style != .borderless)
     #expect(NativeWindowPolicy.fullScreenMenuTitle(isFullScreen: false) == "Enter Full Screen")
     #expect(NativeWindowPolicy.fullScreenMenuTitle(isFullScreen: true) == "Exit Full Screen")
@@ -49,6 +51,27 @@ struct NativeWindowPolicyTests {
     #expect(window.contentMaxSize.width > 1_800)
     #expect(window.contentMaxSize.height > 1_130)
     #expect(window.contentViewController?.preferredContentSize == .zero)
+  }
+
+  @Test("Uses the same unified chrome for floating notes")
+  @MainActor
+  func floatingNotesUseTransparentUnifiedChrome() throws {
+    let controller = FloatingNoteWindowController(
+      url: try #require(URL(string: "https://example.com/menubar?note=task-1"))
+    ) {}
+    let window = try #require(controller.window)
+
+    #expect(window.styleMask.contains(.titled))
+    #expect(window.styleMask.contains(.fullSizeContentView))
+    #expect(!window.styleMask.contains(.utilityWindow))
+    #expect(window.titlebarAppearsTransparent)
+    #expect(window.titleVisibility == .hidden)
+    #expect(window.titlebarSeparatorStyle == .none)
+    #expect(window.appearance?.name == .darkAqua)
+    #expect(window.backgroundColor == NativeWindowPolicy.canvasColor)
+    #expect(window.isOpaque)
+    #expect(window.standardWindowButton(.closeButton)?.isHidden != true)
+    #expect(window.contentView is NativeChromeWebView)
   }
 
   @Test("Hides the system title bar so content can fill the window")
