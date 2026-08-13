@@ -205,7 +205,7 @@ describe('CI workflow', () => {
   it('limits permissions and pins actions to immutable revisions', () => {
     expect(workflow.permissions.contents).toBe('read');
     expect(dependencyWorkflow.permissions.contents).toBe('read');
-    expect(functionsWorkflow.permissions.contents).toBe('write');
+    expect(functionsWorkflow.permissions.contents).toBe('read');
     expect(functionsWorkflow.permissions.actions).toBe('read');
 
     const actionReferences = [workflow, dependencyWorkflow, functionsWorkflow].flatMap(
@@ -254,7 +254,9 @@ describe('CI workflow', () => {
 
     const stepsByName = Object.fromEntries(deploy.steps.map((step) => [step.name, step]));
     expect(stepsByName['Check out repository'].with.ref).toContain('workflow_run.head_sha');
-    expect(functionsWorkflow.permissions.contents).toBe('write');
+    expect(functionsWorkflow.permissions.contents).toBe('read');
+    expect(deploy.permissions.contents).toBe('read');
+    expect(stepsByName['Check out repository'].with['persist-credentials']).toBe(false);
     expect(stepsByName['Resolve undeployed main range'].run).toContain(
       'refs/tags/insforge-functions-deployed',
     );
@@ -272,11 +274,17 @@ describe('CI workflow', () => {
     expect(stepsByName['Install dependencies'].if).toBe(
       "steps.range.outputs.should_run == 'true'",
     );
-    expect(stepsByName['Block automatic deploy for backend state changes'].if).toBe(
-      "github.event_name != 'workflow_dispatch' && steps.range.outputs.should_run == 'true'",
+    expect(stepsByName['Guard backend state ordering'].if).toBe(
+      "steps.range.outputs.should_run == 'true'",
     );
-    expect(stepsByName['Block automatic deploy for backend state changes'].run).toContain(
+    expect(stepsByName['Guard backend state ordering'].run).toContain(
       'git diff --quiet "$DEPLOY_BASE" "$DEPLOY_HEAD" -- migrations insforge.toml',
+    );
+    expect(stepsByName['Guard backend state ordering'].run).toContain(
+      '--json db migrations list',
+    );
+    expect(stepsByName['Guard backend state ordering'].run).toContain(
+      '--json config plan',
     );
     expect(stepsByName['Deploy changed functions and verify live source'].run).toContain(
       'link --api-base-url "$INSFORGE_API_BASE_URL" --api-key "$INSFORGE_API_KEY"',
@@ -301,6 +309,9 @@ describe('CI workflow', () => {
     });
     expect(stepsByName['Advance deployment marker'].run).toContain(
       '--force-with-lease=refs/tags/insforge-functions-deployed:"$DEPLOY_BASE"',
+    );
+    expect(stepsByName['Advance deployment marker'].env.MARKER_TOKEN).toBe(
+      '${{ secrets.INSFORGE_MARKER_TOKEN }}',
     );
   });
 });

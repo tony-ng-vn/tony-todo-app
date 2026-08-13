@@ -14,13 +14,16 @@ concurrency:
 
 permissions:
   actions: read
-  contents: write
+  contents: read
 
 jobs:
   deploy:
     name: Deploy InsForge functions
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    permissions:
+      actions: read
+      contents: read
     if: >
       (github.event_name == 'workflow_dispatch' &&
        github.ref == 'refs/heads/main') ||
@@ -37,6 +40,7 @@ jobs:
         with:
           fetch-depth: 0
           fetch-tags: true
+          persist-credentials: false
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Resolve undeployed main range
@@ -108,14 +112,40 @@ jobs:
         if: steps.range.outputs.should_run == 'true'
         run: npm ci
 
-      - name: Block automatic deploy for backend state changes
-        if: github.event_name != 'workflow_dispatch' && steps.range.outputs.should_run == 'true'
+      - name: Guard backend state ordering
+        if: steps.range.outputs.should_run == 'true'
         env:
           DEPLOY_BASE: ${{ steps.range.outputs.base }}
           DEPLOY_HEAD: ${{ steps.range.outputs.head }}
+          INSFORGE_API_KEY: ${{ secrets.INSFORGE_API_KEY }}
         run: |
-          if ! git diff --quiet "$DEPLOY_BASE" "$DEPLOY_HEAD" -- migrations insforge.toml; then
+          if git diff --quiet "$DEPLOY_BASE" "$DEPLOY_HEAD" -- migrations insforge.toml; then
+            exit 0
+          fi
+          if [ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ]; then
             echo "This push changes migrations or InsForge config. Apply those live changes first, then replay this workflow from main."
+            exit 1
+          fi
+
+          if [ -z "$INSFORGE_API_KEY" ]; then
+            echo "Add repository secret INSFORGE_API_KEY from the linked Todo App project."
+            exit 1
+          fi
+          npx -y --offline @insforge/cli@0.2.6 link --api-base-url "$INSFORGE_API_BASE_URL" --api-key "$INSFORGE_API_KEY" -y
+          local_versions=$(find migrations -maxdepth 1 -type f -name '*.sql' -print \
+            | sed -E 's#^.*/([0-9]+)_.*#\1#' \
+            | sort -u)
+          remote_versions=$(npx -y --offline @insforge/cli@0.2.6 --json db migrations list \
+            | jq -r '.migrations[].version' \
+            | sort -u)
+          if [ "$local_versions" != "$remote_versions" ]; then
+            echo "Live migration versions do not match migrations/. Apply and reconcile them before replaying this workflow."
+            exit 1
+          fi
+          config_plan=$(npx -y --offline @insforge/cli@0.2.6 --json config plan)
+          if [ "$(jq '.changes | length' <<<"$config_plan")" -ne 0 ] || \
+             [ "$(jq '.skipped | length' <<<"$config_plan")" -ne 0 ]; then
+            echo "Live InsForge config does not match insforge.toml. Apply and verify it before replaying this workflow."
             exit 1
           fi
 
@@ -149,8 +179,14 @@ jobs:
         env:
           DEPLOY_BASE: ${{ steps.range.outputs.base }}
           DEPLOY_HEAD: ${{ steps.range.outputs.head }}
+          MARKER_TOKEN: ${{ secrets.INSFORGE_MARKER_TOKEN }}
         run: |
+          if [ -z "$MARKER_TOKEN" ]; then
+            echo "Add repository secret INSFORGE_MARKER_TOKEN with contents write access."
+            exit 1
+          fi
           git tag -f insforge-functions-deployed "$DEPLOY_HEAD"
           git push \
             --force-with-lease=refs/tags/insforge-functions-deployed:"$DEPLOY_BASE" \
-            origin refs/tags/insforge-functions-deployed
+            "https://x-access-token:${MARKER_TOKEN}@github.com/${GITHUB_REPOSITORY}.git" \
+            refs/tags/insforge-functions-deployed
