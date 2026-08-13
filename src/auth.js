@@ -31,5 +31,16 @@ function mapAuthError(error) {
     return null;
   }
 
-  return { message: error.message ?? 'Something went wrong. Please try again.' };
+  const message = error.message ?? 'Something went wrong. Please try again.';
+  if (isUnreachableBackendMessage(message)) {
+    return { message: 'Could not reach the server. Try again in a moment.' };
+  }
+
+  return { message };
+}
+
+function isUnreachableBackendMessage(message) {
+  return /internal server error|internal error|fetch failed|bad gateway|could not reach the backend/i.test(
+    message,
+  );
 }

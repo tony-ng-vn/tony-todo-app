@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { createProxyResponse, stripCookieDomain } from './insforgeProxy.js';
+import {
+  createProxyResponse,
+  proxyUpstreamErrorResponse,
+  stripCookieDomain,
+} from './insforgeProxy.js';
 
 describe('createProxyResponse', () => {
   it('preserves a response body from the backend', async () => {
@@ -30,6 +34,21 @@ describe('createProxyResponse', () => {
       expect(response.headers.get('x-backend')).toBe('insforge');
     },
   );
+});
+
+describe('proxyUpstreamErrorResponse', () => {
+  it('turns a failed upstream fetch into a 502 with a readable message', async () => {
+    const error = new TypeError('fetch failed');
+    error.cause = new Error('getaddrinfo ENOTFOUND');
+
+    const response = proxyUpstreamErrorResponse(error);
+    const body = await response.json();
+
+    expect(response.status).toBe(502);
+    expect(body.error).toBe('BAD_GATEWAY');
+    expect(body.message).toContain('Could not reach the backend');
+    expect(body.message).toContain('getaddrinfo ENOTFOUND');
+  });
 });
 
 describe('stripCookieDomain', () => {

@@ -103,6 +103,22 @@ describe('auth', () => {
     expect(await getCurrentUser(client)).toEqual({ user: null, error: null });
   });
 
+  it('rewrites proxy 500s into a reachable-server message', async () => {
+    const client = fakeAuthClient({
+      signInWithPassword: async () => ({
+        data: null,
+        error: { message: 'Request failed: Internal Server Error' },
+      }),
+    });
+
+    const result = await signInWithPassword(client, {
+      email: 'tony@example.com',
+      password: 'wrong',
+    });
+
+    expect(result.error.message).toBe('Could not reach the server. Try again in a moment.');
+  });
+
   it('falls back to a generic message when the error has none', async () => {
     const client = fakeAuthClient({
       signInWithPassword: async () => ({ data: null, error: {} }),
