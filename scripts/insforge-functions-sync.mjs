@@ -7,8 +7,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FUNCTIONS_DIR = 'functions';
 const SHELL_SUFFIX = '.shell.ts';
 const SOURCE_SUFFIX = '.ts';
+// These live endpoints belong to feature branches that have not merged their source yet.
+const UNMANAGED_LIVE_SLUGS = new Set(['claim-preauth-todos', 'extract-video-knowledge']);
 
-const LIVE_SOURCE_HEADER = /^Function:.*\n(?:Status:.*\n)?---\n/;
+const LIVE_SOURCE_DELIMITER = '\n---\n';
 
 export function listDeployableSlugs(fileNames) {
   return fileNames
@@ -42,9 +44,38 @@ export function slugsFromChangedPaths(paths) {
 }
 
 export function stripLiveFunctionSource(output) {
-  return String(output ?? '')
-    .replaceAll('\r\n', '\n')
-    .replace(LIVE_SOURCE_HEADER, '');
+  const normalized = String(output ?? '').replaceAll('\r\n', '\n');
+  try {
+    const parsed = JSON.parse(normalized);
+    if (typeof parsed?.code === 'string') {
+      return parsed.code;
+    }
+  } catch {
+    // Text output remains supported for local diagnostics and older CLI versions.
+  }
+
+  const delimiterIndex = normalized.indexOf(LIVE_SOURCE_DELIMITER);
+  return delimiterIndex === -1
+    ? normalized
+    : normalized.slice(delimiterIndex + LIVE_SOURCE_DELIMITER.length);
+}
+
+export function parseLiveFunctionSlugs(output) {
+  let parsed;
+  try {
+    parsed = JSON.parse(String(output ?? ''));
+  } catch {
+    throw new Error('InsForge function inventory was not valid JSON');
+  }
+
+  if (!Array.isArray(parsed?.functions)) {
+    throw new Error('InsForge function inventory did not include functions[]');
+  }
+
+  return parsed.functions
+    .map((entry) => entry?.slug)
+    .filter((slug) => typeof slug === 'string' && slug.length > 0)
+    .sort();
 }
 
 export function normalizeFunctionSource(source) {
@@ -108,10 +139,14 @@ export function parseSyncArgs(argv) {
 }
 
 function defaultGitDiff(root, base, head) {
-  const output = execFileSync('git', ['diff', '--name-only', `${base}..${head}`, '--', FUNCTIONS_DIR], {
-    cwd: root,
-    encoding: 'utf8',
-  });
+  const output = execFileSync(
+    'git',
+    ['diff', '--no-renames', '--name-only', `${base}..${head}`, '--', FUNCTIONS_DIR],
+    {
+      cwd: root,
+      encoding: 'utf8',
+    },
+  );
   return output.split('\n').map((line) => line.trim()).filter(Boolean);
 }
 
@@ -153,6 +188,18 @@ export function syncInsforgeFunctions({
     }
   }
 
+  const liveSlugs = parseLiveFunctionSlugs(
+    runInsforge(['functions', 'list', '--json'], { capture: true, cwd: root }),
+  );
+  const unexpectedLiveSlugs = liveSlugs.filter(
+    (slug) => !allSlugs.includes(slug) && !UNMANAGED_LIVE_SLUGS.has(slug),
+  );
+  if (unexpectedLiveSlugs.length > 0) {
+    throw new Error(
+      `InsForge has unexpected live functions that are absent from the repo: ${unexpectedLiveSlugs.join(', ')}. Remove them explicitly before rerunning this deployment. No functions were deployed.`,
+    );
+  }
+
   for (const slug of slugsToDeploy) {
     const filePath = join(FUNCTIONS_DIR, `${slug}${SOURCE_SUFFIX}`);
     log.error(`Deploying ${slug} from ${filePath}`);
@@ -166,7 +213,10 @@ export function syncInsforgeFunctions({
   const mismatches = [];
   for (const slug of allSlugs) {
     const localSource = readSource(join(functionsDirectory, `${slug}${SOURCE_SUFFIX}`));
-    const liveOutput = runInsforge(['functions', 'code', slug], { capture: true, cwd: root });
+    const liveOutput = runInsforge(['functions', 'code', slug, '--json'], {
+      capture: true,
+      cwd: root,
+    });
     if (!sourcesMatch(localSource, liveOutput)) {
       mismatches.push(slug);
     }
