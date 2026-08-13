@@ -1,0 +1,50 @@
+import { describe, expect, it } from 'vitest';
+import {
+  AGENT_TODOS_URL,
+  buildAgentSetupPrompt,
+  createAgentToken,
+  isAgentAccessToken,
+  maskAgentToken,
+} from './agentSetup.js';
+
+describe('createAgentToken', () => {
+  it('builds a dlg_ key from 32 random bytes', () => {
+    const bytes = Uint8Array.from({ length: 32 }, (_, i) => i);
+    expect(createAgentToken(() => bytes)).toBe(
+      'dlg_000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f',
+    );
+  });
+});
+
+describe('isAgentAccessToken', () => {
+  it('accepts only the dlg_ hex format', () => {
+    const token = createAgentToken(() => new Uint8Array(32).fill(7));
+    expect(isAgentAccessToken(token)).toBe(true);
+    expect(isAgentAccessToken('INGEST_NOT_AN_AGENT_KEY')).toBe(false);
+    expect(isAgentAccessToken('eyJhbGciOiJIUzI1NiJ9.e30.sig')).toBe(false);
+    expect(isAgentAccessToken('dlg_short')).toBe(false);
+  });
+});
+
+describe('buildAgentSetupPrompt', () => {
+  it('copies a ready-to-paste HTTP setup without ownerUserId', () => {
+    const token = createAgentToken(() => new Uint8Array(32).fill(10));
+    const prompt = buildAgentSetupPrompt({ token });
+
+    expect(prompt).toContain(`POST ${AGENT_TODOS_URL}`);
+    expect(prompt).toContain(`Authorization: Bearer ${token}`);
+    expect(prompt).toContain('{"command":"list"}');
+    expect(prompt).toContain('{"command":"create","title":"..."}');
+    expect(prompt).toContain('{"command":"complete","id":"..."}');
+    expect(prompt).toContain('{"command":"daySummary"}');
+    expect(prompt).not.toMatch(/"ownerUserId"/);
+    expect(prompt).not.toContain('INGEST_FUNCTION_TOKEN');
+  });
+});
+
+describe('maskAgentToken', () => {
+  it('keeps the prefix and last four characters', () => {
+    const token = createAgentToken(() => new Uint8Array(32).fill(11));
+    expect(maskAgentToken(token)).toBe('dlg_••••0b0b');
+  });
+});

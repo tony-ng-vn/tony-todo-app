@@ -1,5 +1,12 @@
 <script>
+  import { onMount } from 'svelte';
   import WorkspaceTabs from './WorkspaceTabs.svelte';
+  import {
+    buildAgentSetupPrompt,
+    createAgentToken,
+    maskAgentToken,
+  } from '../../agentSetup.js';
+  import { deleteAgentToken, loadAgentToken, saveAgentToken } from '../../agentTokenRemote.js';
 
   export let syncStatus = [];
   export let auditLog = [];
@@ -9,6 +16,87 @@
   export let onViewChange;
   export let showSignOut = false;
   export let onSignOut;
+  export let insforge = null;
+  export let userId = null;
+
+  let agentToken = null;
+  let agentTokenError = '';
+  let agentBusy = false;
+  let revealAgentKey = false;
+  let copiedSetup = false;
+  let copyTimer = null;
+
+  onMount(() => {
+    void refreshAgentToken();
+    return () => {
+      if (copyTimer) clearTimeout(copyTimer);
+    };
+  });
+
+  async function refreshAgentToken() {
+    if (!insforge || !userId) {
+      agentToken = null;
+      return;
+    }
+    agentTokenError = '';
+    try {
+      agentToken = await loadAgentToken(insforge, userId);
+    } catch (error) {
+      agentTokenError = error.message ?? 'Could not load the agent key.';
+    }
+  }
+
+  async function createOrReplaceAgentKey() {
+    if (!insforge || !userId || agentBusy) return;
+    if (agentToken && !window.confirm('Replace the current agent key? Existing agents will stop working until they use the new one.')) {
+      return;
+    }
+    agentBusy = true;
+    agentTokenError = '';
+    try {
+      const token = createAgentToken();
+      await saveAgentToken(insforge, userId, token);
+      agentToken = token;
+      revealAgentKey = true;
+    } catch (error) {
+      agentTokenError = error.message ?? 'Could not create an agent key.';
+    } finally {
+      agentBusy = false;
+    }
+  }
+
+  async function removeAgentKey() {
+    if (!insforge || !userId || agentBusy || !agentToken) return;
+    if (!window.confirm('Remove the agent key? Agents using it will no longer be able to reach Done Log.')) {
+      return;
+    }
+    agentBusy = true;
+    agentTokenError = '';
+    try {
+      await deleteAgentToken(insforge, userId);
+      agentToken = null;
+      revealAgentKey = false;
+    } catch (error) {
+      agentTokenError = error.message ?? 'Could not remove the agent key.';
+    } finally {
+      agentBusy = false;
+    }
+  }
+
+  async function copyAgentSetup() {
+    if (!agentToken) return;
+    try {
+      await navigator.clipboard.writeText(buildAgentSetupPrompt({ token: agentToken }));
+      copiedSetup = true;
+      if (copyTimer) clearTimeout(copyTimer);
+      copyTimer = setTimeout(() => {
+        copiedSetup = false;
+      }, 2000);
+    } catch {
+      agentTokenError = 'Could not copy. Select the key and copy it manually.';
+      revealAgentKey = true;
+    }
+  }
 
   const SOURCE_LABELS = {
     'granola-personal': 'Granola (personal notes)',
@@ -45,6 +133,41 @@
       <button type="button" class="sign-out-button" on:click={onSignOut}>Sign out</button>
     </div>
   {/if}
+
+  <div class="settings-section">
+    <h3 class="section-title">Agents</h3>
+    {#if !userId}
+      <p class="empty-note">Sign in to create a personal agent key. Paste the setup into Cursor, Codex, or any tool that can POST JSON.</p>
+    {:else}
+      <p class="empty-note">Create a key, then copy the setup. The key only reaches your todos. Treat it like a password.</p>
+      {#if agentToken}
+        <p class="agent-key">{revealAgentKey ? agentToken : maskAgentToken(agentToken)}</p>
+      {/if}
+      {#if agentTokenError}
+        <p class="empty-note">{agentTokenError}</p>
+      {/if}
+      <div class="agent-actions">
+        {#if !agentToken}
+          <button type="button" class="sign-out-button" disabled={agentBusy} on:click={createOrReplaceAgentKey}>
+            {agentBusy ? 'Creating key' : 'Create agent key'}
+          </button>
+        {:else}
+          <button type="button" class="sign-out-button" disabled={agentBusy} on:click={copyAgentSetup}>
+            {copiedSetup ? 'Copied setup' : 'Copy setup'}
+          </button>
+          <button type="button" class="sign-out-button" on:click={() => (revealAgentKey = !revealAgentKey)}>
+            {revealAgentKey ? 'Hide key' : 'Show key'}
+          </button>
+          <button type="button" class="sign-out-button" disabled={agentBusy} on:click={createOrReplaceAgentKey}>
+            Replace key
+          </button>
+          <button type="button" class="sign-out-button" disabled={agentBusy} on:click={removeAgentKey}>
+            Remove key
+          </button>
+        {/if}
+      </div>
+    {/if}
+  </div>
 
   <div class="settings-section">
     <h3 class="section-title">Connected sources</h3>
@@ -128,6 +251,25 @@
     margin: 0;
     font-size: 12px;
     color: var(--subtle);
+  }
+
+  .agent-key {
+    margin: 0;
+    padding: var(--space-2) var(--space-3);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    background: var(--field-surface);
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 12px;
+    color: var(--strong);
+    word-break: break-all;
+    overflow: hidden;
+  }
+
+  .agent-actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--space-2);
   }
 
   .source-list {
