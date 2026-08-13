@@ -187,6 +187,8 @@ describe('menu bar app bundle', () => {
     expect(app).toContain('hostStatusItem');
     expect(app).toContain('shouldKeepWaitingForStatusItem');
     expect(app).toContain('shouldRecreateStatusItem');
+    expect(app).toContain('allowUnhosted: true');
+    expect(app).toContain('shouldOpenFullAppAfterTimeout');
   });
 
   it('opens the browser-sized experience in a native window', () => {

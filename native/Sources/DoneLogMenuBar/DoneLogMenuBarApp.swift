@@ -44,7 +44,8 @@ final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
     hostStatusItem(
       controller: controller,
       startedAt: Date(),
-      action: NativeAppLaunchPolicy.reopenAction
+      action: NativeAppLaunchPolicy.reopenAction,
+      allowUnhosted: true
     )
     return false
   }
@@ -52,11 +53,23 @@ final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
   private func hostStatusItem(
     controller: MenuBarController,
     startedAt: Date,
-    action: NativeAppLaunchPolicy.Action
+    action: NativeAppLaunchPolicy.Action,
+    allowUnhosted: Bool = false
   ) {
     if NativeAppLaunchPolicy.shouldOpenFullAppNow(
       action: action,
-      statusItemIsReady: controller.isReady
+      statusItemIsReady: controller.isReady,
+      allowUnhosted: allowUnhosted
+    ) {
+      controller.showFullApp()
+      return
+    }
+
+    let elapsed = Date().timeIntervalSince(startedAt)
+    if NativeAppLaunchPolicy.shouldOpenFullAppAfterTimeout(
+      action: action,
+      statusItemIsReady: controller.isReady,
+      elapsed: elapsed
     ) {
       controller.showFullApp()
       return
@@ -66,7 +79,6 @@ final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
       return
     }
 
-    let elapsed = Date().timeIntervalSince(startedAt)
     if NativeAppLaunchPolicy.shouldRecreateStatusItem(
       statusItemIsReady: controller.isReady,
       alreadyRecreated: didRecreateStatusItem,
@@ -89,7 +101,8 @@ final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
         self?.hostStatusItem(
           controller: controller,
           startedAt: startedAt,
-          action: action
+          action: action,
+          allowUnhosted: allowUnhosted
         )
       }
     }
