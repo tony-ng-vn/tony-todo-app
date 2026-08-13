@@ -1,9 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyTodoNote,
   createInitialState,
   createTodoId,
   dateAtSanFranciscoTime,
+  formatNoteAtLocal,
   formatSummaryDayKey,
+  parseNoteEntries,
   parseTodoCommand,
   runTodoCommand,
   toRemoteRecord,
@@ -30,7 +33,7 @@ function openTodo(overrides = {}) {
 }
 
 describe('parseTodoCommand', () => {
-  it('parses the four commands and complete id XOR title', () => {
+  it('parses list, create, complete, daySummary, and appendNote', () => {
     expect(parseTodoCommand({ command: 'list' })).toEqual({
       ok: true,
       command: { kind: 'list' },
@@ -51,10 +54,42 @@ describe('parseTodoCommand', () => {
       kind: 'daySummary',
       day: '2026-01-15',
     });
+    expect(parseTodoCommand({ command: 'appendNote', id: 'task-1', text: 'Left voicemail' }).command).toEqual({
+      kind: 'appendNote',
+      target: { by: 'id', id: 'task-1' },
+      text: 'Left voicemail',
+    });
 
     expect(parseTodoCommand({ command: 'complete', id: 'task-1', title: 'Call Sam' }).ok).toBe(false);
     expect(parseTodoCommand({ command: 'complete' }).ok).toBe(false);
+    expect(parseTodoCommand({ command: 'appendNote', id: 'task-1' }).ok).toBe(false);
     expect(parseTodoCommand({ command: 'start' }).ok).toBe(false);
+  });
+});
+
+describe('note entries', () => {
+  it('parses stamped blocks and blank-line notes', () => {
+    expect(parseNoteEntries('')).toEqual([]);
+    expect(parseNoteEntries('Ask about the deadline.')).toEqual([
+      { at: null, text: 'Ask about the deadline.' },
+    ]);
+    expect(
+      parseNoteEntries('@ 2026-06-08 08:00\nLeft voicemail\n\n@ 2026-06-08 08:12\nWaiting on callback'),
+    ).toEqual([
+      { at: dateAtSanFranciscoTime('2026-06-08', 8 * 60).toISOString(), text: 'Left voicemail' },
+      { at: dateAtSanFranciscoTime('2026-06-08', 8 * 60 + 12).toISOString(), text: 'Waiting on callback' },
+    ]);
+  });
+
+  it('stamps new note blocks and keeps earlier times', () => {
+    const first = new Date('2026-06-08T15:00:00.000Z');
+    const later = new Date('2026-06-08T15:12:00.000Z');
+    const stamped = applyTodoNote('', 'Left voicemail', first);
+
+    expect(stamped).toBe(`@ ${formatNoteAtLocal(first)}\nLeft voicemail`);
+    expect(applyTodoNote(stamped, `${stamped}\n\nWaiting on callback`, later)).toBe(
+      `@ ${formatNoteAtLocal(first)}\nLeft voicemail\n\n@ ${formatNoteAtLocal(later)}\nWaiting on callback`,
+    );
   });
 });
 
@@ -237,6 +272,8 @@ describe('runTodoCommand list and daySummary', () => {
     const result = runTodoCommand(state, { kind: 'list' }, UTC_EVENING);
 
     expect(result.persist).toEqual({ kind: 'none' });
+    expect(result.view.now).toBe(UTC_EVENING.toISOString());
+    expect(result.view.nowLocal).toBe(formatNoteAtLocal(UTC_EVENING));
     expect(result.view.tasks.map((task) => task.id)).toEqual(['ready', 'running', 'progressive']);
     expect(result.view.tasks.find((task) => task.id === 'ready')).toMatchObject({
       status: 'not_started',
@@ -251,6 +288,63 @@ describe('runTodoCommand list and daySummary', () => {
     });
   });
 
+  it('includes timestamped notes so agents can see when each note happened', () => {
+    const writtenAt = new Date('2026-01-15T18:12:00.000Z');
+    const state = createInitialState([
+      openTodo({
+        note: `@ ${formatNoteAtLocal(writtenAt)}\nLeft voicemail`,
+        updatedAt: '2026-01-15T19:00:00.000Z',
+      }),
+      openTodo({
+        id: 'legacy',
+        title: 'Legacy note',
+        note: 'Old context without a stamp',
+        createdAt: '2026-01-15T17:00:00.000Z',
+        updatedAt: '2026-01-15T17:30:00.000Z',
+      }),
+    ]);
+    const result = runTodoCommand(state, { kind: 'list' }, UTC_EVENING);
+
+    expect(result.view.tasks.find((task) => task.id === 'task-1').notes).toEqual([
+      {
+        at: writtenAt.toISOString(),
+        atLocal: formatNoteAtLocal(writtenAt),
+        text: 'Left voicemail',
+      },
+    ]);
+    expect(result.view.tasks.find((task) => task.id === 'legacy').notes).toEqual([
+      {
+        at: '2026-01-15T17:30:00.000Z',
+        atLocal: formatNoteAtLocal(new Date('2026-01-15T17:30:00.000Z')),
+        text: 'Old context without a stamp',
+      },
+    ]);
+  });
+});
+
+describe('runTodoCommand appendNote', () => {
+  it('appends a stamped note and persists the task note', () => {
+    const state = createInitialState([openTodo({ note: '' })]);
+    const result = runTodoCommand(
+      state,
+      { kind: 'appendNote', target: { by: 'id', id: 'task-1' }, text: 'Left voicemail' },
+      UTC_EVENING,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.persist.kind).toBe('update');
+    expect(result.persist.todo.note).toBe(`@ ${formatNoteAtLocal(UTC_EVENING)}\nLeft voicemail`);
+    expect(result.view.task.notes).toEqual([
+      {
+        at: UTC_EVENING.toISOString(),
+        atLocal: formatNoteAtLocal(UTC_EVENING),
+        text: 'Left voicemail',
+      },
+    ]);
+  });
+});
+
+describe('runTodoCommand daySummary', () => {
   it('returns existing day-summary buckets', () => {
     const state = createInitialState([
       openTodo({

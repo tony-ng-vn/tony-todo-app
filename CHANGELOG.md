@@ -1,6 +1,6 @@
 # Changelog
 
-## v0.10.1
+## v0.10.3
 
 2026-08-13
 
@@ -12,6 +12,38 @@
 **Docs**
 
 - Design rules moved out of the tool-managed section of AGENTS.md so automated syncs cannot delete them again.
+
+---
+
+## v0.10.2
+
+2026-08-13
+
+**Native App**
+
+- Task notes now use the same dark native chrome as the full window, so they no longer show a separate white system title bar.
+
+**Docs**
+
+- Agents may open PRs, watch CI, fix review comments, and merge when the PR is ready.
+
+---
+
+## v0.10.1
+
+2026-08-13
+
+**Native App**
+
+- The full app window now uses unified macOS chrome: the workspace draws under the traffic lights instead of sitting below a separate title-bar strip, and empty header space still double-click zooms.
+
+**Web App**
+
+- Native-host layout no longer reserves a blank bar above the panels; left headers indent past the window controls.
+
+**Docs**
+
+- The menu bar companion notes now describe drag and zoom on the traffic-light area and empty headers.
 
 ---
 
