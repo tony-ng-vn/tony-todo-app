@@ -63,7 +63,13 @@ struct NativeWindowPolicyTests {
     #expect(window.titlebarAppearsTransparent)
     #expect(window.titleVisibility == .hidden)
     #expect(window.titlebarSeparatorStyle == .none)
-    #expect(window.isOpaque == false)
+    #expect(window.appearance?.name == .darkAqua)
+    #expect(window.backgroundColor == NativeWindowPolicy.canvasColor)
+    #expect(window.isOpaque)
+    #expect(window.standardWindowButton(.closeButton)?.isHidden != true)
+    #expect(window.standardWindowButton(.miniaturizeButton)?.isHidden != true)
+    #expect(window.standardWindowButton(.zoomButton)?.isHidden != true)
+    #expect(!(window.contentView is NSVisualEffectView))
   }
 
   @Test("Uses the screen visible frame for the native zoom action")

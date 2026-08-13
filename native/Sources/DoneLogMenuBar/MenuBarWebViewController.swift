@@ -52,20 +52,9 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     webView.navigationDelegate = self
     webView.uiDelegate = self
     webView.allowsMagnification = false
-    webView.underPageBackgroundColor = .clear
-
-    if usesWindowChrome {
-      let effectView = NSVisualEffectView(frame: NSRect(origin: .zero, size: initialSize))
-      effectView.material = .underWindowBackground
-      effectView.blendingMode = .behindWindow
-      effectView.state = .followsWindowActiveState
-      webView.frame = effectView.bounds
-      webView.autoresizingMask = [.width, .height]
-      effectView.addSubview(webView)
-      view = effectView
-    } else {
-      view = webView
-    }
+    webView.underPageBackgroundColor =
+      usesWindowChrome ? NativeWindowPolicy.canvasColor : .clear
+    view = webView
 
     webView.load(MenuBarConfiguration.makeHomeRequest(for: homeURL))
   }

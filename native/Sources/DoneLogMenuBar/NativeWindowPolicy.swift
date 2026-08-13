@@ -9,13 +9,17 @@ enum NativeWindowPolicy {
     .fullSizeContentView,
   ]
 
+  static let canvasColor = NSColor(srgbRed: 20.0 / 255.0, green: 20.0 / 255.0, blue: 18.0 / 255.0, alpha: 1)
+
   @MainActor
   static func applyChrome(to window: NSWindow) {
+    window.styleMask.formUnion(.fullSizeContentView)
     window.titleVisibility = .hidden
     window.titlebarAppearsTransparent = true
     window.titlebarSeparatorStyle = .none
-    window.isOpaque = false
-    window.backgroundColor = .clear
+    window.appearance = NSAppearance(named: .darkAqua)
+    window.isOpaque = true
+    window.backgroundColor = canvasColor
     window.isMovableByWindowBackground = true
   }
 
