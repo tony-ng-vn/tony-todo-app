@@ -104,7 +104,7 @@ This section is durable operational fact, kept outside the INSFORGE block so a s
 - `docs/next-steps.md` describes remaining one-time setup, but treat the live project as the source of truth over any doc or chat history.
 - Functions are live only after `Deploy InsForge functions` is green.
   A Backend changelog entry is not production until then.
-- One-time GitHub setup requires repository secret `INSFORGE_USER_API_KEY`, using a `uak_` key from InsForge Profile -> API Keys.
-  The project ID is already in the workflow.
+- One-time GitHub setup requires repository secret `INSFORGE_API_KEY`, using the admin key from the linked Todo App project.
+  The project URL is already in the workflow.
 - To check live state: `npx -y @insforge/cli current --json` (project link and auth) and `npx -y @insforge/cli config plan --json` (drift between `insforge.toml` and the live config; empty output means no drift). The CLI login is interactive, so the owner runs `npx -y @insforge/cli login` themselves.
 - Do not print `auth.users` emails into chat or logs unless the owner asks; row existence is enough.

@@ -15,7 +15,7 @@ Migrations and `insforge.toml` config apply stay manual.
 - Function deploys wait for the required `Verify` job.
   A Backend changelog entry is not live until the `Deploy InsForge functions` job is green.
 - An automatic function deploy stops before authentication or production writes when the same merge changes `migrations/` or `insforge.toml`.
-- One-time: add GitHub repository secret `INSFORGE_USER_API_KEY` (InsForge dashboard -> Profile -> API Keys).
+- One-time: add GitHub repository secret `INSFORGE_API_KEY` from the linked Todo App project.
 - Migrations always land in the repo before or together with being applied to the live database.
   If an urgent fix must be applied live first, commit and PR it in the same session so the repo never drifts from production.
 - Test risky schema, RLS, or function changes on an InsForge backend branch first (`npx -y @insforge/cli branch create/switch/merge`), not on production.
