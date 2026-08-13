@@ -30,6 +30,7 @@ enum NativeWindowPolicy {
     window.appearance = NSAppearance(named: .darkAqua)
     window.isOpaque = true
     window.backgroundColor = canvasColor
+    window.hidesOnDeactivate = false
     window.isMovableByWindowBackground = true
   }
 
