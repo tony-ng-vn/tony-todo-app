@@ -286,6 +286,9 @@ describe('CI workflow', () => {
     expect(stepsByName['Guard backend state ordering'].run).toContain(
       '--json config plan',
     );
+    expect(stepsByName['Guard backend state ordering'].run).toMatch(
+      /if \[ "\$EVENT_NAME" != "workflow_dispatch" \]; then[\s\S]+git diff --quiet/,
+    );
     expect(stepsByName['Deploy changed functions and verify live source'].run).toContain(
       'link --api-base-url "$INSFORGE_API_BASE_URL" --api-key "$INSFORGE_API_KEY"',
     );

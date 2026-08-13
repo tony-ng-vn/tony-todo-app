@@ -117,12 +117,13 @@ jobs:
         env:
           DEPLOY_BASE: ${{ steps.range.outputs.base }}
           DEPLOY_HEAD: ${{ steps.range.outputs.head }}
+          EVENT_NAME: ${{ github.event_name }}
           INSFORGE_API_KEY: ${{ secrets.INSFORGE_API_KEY }}
         run: |
-          if git diff --quiet "$DEPLOY_BASE" "$DEPLOY_HEAD" -- migrations insforge.toml; then
-            exit 0
-          fi
-          if [ "${GITHUB_EVENT_NAME}" != "workflow_dispatch" ]; then
+          if [ "$EVENT_NAME" != "workflow_dispatch" ]; then
+            if git diff --quiet "$DEPLOY_BASE" "$DEPLOY_HEAD" -- migrations insforge.toml; then
+              exit 0
+            fi
             echo "This push changes migrations or InsForge config. Apply those live changes first, then replay this workflow from main."
             exit 1
           fi
