@@ -13,6 +13,7 @@
     "test": "vitest run",
     "test:native-menubar": "swift test --package-path native",
     "test:ui": "node scripts/ui-smoke.mjs",
+    "test:ui:note-caret": "node scripts/note-caret-smoke.mjs",
     "test:menubar": "node scripts/menubar-smoke.mjs",
     "build": "vite build",
     "build:native-menubar": "swift build --package-path native -c release",
