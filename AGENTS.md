@@ -44,6 +44,21 @@ Several agents work this repo concurrently; these rules keep them from colliding
 - When checks are green and comments addressed, merge, or enable auto-merge (merge commit) and move on; the head branch deletes itself on merge.
 - Dependency changes (`package-lock.json`) go in their own small PRs, never bundled with feature work.
 - Keep PRs small and short-lived; a long-lived branch in this repo will need repeated merges from main because required checks are strict.
+- A small PR is not one commit. See Commits.
+
+## Commits
+
+This section is the commit rule. Cloud agents, hosted agents, and local agents all follow it. "Keep PRs small" is not permission to squash a feature into one commit at the end.
+
+- One idea per commit. `git show` on that commit must make sense without the rest of the branch.
+- Commit as you go, in this order when it applies: failing test, then the fix, then docs.
+- Never implement the whole PR and `git add` every changed file into a single commit before opening or updating the PR. That is a rule violation even if tests are green.
+- Run `npm test` before every commit (a narrower vitest path is fine when that is the whole change). The push gate is extra, not a substitute.
+- Conventional `type(scope):` subject. Plain ASCII. No agent names or tool Co-authored-by lines (see the contribution policy).
+- Same-commit pairing is required only for these, and only these:
+  - a CI command and the matching `package.json` script
+  - a changelog fragment and the change it describes
+- Do not mix unrelated workflow, product, and docs edits in one commit just because they will ship in one PR.
 
 ## Native menu bar
 
@@ -60,7 +75,7 @@ Several agents work this repo concurrently; these rules keep them from colliding
 - `.ci/verification.json` marks a stage `"pushGate": false` to exclude it from local pushes; CI ignores that flag and always runs every stage.
 - InsForge edge functions are not deployed by the local push gate or by cloud agents. After the required `Verify` job is green on `main`, GitHub Actions deploys changed files under `functions/` and fails if live source still does not match the repo.
 - Use `SKIP_VERIFY=1 git push` only for an emergency push when local verification cannot run, and report why in the PR.
-- Keep the canonical verification commands in `package.json`; when a CI command changes, update the matching npm script in the same commit.
+- Keep the canonical verification commands in `package.json`. When a CI command changes, pair that script in the same commit (see Commits).
 - CI failures are cached as redacted packets in `.ci-learning/` and matched against the versioned lessons in `.ci/lessons/`.
 - Run `npm run ci:replay` when a CI lesson changes.
 - Run `npm run ci:repair` only on a feature branch when an AI repair loop is wanted. It must remain bounded and must not commit, push, merge, or weaken checks.

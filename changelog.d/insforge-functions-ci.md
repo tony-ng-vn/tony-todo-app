@@ -6,3 +6,4 @@
 
 - Backend changelog entries describe merged code; they are not live until the InsForge functions GitHub job is green. Agents must not deploy functions.
 - The deploy runbook now treats GitHub Actions as the function deploy path; laptop deploys are not the production path.
+- AGENTS.md now states the incremental commit rule in its own section so agents cannot treat a small PR as one commit.
