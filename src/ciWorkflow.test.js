@@ -206,6 +206,7 @@ describe('CI workflow', () => {
     expect(workflow.permissions.contents).toBe('read');
     expect(dependencyWorkflow.permissions.contents).toBe('read');
     expect(functionsWorkflow.permissions.contents).toBe('write');
+    expect(functionsWorkflow.permissions.actions).toBe('read');
 
     const actionReferences = [workflow, dependencyWorkflow, functionsWorkflow].flatMap(
       (currentWorkflow) =>
@@ -258,8 +259,15 @@ describe('CI workflow', () => {
       'refs/tags/insforge-functions-deployed',
     );
     expect(stepsByName['Resolve undeployed main range'].run).toContain(
+      'refs/heads/main:refs/remotes/origin/main',
+    );
+    expect(stepsByName['Resolve undeployed main range'].run).toContain(
       'git merge-base --is-ancestor "$deploy_head" "$deploy_base"',
     );
+    expect(stepsByName['Resolve undeployed main range'].run).toContain(
+      'actions/workflows/ci.yml/runs',
+    );
+    expect(stepsByName['Resolve undeployed main range'].run).toContain('-f event=push');
     expect(stepsByName['Resolve undeployed main range'].run).toContain('should_run=false');
     expect(stepsByName['Install dependencies'].if).toBe(
       "steps.range.outputs.should_run == 'true'",
