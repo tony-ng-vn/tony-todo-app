@@ -89,6 +89,18 @@ export function applyTodoNote(previousNote, nextNote, now = new Date()) {
     resolved[item.index] = { at: now.toISOString(), text: item.entry.text };
   }
 
+  // A unit can match a previous unit that itself has no stamp (a legacy
+  // chunk only stamps its first paragraph; a later paragraph parses as
+  // at: null). A non-empty unit must not stay unstamped forever, so it gets
+  // backfilled with now here - empty structural units are exempt, they are
+  // never stamped.
+  for (let index = 0; index < resolved.length; index += 1) {
+    const entry = resolved[index];
+    if (!entry.at && !isEmptyNoteUnitText(entry.text)) {
+      resolved[index] = { at: now.toISOString(), text: entry.text };
+    }
+  }
+
   return serializeNoteEntries(resolved);
 }
 
