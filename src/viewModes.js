@@ -1,6 +1,7 @@
 // Single source of truth for workspace routing and navigation.
 export const WORKSPACE_TABS = [
   { id: 'flow', label: 'Tasks' },
+  { id: 'agenda', label: 'Agenda' },
   { id: 'board', label: 'Board' },
   { id: 'calendar', label: 'Calendar' },
   { id: 'inbox', label: 'Inbox' },
