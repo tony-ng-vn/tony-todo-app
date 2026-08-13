@@ -117,7 +117,7 @@ function defaultGitDiff(root, base, head) {
 }
 
 function defaultRunInsforge(args, { capture = false, cwd = ROOT } = {}) {
-  return execFileSync('npx', ['-y', '@insforge/cli', ...args], {
+  return execFileSync('npx', ['-y', '--offline', '@insforge/cli@0.2.6', ...args], {
     cwd,
     encoding: 'utf8',
     stdio: capture ? ['ignore', 'pipe', 'inherit'] : 'inherit',

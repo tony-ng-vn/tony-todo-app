@@ -21,7 +21,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     if: >
-      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_dispatch' &&
+       github.ref == 'refs/heads/main') ||
       (github.event.workflow_run.event == 'push' &&
        github.event.workflow_run.head_branch == 'main' &&
        github.event.workflow_run.conclusion == 'success')
@@ -42,6 +43,9 @@ jobs:
           node-version-file: .node-version
           cache: npm
 
+      - name: Install dependencies
+        run: npm ci
+
       - name: Require InsForge user API key
         env:
           INSFORGE_USER_API_KEY: ${{ secrets.INSFORGE_USER_API_KEY }}
@@ -56,8 +60,8 @@ jobs:
         env:
           INSFORGE_USER_API_KEY: ${{ secrets.INSFORGE_USER_API_KEY }}
         run: |
-          npx -y @insforge/cli login --user-api-key "$INSFORGE_USER_API_KEY"
-          npx -y @insforge/cli link --project-id "$INSFORGE_PROJECT_ID" -y
+          npx -y --offline @insforge/cli@0.2.6 login --user-api-key "$INSFORGE_USER_API_KEY"
+          npx -y --offline @insforge/cli@0.2.6 link --project-id "$INSFORGE_PROJECT_ID" -y
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
             npm run sync:insforge-functions -- --deploy-all --check
           else
