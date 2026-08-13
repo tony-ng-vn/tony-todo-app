@@ -3,7 +3,7 @@ import { fromRemoteRecord, parseTodoKind, toRemoteRecord } from './todoCommands.
 export { fromRemoteRecord, toRemoteRecord };
 
 const TODO_SELECT_COLUMNS =
-  'id,title,created_at,completed_at,kind,someday_at,due_date,note,source,notion_page_id,notion_database_id,notion_status,first_started_at,active_started_at,tracked_seconds,time_segments,is_progressive,parent_task_id,is_progress_session,progress_label';
+  'id,title,created_at,completed_at,kind,someday_at,due_date,note,source,notion_page_id,notion_database_id,notion_status,first_started_at,active_started_at,tracked_seconds,time_segments,is_progressive,parent_task_id,is_progress_session,progress_label,updated_at';
 
 export async function loadRemoteTodos(client, userId) {
   const { data, error } = await client.database
