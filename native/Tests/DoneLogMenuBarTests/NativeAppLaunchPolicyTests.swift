@@ -110,6 +110,22 @@ struct NativeAppLaunchPolicyTests {
   @Test("Keeps retrying the extra after the window is already open")
   func keepsWaitingAfterWindowOpens() {
     #expect(
+      !NativeAppLaunchPolicy.shouldOpenFullAppNow(
+        action: .openFullApp,
+        statusItemIsReady: false,
+        allowUnhosted: true,
+        hasOpenedFullApp: true
+      )
+    )
+    #expect(
+      !NativeAppLaunchPolicy.shouldOpenFullAppAfterTimeout(
+        action: .openFullApp,
+        statusItemIsReady: false,
+        elapsed: 1.5,
+        hasOpenedFullApp: true
+      )
+    )
+    #expect(
       NativeAppLaunchPolicy.shouldKeepWaitingForStatusItem(
         statusItemIsReady: false,
         elapsed: 1.5
