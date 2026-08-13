@@ -45,7 +45,7 @@ export const BOARD_COLUMNS = [
   { id: 'not_started', label: 'Not started' },
   { id: 'in_progress', label: 'In progress' },
   { id: 'paused', label: 'Paused' },
-  { id: 'someday', label: 'Someday' },
+  { id: 'stall', label: 'Stall' },
   { id: 'done', label: 'Done' },
 ];
 
@@ -355,7 +355,7 @@ export function getBoardColumns(state, { dayKey, dueFilter = 'all', now = new Da
   const notStarted = [];
   const inProgress = [];
   const paused = [];
-  const someday = [];
+  const stall = [];
 
   for (const todo of pending) {
     if (!matchesDueFilter(todo, dueFilter, now)) {
@@ -367,8 +367,8 @@ export function getBoardColumns(state, { dayKey, dueFilter = 'all', now = new Da
       inProgress.push(enrichBoardItem(todo, now));
     } else if (columnId === 'paused') {
       paused.push(enrichBoardItem(todo, now));
-    } else if (columnId === 'someday') {
-      someday.push(enrichBoardItem(todo, now));
+    } else if (columnId === 'stall') {
+      stall.push(enrichBoardItem(todo, now));
     } else {
       notStarted.push(enrichBoardItem(todo, now));
     }
@@ -391,8 +391,8 @@ export function getBoardColumns(state, { dayKey, dueFilter = 'all', now = new Da
       return { ...column, items: paused };
     }
 
-    if (column.id === 'someday') {
-      return { ...column, items: someday };
+    if (column.id === 'stall') {
+      return { ...column, items: stall };
     }
 
     return { ...column, items: done };
@@ -411,15 +411,15 @@ export function moveTodoToBoardColumn(state, todoId, columnId, at = new Date()) 
     return state;
   }
 
-  if (columnId === 'someday') {
+  if (columnId === 'stall') {
     return setTodoSomeday(state, todoId, at);
   }
 
-  if (currentColumnId === 'someday' && columnId === 'paused' && !todo.firstStartedAt) {
+  if (currentColumnId === 'stall' && columnId === 'paused' && !todo.firstStartedAt) {
     return state;
   }
 
-  if (currentColumnId === 'someday') {
+  if (currentColumnId === 'stall') {
     state = restoreTodoFromSomeday(state, todoId);
     todo = state.todos.find((entry) => entry.id === todoId);
     currentColumnId = getBoardColumnId(todo);
@@ -490,6 +490,17 @@ export function restoreTodoFromSomeday(state, todoId) {
     ...state,
     todos: state.todos.map((todo) =>
       todo.id === todoId && todo.somedayAt ? { ...todo, somedayAt: null } : todo,
+    ),
+  };
+}
+
+export function promoteTodoToTask(state, todoId) {
+  return {
+    ...state,
+    todos: state.todos.map((todo) =>
+      todo.id === todoId && parseTodoKind(todo.kind) === 'project'
+        ? { ...todo, kind: 'task', somedayAt: null }
+        : todo,
     ),
   };
 }

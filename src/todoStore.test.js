@@ -34,6 +34,7 @@ import {
   pauseTodoTimer,
   partitionPendingTodos,
   partitionTaskFlowTodos,
+  promoteTodoToTask,
   reorderCompletedTodosForDay,
   reopenTodo,
   setTodoProgressive,
@@ -1274,7 +1275,7 @@ describe('board view columns', () => {
       'not_started',
       'in_progress',
       'paused',
-      'someday',
+      'stall',
       'done',
     ]);
     expect(columns[0].items.map((todo) => todo.title)).toEqual(['Backlog task']);
@@ -1297,7 +1298,7 @@ describe('board view columns', () => {
     state = startTodoTimer(state, todoId, new Date('2026-06-08T09:00:00.000Z'));
 
     const parkedAt = new Date('2026-06-08T09:20:00.000Z');
-    state = moveTodoToBoardColumn(state, todoId, 'someday', parkedAt);
+    state = moveTodoToBoardColumn(state, todoId, 'stall', parkedAt);
 
     expect(state.todos[0]).toMatchObject({
       somedayAt: parkedAt.toISOString(),
@@ -1305,7 +1306,7 @@ describe('board view columns', () => {
       completedAt: null,
       trackedSeconds: 20 * 60,
     });
-    expect(getBoardColumnId(state.todos[0])).toBe('someday');
+    expect(getBoardColumnId(state.todos[0])).toBe('stall');
     expect(getActiveTodos(state)).toEqual([]);
     expect(getSomedayTodos(state).map((todo) => todo.id)).toEqual([todoId]);
 
@@ -1324,7 +1325,7 @@ describe('board view columns', () => {
 
     state = moveTodoToBoardColumn(state, todoId, 'paused', new Date('2026-06-09T09:00:00.000Z'));
 
-    expect(getBoardColumnId(state.todos[0])).toBe('someday');
+    expect(getBoardColumnId(state.todos[0])).toBe('stall');
     expect(state.todos[0].somedayAt).toBe('2026-06-08T09:00:00.000Z');
   });
 
@@ -1658,5 +1659,18 @@ describe('project kind', () => {
 
     expect(state.todos[0].somedayAt).toBeNull();
     expect(getProjectTodos(state).map((todo) => todo.id)).toEqual([todoId]);
+  });
+
+  it('promotes a project into an active task', () => {
+    let state = addTodo(createInitialState(), 'Garden studio', new Date('2026-06-08T08:00:00.000Z'), {
+      kind: 'project',
+    });
+    const todoId = state.todos[0].id;
+
+    state = promoteTodoToTask(state, todoId);
+
+    expect(state.todos[0].kind).toBe('task');
+    expect(getPendingTodos(state).map((todo) => todo.id)).toEqual([todoId]);
+    expect(getProjectTodos(state)).toEqual([]);
   });
 });
