@@ -105,11 +105,17 @@ describe('menu bar app bundle', () => {
     expect(workflow).toContain('xcrun notarytool submit');
     expect(workflow).toContain('xcrun stapler staple');
     expect(workflow).toContain('generate_appcast');
+    expect(workflow).toContain('Curve25519.Signing.PrivateKey');
+    expect(workflow).toContain('embedded Sparkle public key does not match');
+    expect(workflow).toContain('sign_update');
+    expect(workflow).toContain('sparkle:edSignature=');
     expect(workflow).toContain('SPARKLE_PRIVATE_KEY');
     expect(workflow).toContain('Done-Log.dmg');
     expect(workflow).toContain('appcast.xml');
     expect(workflow).toContain('fetch-depth: 0');
     expect(workflow).toContain('git merge-base --is-ancestor "$GITHUB_SHA" origin/main');
+    expect(workflow).toContain('environment: native-release');
+    expect(workflow).toContain('native build version must exceed the published Sparkle build');
   });
 
   it('keeps task notes in a draggable native window', () => {

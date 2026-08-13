@@ -30,4 +30,23 @@ enum NativeUpdatePolicy {
 
     return command == "check" ? .check : nil
   }
+
+  static func accepts(
+    messageName: String,
+    body: Any,
+    isMainFrame: Bool,
+    sourceURL: URL?,
+    homeURL: URL
+  ) -> Bool {
+    guard messageName == Self.messageName,
+      isMainFrame,
+      let sourceURL,
+      MenuBarNavigationPolicy.decide(url: sourceURL, homeURL: homeURL)
+        == .allowInPopover
+    else {
+      return false
+    }
+
+    return command(from: body) == .check
+  }
 }

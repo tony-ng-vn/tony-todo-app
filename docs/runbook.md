@@ -40,7 +40,8 @@ It runs only for a version tag and never publishes an unsigned build from a pull
 
 ### One-time signing setup
 
-Configure these encrypted GitHub Actions secrets before creating the first native release:
+The `native-release` GitHub environment requires owner approval, and only protected `v*` tags may target it.
+Configure these encrypted environment secrets before creating the first native release:
 
 - `MACOS_DEVELOPER_ID_P12`: Base64-encoded Developer ID Application certificate and private key exported as a `.p12` file.
 - `MACOS_DEVELOPER_ID_PASSWORD`: Password used when exporting that `.p12` file.

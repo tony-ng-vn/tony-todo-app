@@ -232,8 +232,13 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
 
   func handleNativeUpdateMessage(_ message: WKScriptMessage) {
     guard
-      message.name == NativeUpdatePolicy.messageName,
-      NativeUpdatePolicy.command(from: message.body) == .check
+      NativeUpdatePolicy.accepts(
+        messageName: message.name,
+        body: message.body,
+        isMainFrame: message.frameInfo.isMainFrame,
+        sourceURL: message.frameInfo.request.url,
+        homeURL: homeURL
+      )
     else {
       return
     }

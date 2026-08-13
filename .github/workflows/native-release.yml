@@ -17,6 +17,7 @@ jobs:
     name: Sign, notarize, and publish
     runs-on: macos-15
     timeout-minutes: 30
+    environment: native-release
 
     steps:
       - name: Check out repository
@@ -37,14 +38,34 @@ jobs:
           umask 077
           version="$(node -p "require('./package.json').version")"
           plist_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' native/App/Info.plist)"
+          build_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' native/App/Info.plist)"
           if [[ "${GITHUB_REF_NAME}" != "v${version}" || "$plist_version" != "$version" ]]; then
             echo "tag, package version, and native version must match" >&2
+            exit 1
+          fi
+          if [[ ! "$build_version" =~ ^[0-9]+$ ]]; then
+            echo "native build version must be an integer" >&2
             exit 1
           fi
           git fetch --no-tags origin main
           if ! git merge-base --is-ancestor "$GITHUB_SHA" origin/main; then
             echo "native releases must be tagged from merged main" >&2
             exit 1
+          fi
+          previous_appcast="$RUNNER_TEMP/previous-appcast.xml"
+          if curl -fsSL \
+            'https://github.com/tony-ng-vn/tony-todo-app/releases/latest/download/appcast.xml' \
+            -o "$previous_appcast"
+          then
+            previous_build="$(
+              sed -nE 's#.*<sparkle:version>([0-9]+)</sparkle:version>.*#\1#p' \
+                "$previous_appcast" \
+                | head -n 1
+            )"
+            if [[ -z "$previous_build" || "$build_version" -le "$previous_build" ]]; then
+              echo "native build version must exceed the published Sparkle build" >&2
+              exit 1
+            fi
           fi
           echo "DONE_LOG_RELEASE_VERSION=$version" >> "$GITHUB_ENV"
 
@@ -170,12 +191,53 @@ jobs:
           tar -xf "$sparkle_dir/Sparkle-2.9.5.tar.xz" -C "$sparkle_dir"
           private_key="$RUNNER_TEMP/sparkle-private-key"
           printf '%s' "$SPARKLE_PRIVATE_KEY" > "$private_key"
+          embedded_public_key="$(
+            /usr/libexec/PlistBuddy -c 'Print :SUPublicEDKey' native/App/Info.plist
+          )"
+          derived_public_key="$(
+            swift -e '
+              import CryptoKit
+              import Foundation
+              let encoded = try String(
+                contentsOfFile: CommandLine.arguments[1],
+                encoding: .utf8
+              ).trimmingCharacters(in: .whitespacesAndNewlines)
+              guard let seed = Data(base64Encoded: encoded) else {
+                throw CocoaError(.fileReadCorruptFile)
+              }
+              let key = try Curve25519.Signing.PrivateKey(rawRepresentation: seed)
+              print(key.publicKey.rawRepresentation.base64EncodedString())
+            ' "$private_key"
+          )"
+          if [[ "$derived_public_key" != "$embedded_public_key" ]]; then
+            echo 'embedded Sparkle public key does not match the release secret' >&2
+            exit 1
+          fi
           "$sparkle_dir/bin/generate_appcast" \
             --ed-key-file "$private_key" \
             --download-url-prefix "https://github.com/tony-ng-vn/tony-todo-app/releases/download/${GITHUB_REF_NAME}/" \
             --link 'https://github.com/tony-ng-vn/tony-todo-app' \
             --maximum-versions 1 \
             "$release_dir"
+          "$sparkle_dir/bin/sign_update" \
+            --verify \
+            --ed-key-file "$private_key" \
+            "$release_dir/appcast.xml"
+          grep -q '<!-- sparkle-signatures:' "$release_dir/appcast.xml"
+          archive_signature="$(
+            sed -nE 's/.*sparkle:edSignature="([^"]+)".*/\1/p' \
+              "$release_dir/appcast.xml" \
+              | head -n 1
+          )"
+          if [[ -z "$archive_signature" ]]; then
+            echo 'generated appcast is missing the archive signature' >&2
+            exit 1
+          fi
+          "$sparkle_dir/bin/sign_update" \
+            --verify \
+            --ed-key-file "$private_key" \
+            "$archive" \
+            "$archive_signature"
           echo "DONE_LOG_RELEASE_DIR=$release_dir" >> "$GITHUB_ENV"
           echo "DONE_LOG_BOOTSTRAP_DMG=$disk_image" >> "$GITHUB_ENV"
 
