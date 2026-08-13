@@ -1,8 +1,11 @@
 import {
   DEFAULT_AGENT_KEY_NAME,
+  hashAgentToken,
   isAgentAccessToken,
   normalizeAgentKeyName,
 } from './agentSetup.js';
+
+const HASH_PATTERN = /^[0-9a-f]{64}$/;
 
 export async function loadAgentToken(client, userId) {
   if (!userId) {
@@ -11,18 +14,17 @@ export async function loadAgentToken(client, userId) {
 
   const { data, error } = await client.database
     .from('agent_tokens')
-    .select('token, name')
+    .select('token_hash, name')
     .eq('user_id', userId)
     .limit(1);
 
   throwIfError(error);
   const row = data?.[0];
-  if (!isAgentAccessToken(row?.token)) {
+  if (!HASH_PATTERN.test(row?.token_hash ?? '')) {
     return null;
   }
 
   return {
-    token: row.token,
     name: row.name?.trim() || DEFAULT_AGENT_KEY_NAME,
   };
 }
@@ -35,26 +37,27 @@ export async function saveAgentToken(client, userId, { token, name }) {
     throw new Error('That agent key is not valid.');
   }
   const keyName = normalizeAgentKeyName(name);
+  const tokenHash = await hashAgentToken(token);
 
   const existing = await loadAgentToken(client, userId);
   if (existing) {
     const { error } = await client.database
       .from('agent_tokens')
-      .update({ token, name: keyName, created_at: new Date().toISOString() })
+      .update({ token_hash: tokenHash, name: keyName, created_at: new Date().toISOString() })
       .eq('user_id', userId);
     throwIfError(error);
-    return { token, name: keyName };
+    return { name: keyName };
   }
 
   const { error } = await client.database.from('agent_tokens').insert([
     {
       user_id: userId,
-      token,
+      token_hash: tokenHash,
       name: keyName,
     },
   ]);
   throwIfError(error);
-  return { token, name: keyName };
+  return { name: keyName };
 }
 
 export async function deleteAgentToken(client, userId) {

@@ -62,3 +62,16 @@ function defaultRandomBytes(size) {
   crypto.getRandomValues(bytes);
   return bytes;
 }
+
+export async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(value)));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
+}
+
+// The hash is what gets stored; the plaintext key is shown once and gone.
+export async function hashAgentToken(token) {
+  if (!isAgentAccessToken(token)) {
+    throw new Error('That agent key is not valid.');
+  }
+  return sha256Hex(token);
+}

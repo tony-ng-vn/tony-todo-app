@@ -4,8 +4,10 @@ import {
   AGENT_TODOS_URL,
   buildAgentSetupPrompt,
   createAgentToken,
+  hashAgentToken,
   isAgentAccessToken,
   normalizeAgentKeyName,
+  sha256Hex,
 } from './agentSetup.js';
 
 describe('createAgentToken', () => {
@@ -56,5 +58,24 @@ describe('buildAgentSetupPrompt', () => {
     expect(prompt).toContain('notes[]');
     expect(prompt).not.toMatch(/"ownerUserId"/);
     expect(prompt).not.toContain('INGEST_FUNCTION_TOKEN');
+  });
+});
+
+describe('agent token hashing', () => {
+  it('hashes with sha-256 hex', async () => {
+    expect(await sha256Hex('abc')).toBe(
+      'ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad',
+    );
+  });
+
+  it('hashes a valid agent token to 64 hex chars that leak nothing', async () => {
+    const token = createAgentToken();
+    const hash = await hashAgentToken(token);
+    expect(hash).toMatch(/^[0-9a-f]{64}$/);
+    expect(hash).not.toContain(token.slice(4, 20));
+  });
+
+  it('refuses to hash an invalid token', async () => {
+    await expect(hashAgentToken('nope')).rejects.toThrow('not valid');
   });
 });

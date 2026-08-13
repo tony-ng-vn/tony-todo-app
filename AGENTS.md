@@ -45,3 +45,19 @@ Design rules:
 - Run `npm run ci:replay` when a CI lesson changes.
 - Run `npm run ci:repair` only on a feature branch when an AI repair loop is wanted. It must remain bounded and must not commit, push, merge, or weaken checks.
 - Treat generated lesson candidates as evidence. Review their context, solution, and tradeoffs before promoting and committing them.
+
+## Changelog
+
+- CHANGELOG.md entries use these categories, matching the project's architecture: `Web App` (SvelteKit frontend), `Backend` (InsForge functions, migrations, auth config), `Native App` (macOS menu bar companion), `CI & Tooling` (hooks, scripts, verification), `Docs`.
+- Only include the categories a release actually touched.
+- Keep the newest entry first, keep `package.json` version in sync with the newest entry, and update the changelog in the same commit as the change that prompted it.
+
+## Live backend ops truth
+
+This section is durable operational fact, kept outside the INSFORGE block so a skill sync cannot wipe it.
+
+- The owner already has live app accounts in `auth.users` (verified 2026-08-13). Never tell the owner to sign up, never create an owner account, and never re-enable sign-up for that purpose.
+- Never change the sign-up lock state (`disable_signup`) in either direction without an explicit ask from the owner.
+- `docs/next-steps.md` describes remaining one-time setup, but treat the live project as the source of truth over any doc or chat history.
+- To check live state: `npx -y @insforge/cli current --json` (project link and auth) and `npx -y @insforge/cli config plan --json` (drift between `insforge.toml` and the live config; empty output means no drift). The CLI login is interactive, so the owner runs `npx -y @insforge/cli login` themselves.
+- Do not print `auth.users` emails into chat or logs unless the owner asks; row existence is enough.

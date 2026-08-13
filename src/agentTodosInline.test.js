@@ -18,6 +18,8 @@ describe('agent-todos bundle', () => {
     expect(shell).toContain("from('agent_tokens')");
     expect(shell).toContain('agentTokenUserId');
     expect(shell).toContain('agentTokenUserId ?? verifiedUserId');
+    expect(shell).toContain("eq('token_hash'");
+    expect(shell).not.toContain(".eq('token',");
   });
 
   it('keeps functions/agent-todos.ts generated from the domain module', () => {
