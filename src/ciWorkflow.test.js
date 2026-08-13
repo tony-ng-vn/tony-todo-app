@@ -231,6 +231,9 @@ describe('CI workflow', () => {
   });
 
   it('deploys InsForge functions from GitHub after CI is green on main', () => {
+    expect(workflow.concurrency['cancel-in-progress']).toBe(
+      "${{ github.event_name == 'pull_request' }}",
+    );
     expect(functionsWorkflow.on.workflow_run.workflows).toEqual(['CI']);
     expect(functionsWorkflow.on.workflow_run.types).toEqual(['completed']);
     expect(functionsWorkflow.on).toHaveProperty('workflow_dispatch');

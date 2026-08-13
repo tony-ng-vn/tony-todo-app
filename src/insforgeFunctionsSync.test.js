@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   listDeployableSlugs,
+  parseLiveFunctionSlugs,
   parseSyncArgs,
   slugsFromChangedPaths,
   sourcesMatch,
@@ -19,6 +20,7 @@ describe('InsForge CLI execution', () => {
   it('uses the exact locked CLI package without network resolution', () => {
     expect(syncScript).toContain("'@insforge/cli@0.2.6'");
     expect(syncScript).toContain("'--offline'");
+    expect(syncScript).toContain("['diff', '--no-renames'");
   });
 });
 
@@ -59,6 +61,30 @@ describe('stripLiveFunctionSource', () => {
     ].join('\n');
 
     expect(stripLiveFunctionSource(live)).toBe('export default async function handler() {}\n');
+  });
+
+  it('removes all optional CLI metadata through the source delimiter', () => {
+    const live = [
+      'Function: agent-todos (agent-todos)',
+      'Status:   active',
+      'Desc:     Todo commands',
+      'Deployed: today',
+      '---',
+      'export default async function handler() {}',
+      '',
+    ].join('\n');
+
+    expect(stripLiveFunctionSource(live)).toBe('export default async function handler() {}\n');
+  });
+});
+
+describe('parseLiveFunctionSlugs', () => {
+  it('reads the live function inventory from CLI JSON', () => {
+    expect(
+      parseLiveFunctionSlugs(
+        JSON.stringify({ functions: [{ slug: 'draft-follow-up' }, { slug: 'agent-todos' }] }),
+      ),
+    ).toEqual(['agent-todos', 'draft-follow-up']);
   });
 });
 
@@ -106,6 +132,11 @@ describe('syncInsforgeFunctions', () => {
       readSource: (filePath) => sources[filePath.split('/').at(-1)],
       gitDiff: () => ['functions/agent-todos.ts'],
       runInsforge: (args) => {
+        if (args[1] === 'list') {
+          return JSON.stringify({
+            functions: [{ slug: 'agent-todos' }, { slug: 'draft-follow-up' }],
+          });
+        }
         if (args[1] === 'deploy') {
           deployed.push(args[2]);
           return '';
@@ -143,6 +174,30 @@ describe('syncInsforgeFunctions', () => {
     expect(calls).toEqual([]);
   });
 
+  it('rejects unexpected live functions before a manual replay writes', () => {
+    const calls = [];
+
+    expect(() =>
+      syncInsforgeFunctions({
+        root: '/repo',
+        argv: ['--deploy-all', '--check'],
+        listFiles: () => ['agent-todos.ts'],
+        runInsforge: (args) => {
+          calls.push(args);
+          if (args[1] === 'list') {
+            return JSON.stringify({
+              functions: [{ slug: 'agent-todos' }, { slug: 'removed-function' }],
+            });
+          }
+          return '';
+        },
+        log: { error() {} },
+      }),
+    ).toThrow(/unexpected live functions.*removed-function/);
+
+    expect(calls.filter((args) => args[1] === 'deploy')).toEqual([]);
+  });
+
   it('fails when live source does not match the repo', () => {
     expect(() =>
       syncInsforgeFunctions({
@@ -150,7 +205,10 @@ describe('syncInsforgeFunctions', () => {
         argv: ['--check'],
         listFiles: () => ['agent-todos.ts'],
         readSource: () => 'repo source\n',
-        runInsforge: () => 'Function: agent-todos\n---\nlive source\n',
+        runInsforge: (args) =>
+          args[1] === 'list'
+            ? JSON.stringify({ functions: [{ slug: 'agent-todos' }] })
+            : JSON.stringify({ code: 'live source\n' }),
         log: { error() {} },
       }),
     ).toThrow(/does not match the repo: agent-todos/);
