@@ -344,40 +344,45 @@
         on:keydown={handleProgressTextareaKeydown}
       ></textarea>
     {/if}
-    <div class="detail-note-row">
-      <label class="detail-note-label" for="detail-note">Notes</label>
-      <span aria-live="polite">
-        {noteSaveStatus === 'saving'
-          ? 'Saving details...'
-          : noteSaveStatus === 'error'
-            ? 'Saved locally - sync failed'
-            : 'Details saved automatically'}
-      </span>
-    </div>
-    <textarea
-      id="detail-note"
-      class="detail-note"
-      placeholder="Add context, links, or reminders for this task."
-      value={noteDraft}
-      on:input={handleNoteTextareaInput}
-      on:keydown={handleNoteTextareaKeydown}
-    ></textarea>
-    {#if noteTodos.length}
-      <div class="note-todo-list" aria-label="Note todos">
-        {#each noteTodos as item (item.lineIndex)}
-          <button
-            type="button"
-            class:is-done={item.done}
-            class="note-todo-item"
-            on:click={() => handleTodoToggle(item)}
-            aria-pressed={item.done}
-          >
-            <span class="note-todo-checkbox" aria-hidden="true"></span>
-            <span>{item.label}</span>
-          </button>
-        {/each}
+    <div class="detail-notes">
+      <div class="detail-note-row">
+        <label class="detail-note-label" for="detail-note">Notes</label>
+        <span aria-live="polite">
+          {noteSaveStatus === 'saving'
+            ? 'Saving details...'
+            : noteSaveStatus === 'error'
+              ? 'Saved locally - sync failed'
+              : 'Details saved automatically'}
+        </span>
       </div>
-    {/if}
+      <div class="detail-note-shell">
+        <textarea
+          id="detail-note"
+          class="detail-note"
+          rows="8"
+          placeholder="Add context, links, or reminders for this task."
+          value={noteDraft}
+          on:input={handleNoteTextareaInput}
+          on:keydown={handleNoteTextareaKeydown}
+        ></textarea>
+      </div>
+      {#if noteTodos.length}
+        <div class="note-todo-list" aria-label="Note todos">
+          {#each noteTodos as item (item.lineIndex)}
+            <button
+              type="button"
+              class:is-done={item.done}
+              class="note-todo-item"
+              on:click={() => handleTodoToggle(item)}
+              aria-pressed={item.done}
+            >
+              <span class="note-todo-checkbox" aria-hidden="true"></span>
+              <span>{item.label}</span>
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </div>
     <p class="detail-meta" id="detail-meta">{detailMeta(selectedTask)}</p>
     {#if !selectedTask.completedAt}
       <dl class="detail-timeline" aria-label="Task start and end time">
@@ -444,9 +449,6 @@
             </div>
             <label>
               <span>Start time</span>
-              {#if index === 0 && !selectedTask.firstStartedAt}
-                <small class="detail-start-missing">Defaults to creation time</small>
-              {/if}
               <CalendarPicker
                 mode="datetime"
                 triggerClass={index === 0 ? 'detail-start-picker' : 'time-block-start-picker'}
@@ -465,6 +467,9 @@
                 onChange={(nextValue) => handleTimingChange(index, 'endedAt', nextValue)}
               />
             </label>
+            {#if index === 0 && !selectedTask.firstStartedAt}
+              <small class="detail-start-missing">Defaults to creation time</small>
+            {/if}
             {#if block.startedAt && block.endedAt}
               <small class="time-block-duration">
                 {formatDuration(
