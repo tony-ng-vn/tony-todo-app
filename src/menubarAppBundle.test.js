@@ -90,6 +90,27 @@ describe('menu bar app bundle', () => {
     expect(controller).toContain('contentController.onCloseWindow');
   });
 
+  it('keeps floating-note activation from opening the full app', () => {
+    const policy = readFileSync(
+      path.join(repoRoot, 'native/Sources/DoneLogMenuBar/NativeAppLaunchPolicy.swift'),
+      'utf8',
+    );
+    const app = readFileSync(
+      path.join(repoRoot, 'native/Sources/DoneLogMenuBar/DoneLogMenuBarApp.swift'),
+      'utf8',
+    );
+    const noteController = readFileSync(
+      path.join(repoRoot, 'native/Sources/DoneLogMenuBar/FloatingNoteWindowController.swift'),
+      'utf8',
+    );
+
+    expect(policy).toContain('case floatingNoteActivation');
+    expect(app).toContain('NativeAppLaunchPolicy.reopenAction');
+    expect(noteController).toContain(
+      'NativeAppLaunchPolicy.withReopenIntent(.floatingNoteActivation)',
+    );
+  });
+
   it('uses one stable visible status item for the installed app', () => {
     const controller = readFileSync(
       path.join(repoRoot, 'native/Sources/DoneLogMenuBar/MenuBarController.swift'),
