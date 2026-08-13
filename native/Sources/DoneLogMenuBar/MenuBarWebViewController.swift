@@ -12,7 +12,7 @@ private final class WindowChromeMessageRelay: NSObject, WKScriptMessageHandler {
     _ userContentController: WKUserContentController,
     didReceive message: WKScriptMessage
   ) {
-    Task { @MainActor in
+    MainActor.assumeIsolated {
       self.controller?.handleWindowChromeMessage(message)
     }
   }
@@ -251,6 +251,11 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     }
 
     switch NativeWindowPolicy.chromeCommand(from: message.body) {
+    case .drag:
+      guard let event = NSApp.currentEvent, event.type == .leftMouseDown else {
+        return
+      }
+      window.performDrag(with: event)
     case .zoom:
       window.performZoom(nil)
     case nil:

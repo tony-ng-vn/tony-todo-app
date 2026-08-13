@@ -200,6 +200,7 @@ struct NativeWindowPolicyTests {
       )
     )
     #expect(NativeWindowPolicy.trafficLightsLeadingInset(zoomMaxX: 62) == 78)
+    #expect(NativeWindowPolicy.chromeCommand(from: ["command": "drag"]) == .drag)
     #expect(NativeWindowPolicy.chromeCommand(from: ["command": "zoom"]) == .zoom)
     #expect(NativeWindowPolicy.chromeCommand(from: ["command": "nope"]) == nil)
   }
