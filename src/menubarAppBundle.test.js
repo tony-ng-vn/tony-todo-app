@@ -142,7 +142,7 @@ describe('menu bar app bundle', () => {
     expect(controller).toContain('.moveToActiveSpace');
     expect(controller).toContain('windowWillUseStandardFrame');
     expect(controller).toContain('screen?.visibleFrame');
-    expect(app).toContain('NativeAppLaunchPolicy.shouldOpenFullApp');
+    expect(app).toContain('NativeAppLaunchPolicy.action(for: launchIntent)');
   });
 
   it('keeps generated app bundles out of Spotlight-visible dist', () => {
