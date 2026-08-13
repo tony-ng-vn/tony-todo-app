@@ -91,7 +91,7 @@ describe('parseTodoCommand', () => {
   });
 
   it('keeps the catalog aligned with the parser', () => {
-    expect(AGENT_API_VERSION).toBe(1);
+    expect(AGENT_API_VERSION).toBe(2);
     expect(AGENT_COMMANDS.map((entry) => entry.command)).toEqual([
       'describe',
       'list',
@@ -163,6 +163,31 @@ describe('note entries', () => {
     expect(applyTodoNote(stamped, `${stamped}\n\nWaiting on callback`, later)).toBe(
       `@ ${formatNoteAtLocal(first)}\nLeft voicemail\n\n@ ${formatNoteAtLocal(later)}\nWaiting on callback`,
     );
+  });
+
+  it('stamps every bullet by identity instead of by position, so reordering keeps each time', () => {
+    const first = new Date('2026-06-08T15:00:00.000Z');
+    const later = new Date('2026-06-08T15:12:00.000Z');
+    const now = new Date('2026-06-08T16:00:00.000Z');
+    let stored = applyTodoNote('', '- Call Sam', first);
+    stored = applyTodoNote(stored, '- Call Sam\n- Email the landlord', later);
+
+    const reordered = applyTodoNote(stored, '- Email the landlord\n- Call Sam', now);
+
+    expect(parseNoteEntries(reordered)).toEqual([
+      { at: later.toISOString(), text: '- Email the landlord' },
+      { at: first.toISOString(), text: '- Call Sam' },
+    ]);
+  });
+
+  it('gives every bullet in a legacy multi-dash chunk its own stamp instead of one shared stamp', () => {
+    const legacyAt = dateAtSanFranciscoTime('2026-06-08', 8 * 60).toISOString();
+    const legacy = '@ 2026-06-08 08:00\n- Call Sam\n- Email the landlord';
+
+    expect(parseNoteEntries(legacy)).toEqual([
+      { at: legacyAt, text: '- Call Sam' },
+      { at: legacyAt, text: '- Email the landlord' },
+    ]);
   });
 });
 
@@ -395,6 +420,13 @@ describe('runTodoCommand list and daySummary', () => {
       },
     ]);
   });
+
+  it('excludes empty structural bullets from agent-facing notes[]', () => {
+    const state = createInitialState([openTodo({ note: '- ' })]);
+    const result = runTodoCommand(state, { kind: 'list' }, UTC_EVENING);
+
+    expect(result.view.tasks.find((task) => task.id === 'task-1').notes).toEqual([]);
+  });
 });
 
 describe('runTodoCommand appendNote', () => {
@@ -415,6 +447,25 @@ describe('runTodoCommand appendNote', () => {
         atLocal: formatNoteAtLocal(UTC_EVENING),
         text: 'Left voicemail',
       },
+    ]);
+  });
+
+  it('appends multiple list items as separate stamped notes from one command call', () => {
+    const state = createInitialState([openTodo({ note: '' })]);
+    const result = runTodoCommand(
+      state,
+      { kind: 'appendNote', target: { by: 'id', id: 'task-1' }, text: '- a\n- b' },
+      UTC_EVENING,
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.persist.kind).toBe('update');
+    expect(result.persist.todo.note).toBe(
+      `@ ${formatNoteAtLocal(UTC_EVENING)}\n- a\n\n@ ${formatNoteAtLocal(UTC_EVENING)}\n- b`,
+    );
+    expect(result.view.task.notes).toEqual([
+      { at: UTC_EVENING.toISOString(), atLocal: formatNoteAtLocal(UTC_EVENING), text: '- a' },
+      { at: UTC_EVENING.toISOString(), atLocal: formatNoteAtLocal(UTC_EVENING), text: '- b' },
     ]);
   });
 });

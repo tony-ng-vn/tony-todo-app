@@ -56,6 +56,7 @@
     updateTodoNote,
     updateTodoProgress,
     updateTodoTitle,
+    stripNoteStampsForEditor,
   } from '../todoStore.js';
   import { insforge, isInsForgeConfigured } from '../insforgeClient.js';
   import { getCurrentUser, signInWithPassword, signOut, signUp } from '../auth.js';
@@ -222,6 +223,8 @@
     }
   }
 
+  // resolveSelectedNoteDraft strips task.note and edit.note internally, so
+  // it can pass selectedTask straight through here.
   $: {
     const nextDraft = resolveSelectedNoteDraft({
       task: selectedTask,
@@ -721,9 +724,13 @@
       const currentEdit = readNoteEdit(todoId);
       if (!currentEdit || currentEdit.revision !== edit.revision) {
         if (currentEdit) {
-          state = updateTodoNote(state, todoId, currentEdit.note);
+          // Defensive: a pending edit recorded before this fix could still
+          // carry raw "@ " stamps, so strip before it reaches the store or
+          // an open textarea.
+          const draft = stripNoteStampsForEditor(currentEdit.note);
+          state = updateTodoNote(state, todoId, draft);
           if (selectedTaskId === todoId) {
-            noteDraft = currentEdit.note;
+            noteDraft = draft;
           }
           setNoteSaveStatus(
             todoId,
@@ -758,9 +765,10 @@
 
     for (const { todo, edit } of getPendingNoteEdits(state.todos)) {
       if (todo.note !== edit.note) {
-        state = updateTodoNote(state, todo.id, edit.note);
+        const draft = stripNoteStampsForEditor(edit.note);
+        state = updateTodoNote(state, todo.id, draft);
         if (selectedTaskId === todo.id) {
-          noteDraft = edit.note;
+          noteDraft = draft;
         }
         changed = true;
       }

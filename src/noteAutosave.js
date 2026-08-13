@@ -1,3 +1,5 @@
+import { stripNoteStampsForEditor } from './noteEntries.js';
+
 export function createDebouncedSaveQueue(save, { delay = 600 } = {}) {
   const entries = new Map();
 
@@ -138,21 +140,27 @@ export async function loadRemoteAfterNoteFlush(flushAll, loadRemote) {
   return loadRemote();
 }
 
+// noteDraft is always the stripped editor form (no "@ " headers), so every
+// value that can seed or be compared against it - the stored task note and
+// a pending local edit, either of which can still carry raw stamps from
+// before this stripping rule shipped - is stripped right here. One place
+// owns the rule instead of every caller re-deriving it.
 export function resolveSelectedNoteDraft({ task, noteDraftTaskId, noteDraft, edit }) {
   if (!task) {
     return { noteDraftTaskId: null, noteDraft: '' };
   }
 
+  const strippedTaskNote = stripNoteStampsForEditor(task.note ?? '');
   const pending = Boolean(edit && edit.syncedRevision !== edit.revision);
   if (task.id !== noteDraftTaskId) {
     return {
       noteDraftTaskId: task.id,
-      noteDraft: pending ? edit.note : task.note ?? '',
+      noteDraft: pending ? stripNoteStampsForEditor(edit.note) : strippedTaskNote,
     };
   }
 
-  if (!pending && noteDraft !== (task.note ?? '')) {
-    return { noteDraftTaskId: task.id, noteDraft: task.note ?? '' };
+  if (!pending && noteDraft !== strippedTaskNote) {
+    return { noteDraftTaskId: task.id, noteDraft: strippedTaskNote };
   }
 
   return { noteDraftTaskId, noteDraft };

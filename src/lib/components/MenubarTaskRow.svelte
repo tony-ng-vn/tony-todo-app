@@ -9,6 +9,7 @@
     formatTaskTimestamp,
     getEditableTaskTimeSegments,
     getElapsedSeconds,
+    stripNoteStampsForEditor,
   } from '../../todoStore.js';
   import CalendarPicker from './CalendarPicker.svelte';
   import { iconCheck, iconDetails, iconPage, iconPause, iconPlay, iconX } from './icons.js';
@@ -47,7 +48,7 @@
       draftTodoId = todo.id;
       sourceNote = nextNote;
       sourceProgress = nextProgress;
-      noteDraft = nextNote;
+      noteDraft = stripNoteStampsForEditor(nextNote);
       progressDraft = nextProgress;
       sourceTimingBlocks = timingBlocksSource(todo);
       timingBlocksDraft = timingBlocksForTodo(todo);
@@ -55,7 +56,7 @@
     } else {
       if (nextNote !== sourceNote) {
         sourceNote = nextNote;
-        noteDraft = nextNote;
+        noteDraft = stripNoteStampsForEditor(nextNote);
       }
 
       if (nextProgress !== sourceProgress) {
