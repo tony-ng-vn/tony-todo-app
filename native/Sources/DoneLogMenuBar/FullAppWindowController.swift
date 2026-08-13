@@ -4,19 +4,23 @@ import AppKit
 final class FullAppWindowController: NSWindowController, NSWindowDelegate {
   private let application: NSApplication
   private let contentController: MenuBarWebViewController
+  private weak var updateChecker: (any AppUpdateChecking)?
   private var floatingNoteWindows: [String: FloatingNoteWindowController] = [:]
 
   init(
     url: URL,
+    updateChecker: (any AppUpdateChecking)? = nil,
     application: NSApplication = .shared
   ) {
     self.application = application
+    self.updateChecker = updateChecker
 
     contentController = MenuBarWebViewController(
       homeURL: url,
       preferredSize: MenuBarConfiguration.fullAppSize,
       readySelector: nil,
-      usesWindowChrome: true
+      usesWindowChrome: true,
+      updateChecker: updateChecker
     )
     let window = NSWindow(
       contentRect: NSRect(origin: .zero, size: MenuBarConfiguration.fullAppSize),
@@ -100,7 +104,10 @@ final class FullAppWindowController: NSWindowController, NSWindowDelegate {
       return
     }
 
-    let controller = FloatingNoteWindowController(url: url) { [weak self] in
+    let controller = FloatingNoteWindowController(
+      url: url,
+      updateChecker: updateChecker
+    ) { [weak self] in
       self?.floatingNoteWindows[key] = nil
     }
     floatingNoteWindows[key] = controller
