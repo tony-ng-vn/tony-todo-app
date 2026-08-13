@@ -7,12 +7,12 @@ Do them in this order; each one only unblocks what it says it unblocks, nothing 
 
 This is the one to do first. It unblocks the most: your original 8 todos (still sitting under the old anonymous ID) and the recurring ingestion schedule both need a real account to exist before anything else can move.
 
-1. Go to `https://tony-todo-app.vercel.app` (the live production deployment).
-2. Use the sign-up form to create your own account with your real email and a password.
-3. Tell me once it's done, and give me the email you used.
-4. I'll reassign the 8 original pre-auth todos to your new account with a one-time database update, and set up the recurring Granola ingestion schedule pointed at your account.
+1. Public sign-up is now disabled (`disable_signup = true` in `insforge.toml`), so the sign-up form on the live app will not work.
+2. When you are ready, either create your account directly in the InsForge dashboard (Authentication -> Users -> Add user), or tell me and I will temporarily re-enable sign-up, wait for you to register, and lock it again.
+3. Tell me once it is done, and give me the email you used.
+4. I will reassign the 8 original pre-auth todos to your new account with a one-time database update, set the `OWNER_EMAIL` secret to your email, and set up the recurring Granola ingestion schedule pointed at your account.
 
-Note: `require_email_verification` is currently off (I disabled it earlier to unblock testing), so sign-up should work immediately without a confirmation email. Re-enabling it depends on step 3 below.
+Note: `require_email_verification` stays off until SMTP exists (step 3 below), which is fine while sign-up is disabled.
 
 ## 2. Google Cloud OAuth setup (only if you want Gmail + Calendar)
 
