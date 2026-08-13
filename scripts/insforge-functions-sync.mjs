@@ -146,6 +146,12 @@ export function syncInsforgeFunctions({
     slugsToDeploy = allSlugs;
   } else if (options.deployChanged) {
     slugsToDeploy = slugsFromChangedPaths(gitDiff(root, options.base, options.head));
+    const deletedSlugs = slugsToDeploy.filter((slug) => !allSlugs.includes(slug));
+    if (deletedSlugs.length > 0) {
+      throw new Error(
+        `Changed paths include deleted function source files: ${deletedSlugs.join(', ')}. Remove the live functions explicitly before rerunning this deployment. No functions were deployed.`,
+      );
+    }
   }
 
   for (const slug of slugsToDeploy) {
