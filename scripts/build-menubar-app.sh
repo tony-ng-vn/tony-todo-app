@@ -45,6 +45,27 @@ mkdir -p "$APP_BUNDLE/Contents/Resources"
   "$REPO_ROOT/native/App/Info.plist" \
   "$APP_BUNDLE/Contents/Info.plist"
 
+if [[ -n "${DONE_LOG_BUNDLE_IDENTIFIER:-}" ]]; then
+  /usr/bin/plutil -replace CFBundleIdentifier \
+    -string "$DONE_LOG_BUNDLE_IDENTIFIER" \
+    "$APP_BUNDLE/Contents/Info.plist"
+fi
+if [[ -n "${DONE_LOG_BUNDLE_DISPLAY_NAME:-}" ]]; then
+  /usr/bin/plutil -replace CFBundleDisplayName \
+    -string "$DONE_LOG_BUNDLE_DISPLAY_NAME" \
+    "$APP_BUNDLE/Contents/Info.plist"
+  /usr/bin/plutil -replace CFBundleName \
+    -string "$DONE_LOG_BUNDLE_DISPLAY_NAME" \
+    "$APP_BUNDLE/Contents/Info.plist"
+fi
+
+BUNDLE_IDENTIFIER="${DONE_LOG_BUNDLE_IDENTIFIER:-$(
+  /usr/bin/plutil \
+    -extract CFBundleIdentifier \
+    raw \
+    "$APP_BUNDLE/Contents/Info.plist"
+)}"
+
 ICON_TEMP_DIRECTORY="$(
   mktemp -d "${TMPDIR:-/tmp}/done-log-icon.XXXXXX"
 )"
@@ -72,7 +93,7 @@ fi
   --force \
   --deep \
   --sign "$CODE_SIGN_IDENTITY" \
-  --identifier com.tonynguyen.donelog \
+  --identifier "$BUNDLE_IDENTIFIER" \
   "$APP_BUNDLE"
 /usr/bin/codesign --verify --deep --strict "$APP_BUNDLE"
 
