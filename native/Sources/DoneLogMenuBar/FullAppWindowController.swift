@@ -24,7 +24,6 @@ final class FullAppWindowController: NSWindowController, NSWindowDelegate {
       defer: false
     )
     window.title = "Done Log"
-    NativeWindowPolicy.applyChrome(to: window)
     window.contentMinSize = MenuBarConfiguration.fullAppMinimumSize
     window.contentViewController = contentController
     window.isReleasedWhenClosed = false
@@ -37,6 +36,7 @@ final class FullAppWindowController: NSWindowController, NSWindowDelegate {
     window.setFrameAutosaveName(frameName)
 
     super.init(window: window)
+    NativeWindowPolicy.applyChrome(to: window)
     window.delegate = self
 
     contentController.onOpenFloatingNote = { [weak self] noteURL in
@@ -51,6 +51,9 @@ final class FullAppWindowController: NSWindowController, NSWindowDelegate {
 
   func show() {
     application.setActivationPolicy(.regular)
+    if let window {
+      NativeWindowPolicy.applyChrome(to: window)
+    }
     if window?.isMiniaturized == true {
       window?.deminiaturize(nil)
     }
