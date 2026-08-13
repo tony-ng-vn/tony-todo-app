@@ -2687,6 +2687,35 @@ h2 {
   }
 }
 
+@media (max-width: 900px), (pointer: coarse) {
+  html:not(.is-native-host) .workspace.has-detail,
+  html:not(.is-native-host) .workspace.is-board-view.has-detail {
+    overflow: hidden;
+  }
+
+  html:not(.is-native-host) .workspace.has-detail .task-detail {
+    position: absolute;
+    inset: 0;
+    z-index: 30;
+    order: 0;
+    flex: none;
+    width: 100%;
+    min-height: 100%;
+    max-height: 100%;
+    overflow: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 0;
+    padding-bottom: max(24px, env(safe-area-inset-bottom, 0px));
+  }
+
+  .detail-note,
+  .progress-input,
+  .detail-title-input {
+    font-size: 16px;
+  }
+}
+
 @media (max-width: 560px) {
   .workspace {
     width: 100vw;
