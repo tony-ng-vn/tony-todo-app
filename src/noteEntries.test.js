@@ -64,6 +64,17 @@ describe('parseNoteEntries', () => {
       { at: null, text: '- c' },
     ]);
   });
+
+  it('keeps marker-only units as unstamped entries in document order, even under a header', () => {
+    const at = dateAtSanFranciscoTime('2026-08-13', 10 * 60).toISOString();
+
+    expect(parseNoteEntries('@ 2026-08-13 10:00\n- a\n- \n- [ ]\n-')).toEqual([
+      { at, text: '- a' },
+      { at: null, text: '- ' },
+      { at: null, text: '- [ ]' },
+      { at: null, text: '-' },
+    ]);
+  });
 });
 
 describe('applyTodoNote bullet matching', () => {
@@ -163,13 +174,63 @@ describe('applyTodoNote bullet matching', () => {
     expect(parseNoteEntries(next)).toEqual([{ at: now.toISOString(), text: '- Not getting lunch yet' }]);
   });
 
-  it('drops an empty bullet from the serialized result', () => {
-    const stored = applyTodoNote('', '- Buy milk', first);
+  // Enter-on-dash creates a fresh "- " line under the caret; the surviving
+  // structural line must round-trip verbatim (including its trailing space)
+  // or a reactive reseed from storage erases what the user just typed.
+  it('keeps a trailing empty bullet as a bare unstamped line with its trailing space intact', () => {
+    const stored = applyTodoNote('', '- a', first);
 
-    const next = applyTodoNote(stored, '- Buy milk\n- ', now);
+    const next = applyTodoNote(stored, '- a\n- ', now);
 
-    expect(parseNoteEntries(next)).toEqual([{ at: first.toISOString(), text: '- Buy milk' }]);
-    expect(next).toBe(`@ ${formatNoteAtLocal(first)}\n- Buy milk`);
+    expect(parseNoteEntries(next)).toEqual([
+      { at: first.toISOString(), text: '- a' },
+      { at: null, text: '- ' },
+    ]);
+    expect(next).toBe(`@ ${formatNoteAtLocal(first)}\n- a\n\n- `);
+    expect(stripNoteStampsForEditor(next)).toBe('- a\n- ');
+  });
+
+  it('keeps a middle empty dash between two real bullets through a strip-and-reapply round trip', () => {
+    const stored = applyTodoNote('', '- a\n- \n- b', first);
+
+    expect(parseNoteEntries(stored)).toEqual([
+      { at: first.toISOString(), text: '- a' },
+      { at: null, text: '- ' },
+      { at: first.toISOString(), text: '- b' },
+    ]);
+
+    const stripped = stripNoteStampsForEditor(stored);
+    expect(stripped).toBe('- a\n- \n- b');
+
+    const next = applyTodoNote(stored, stripped, now);
+
+    expect(parseNoteEntries(next)).toEqual([
+      { at: first.toISOString(), text: '- a' },
+      { at: null, text: '- ' },
+      { at: first.toISOString(), text: '- b' },
+    ]);
+  });
+
+  it('stores a note that is only an empty bullet as the bare line itself, never wiped to empty', () => {
+    const stored = applyTodoNote('', '- ', now);
+
+    expect(stored).toBe('- ');
+    expect(parseNoteEntries(stored)).toEqual([{ at: null, text: '- ' }]);
+    expect(stripNoteStampsForEditor(stored)).toBe('- ');
+  });
+
+  it('does not let an empty unit steal a stamp or corrupt matching with NaN', () => {
+    const stored = applyTodoNote('', '- Call the vet', first);
+
+    const withEmpty = applyTodoNote(stored, '- \n- Call the vet', now);
+    const withoutEmpty = applyTodoNote(stored, '- Call the vet', now);
+
+    expect(withEmpty).not.toContain('NaN');
+    const emptyEntry = parseNoteEntries(withEmpty).find((entry) => entry.text === '- ');
+    const realEntry = parseNoteEntries(withEmpty).find((entry) => entry.text === '- Call the vet');
+
+    expect(emptyEntry.at).toBeNull();
+    expect(realEntry.at).toBe(parseNoteEntries(withoutEmpty)[0].at);
   });
 
   it('keeps remaining dashes times when one dash is deleted', () => {

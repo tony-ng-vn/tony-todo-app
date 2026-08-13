@@ -420,6 +420,13 @@ describe('runTodoCommand list and daySummary', () => {
       },
     ]);
   });
+
+  it('excludes empty structural bullets from agent-facing notes[]', () => {
+    const state = createInitialState([openTodo({ note: '- ' })]);
+    const result = runTodoCommand(state, { kind: 'list' }, UTC_EVENING);
+
+    expect(result.view.tasks.find((task) => task.id === 'task-1').notes).toEqual([]);
+  });
 });
 
 describe('runTodoCommand appendNote', () => {
