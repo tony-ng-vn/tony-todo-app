@@ -223,15 +223,11 @@
     }
   }
 
-  // resolveSelectedNoteDraft compares noteDraft against task.note to decide
-  // whether to resync; both sides must be the stripped editor form, or a
-  // stamped todo.note would never equal the always-stripped noteDraft and
-  // this would re-seed the stamped text into the open textarea every tick.
+  // resolveSelectedNoteDraft strips task.note and edit.note internally, so
+  // it can pass selectedTask straight through here.
   $: {
     const nextDraft = resolveSelectedNoteDraft({
-      task: selectedTask
-        ? { ...selectedTask, note: stripNoteStampsForEditor(selectedTask.note ?? '') }
-        : null,
+      task: selectedTask,
       noteDraftTaskId,
       noteDraft,
       edit: selectedTaskId ? readNoteEdit(selectedTaskId) : null,
