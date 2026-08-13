@@ -12,6 +12,8 @@ enum NativeWindowPolicy {
     .fullSizeContentView,
   ]
 
+  static let floatingNoteStyleMask = primaryStyleMask
+
   static let canvasColor = NSColor(srgbRed: 20.0 / 255.0, green: 20.0 / 255.0, blue: 18.0 / 255.0, alpha: 1)
 
   enum ChromeCommand: Equatable {

@@ -1,5 +1,19 @@
 # Changelog
 
+## v0.10.2
+
+2026-08-13
+
+**Native App**
+
+- Task notes now use the same dark native chrome as the full window, so they no longer show a separate white system title bar.
+
+**Docs**
+
+- Agents may open PRs, watch CI, fix review comments, and merge when the PR is ready.
+
+---
+
 ## v0.10.1
 
 2026-08-13
@@ -15,6 +29,8 @@
 **Docs**
 
 - The menu bar companion notes now describe drag and zoom on the traffic-light area and empty headers.
+
+---
 
 ## v0.10.0
 

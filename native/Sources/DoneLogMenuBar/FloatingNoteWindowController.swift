@@ -2,20 +2,22 @@ import AppKit
 
 @MainActor
 final class FloatingNoteWindowController: NSWindowController, NSWindowDelegate {
+  private let contentController: MenuBarWebViewController
   private let onClose: () -> Void
   private var hasBeenShown = false
 
   init(url: URL, onClose: @escaping () -> Void) {
     self.onClose = onClose
 
-    let contentController = MenuBarWebViewController(
+    contentController = MenuBarWebViewController(
       homeURL: url,
       preferredSize: MenuBarConfiguration.floatingNoteSize,
-      readySelector: ".floating-note-shell"
+      readySelector: ".floating-note-shell",
+      usesWindowChrome: true
     )
     let window = NSPanel(
       contentRect: NSRect(origin: .zero, size: MenuBarConfiguration.floatingNoteSize),
-      styleMask: [.titled, .closable, .miniaturizable, .resizable, .utilityWindow],
+      styleMask: NativeWindowPolicy.floatingNoteStyleMask,
       backing: .buffered,
       defer: false
     )
@@ -26,11 +28,11 @@ final class FloatingNoteWindowController: NSWindowController, NSWindowDelegate {
       window?.close()
     }
     window.isReleasedWhenClosed = false
-    window.isMovableByWindowBackground = true
     window.level = .floating
     window.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
 
     super.init(window: window)
+    NativeWindowPolicy.applyChrome(to: window)
     window.delegate = self
   }
 
@@ -40,6 +42,10 @@ final class FloatingNoteWindowController: NSWindowController, NSWindowDelegate {
   }
 
   func show() {
+    if let window {
+      NativeWindowPolicy.applyChrome(to: window)
+      contentController.syncNativeChrome(from: window)
+    }
     showWindow(nil)
     if !hasBeenShown {
       window?.center()
@@ -47,6 +53,13 @@ final class FloatingNoteWindowController: NSWindowController, NSWindowDelegate {
     }
     window?.makeKeyAndOrderFront(nil)
     NSApp.activate(ignoringOtherApps: true)
+  }
+
+  func windowDidResize(_ notification: Notification) {
+    guard let window else {
+      return
+    }
+    contentController.syncNativeChrome(from: window)
   }
 
   func windowWillClose(_ notification: Notification) {

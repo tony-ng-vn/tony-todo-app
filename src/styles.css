@@ -3039,3 +3039,12 @@ html.is-native-host .summary-top a,
 html.is-native-host .detail-header a {
   -webkit-app-region: no-drag;
 }
+
+html.is-native-host .floating-note-shell {
+  padding-top: calc(18px + var(--native-titlebar-inset));
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
