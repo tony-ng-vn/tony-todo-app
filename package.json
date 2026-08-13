@@ -34,7 +34,8 @@
     "understanding:build": "node scripts/understanding-workbook.mjs",
     "understanding:serve": "node scripts/understanding-workbook.mjs && node scripts/understanding-serve.mjs",
     "bundle:agent-todos": "node scripts/inline-agent-todos.mjs",
-    "bundle:agent-todos:check": "node scripts/inline-agent-todos.mjs --check"
+    "bundle:agent-todos:check": "node scripts/inline-agent-todos.mjs --check",
+    "release:changelog": "node scripts/compile-changelog.mjs"
   },
   "devDependencies": {
     "@sveltejs/adapter-auto": "^7.0.1",
