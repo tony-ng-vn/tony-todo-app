@@ -3,11 +3,13 @@
 -- no longer read a long-lived credential back out of the database.
 alter table public.agent_tokens rename column token to token_hash;
 
+-- The old dlg_ check must go before the backfill: hashed values would
+-- violate it while it still exists.
+alter table public.agent_tokens drop constraint if exists agent_tokens_token_check;
+
 update public.agent_tokens
   set token_hash = encode(sha256(convert_to(token_hash, 'UTF8')), 'hex')
   where token_hash like 'dlg_%';
-
-alter table public.agent_tokens drop constraint if exists agent_tokens_token_check;
 
 alter table public.agent_tokens
   add constraint agent_tokens_token_hash_check check (token_hash ~ '^[0-9a-f]{64}$');
