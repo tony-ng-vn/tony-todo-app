@@ -362,16 +362,18 @@
         />
       </label>
 
-      <label>
-        <span>Note</span>
+      <div class="menubar-note-field">
+        <label for={`menubar-note-${todo.id}`}>Note</label>
         <RichNoteTextarea
+          id={`menubar-note-${todo.id}`}
           variant="menubar"
+          ariaLabel={`Note for ${todo.title}`}
           value={noteDraft}
           rows="3"
           onInput={handleNoteTextareaInput}
           onKeydown={(event) => handleTextareaKeydown(event, updateNoteDraft)}
         />
-      </label>
+      </div>
       {#if noteTodos.length}
         <div class="note-todo-list" aria-label="Note todos">
           {#each noteTodos as item (item.lineIndex)}
@@ -680,7 +682,8 @@
     animation: panel-enter var(--motion-reveal) var(--ease-out);
   }
 
-  .menubar-task-details label {
+  .menubar-task-details label,
+  .menubar-note-field {
     display: grid;
     gap: 5px;
     color: var(--subtle);
