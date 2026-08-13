@@ -34,6 +34,7 @@
     updateTodoNote,
     updateTodoProgress,
     updateTodoTitle,
+    stripNoteStampsForEditor,
   } from '../../todoStore.js';
   import { getCurrentUser, signInWithPassword, signOut, signUp } from '../../auth.js';
   import { insforge, isInsForgeConfigured } from '../../insforgeClient.js';
@@ -463,7 +464,9 @@
       const currentEdit = readNoteEdit(todoId);
       if (!currentEdit || currentEdit.revision !== edit.revision) {
         if (currentEdit) {
-          state = updateTodoNote(state, todoId, currentEdit.note);
+          // Defensive: a pending edit recorded before this fix could still
+          // carry raw "@ " stamps, so strip before it reaches the store.
+          state = updateTodoNote(state, todoId, stripNoteStampsForEditor(currentEdit.note));
           setNoteSaveStatus(
             todoId,
             currentEdit.syncedRevision === currentEdit.revision ? 'saved' : 'saving',
@@ -497,7 +500,7 @@
 
     for (const { todo, edit } of getPendingNoteEdits(state.todos)) {
       if (todo.note !== edit.note) {
-        state = updateTodoNote(state, todo.id, edit.note);
+        state = updateTodoNote(state, todo.id, stripNoteStampsForEditor(edit.note));
         changed = true;
       }
 
@@ -514,7 +517,7 @@
     let mergedState = nextState;
     for (const { todo, edit } of getPendingNoteEdits(nextState.todos)) {
       if (todo.note !== edit.note) {
-        mergedState = updateTodoNote(mergedState, todo.id, edit.note);
+        mergedState = updateTodoNote(mergedState, todo.id, stripNoteStampsForEditor(edit.note));
       }
     }
     state = mergedState;

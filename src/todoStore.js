@@ -23,6 +23,7 @@ import {
   normalizeTodo,
   normalizedTrackedSeconds,
 } from './todoCommands.js';
+import { stripNoteStampsForEditor } from './noteEntries.js';
 
 export {
   addTodo,
@@ -40,6 +41,7 @@ export {
   getPendingTodos,
   getProjectTodos,
   parseTodoKind,
+  stripNoteStampsForEditor,
 };
 
 export const BOARD_COLUMNS = [
