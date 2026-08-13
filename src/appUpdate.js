@@ -6,6 +6,7 @@ export function resolveUpdateAction({
   isNativeHost,
   isLegacyNativeHost,
   hasNativeUpdater,
+  bootstrapAvailable = false,
   webUpdateAvailable,
 }) {
   if (isNativeHost && hasNativeUpdater) {
@@ -17,7 +18,7 @@ export function resolveUpdateAction({
     };
   }
 
-  if (isLegacyNativeHost || (isNativeHost && !hasNativeUpdater)) {
+  if (bootstrapAvailable && (isLegacyNativeHost || (isNativeHost && !hasNativeUpdater))) {
     return {
       kind: 'legacy-bootstrap',
       label: 'Install desktop update',

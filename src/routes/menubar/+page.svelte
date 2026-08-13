@@ -100,6 +100,7 @@
   let isNativeHost = false;
   let isLegacyNativeHost = false;
   let hasNativeUpdater = false;
+  let bootstrapAvailable = false;
   let themeMode = 'light';
   let expandedTaskId = null;
   let noteSaveStatuses = {};
@@ -128,6 +129,7 @@
     isNativeHost,
     isLegacyNativeHost,
     hasNativeUpdater,
+    bootstrapAvailable,
     webUpdateAvailable: updateAvailable,
   });
   $: floatingNoteTodo = floatingNoteId ? findTodo(floatingNoteId) : null;
@@ -144,6 +146,9 @@
       Boolean(window.webkit) &&
       !navigator.userAgent.includes('Safari/') &&
       !hasNativeUpdater;
+    if (isLegacyNativeHost) {
+      checkForBootstrapRelease();
+    }
     standaloneNoteId = requestedNoteId;
     useRemote = isInsForgeConfigured && !searchParams.has('local');
     syncMessage = useRemote ? 'Connecting' : 'Local only';
@@ -236,6 +241,20 @@
       updateAvailable = await updated.check();
     } finally {
       updateCheckInFlight = false;
+    }
+  }
+
+  async function checkForBootstrapRelease() {
+    try {
+      const response = await fetch('/api/native-release');
+      if (!response.ok) {
+        return;
+      }
+
+      const result = await response.json();
+      bootstrapAvailable = result.available === true;
+    } catch {
+      bootstrapAvailable = false;
     }
   }
 
