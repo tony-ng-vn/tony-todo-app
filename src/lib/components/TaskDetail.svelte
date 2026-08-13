@@ -1,6 +1,7 @@
 <script>
   import { tick } from 'svelte';
   import CalendarPicker from './CalendarPicker.svelte';
+  import RichNoteTextarea from './RichNoteTextarea.svelte';
   import { linkifyText } from '../../linkify.js';
   import { expandTodoCommand, parseNoteTodos, toggleNoteTodo } from '../../noteTodos.js';
   import { getTextareaCaretRestore, getTextareaKeyEdit } from '../../textareaEditing.js';
@@ -365,15 +366,15 @@
         </span>
       </div>
       <div class="detail-note-shell">
-        <textarea
+        <RichNoteTextarea
           id="detail-note"
-          class="detail-note"
+          variant="detail"
           rows="4"
           placeholder="Add context, links, or reminders for this task."
           value={noteDraft}
-          on:input={handleNoteTextareaInput}
-          on:keydown={handleNoteTextareaKeydown}
-        ></textarea>
+          onInput={handleNoteTextareaInput}
+          onKeydown={handleNoteTextareaKeydown}
+        />
       </div>
       {#if noteTodos.length}
         <div class="note-todo-list" aria-label="Note todos">

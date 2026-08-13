@@ -3,6 +3,7 @@ import {
   getStandaloneWebUrl,
   isYouTubeUrl,
   linkifyText,
+  tokenizeLinks,
   shortenLinksText,
 } from './linkify.js';
 
@@ -31,6 +32,31 @@ describe('linkifyText', () => {
     expect(linkifyText('Read https://docs.example.com/path')).toBe(
       'Read <a href="https://docs.example.com/path" target="_blank" rel="noreferrer noopener">docs.example.com</a>',
     );
+  });
+});
+
+describe('tokenizeLinks', () => {
+  it('turns a Markdown link into one readable link token', () => {
+    const url = 'https://www.youtube.com/watch?v=8wysIxzqgPI&t=6s';
+
+    expect(tokenizeLinks(`watching: [${url}](${url})`)).toEqual([
+      { type: 'text', value: 'watching: ' },
+      { type: 'link', href: url, label: url },
+    ]);
+  });
+
+  it('recognizes a bare link without swallowing sentence punctuation', () => {
+    expect(tokenizeLinks('Watch https://youtu.be/abc123, then write notes.')).toEqual([
+      { type: 'text', value: 'Watch ' },
+      { type: 'link', href: 'https://youtu.be/abc123', label: 'https://youtu.be/abc123' },
+      { type: 'text', value: ', then write notes.' },
+    ]);
+  });
+
+  it('keeps unsafe Markdown destinations as plain text', () => {
+    expect(tokenizeLinks('[open me](javascript:alert(1))')).toEqual([
+      { type: 'text', value: '[open me](javascript:alert(1))' },
+    ]);
   });
 });
 

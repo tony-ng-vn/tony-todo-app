@@ -1,4 +1,5 @@
 const URL_PATTERN = /https?:\/\/[^\s<>"']+/g;
+const RICH_LINK_PATTERN = /\[([^\]\n]+)\]\((https?:\/\/[^\s)]+)\)|(https?:\/\/[^\s<>"']+)/g;
 const YOUTUBE_HOSTS = new Set([
   'youtube.com',
   'www.youtube.com',
@@ -34,6 +35,33 @@ export function linkifyText(value) {
   }
 
   return rendered + escapeHtml(text.slice(lastIndex));
+}
+
+export function tokenizeLinks(value) {
+  const text = String(value ?? '');
+  const tokens = [];
+  let lastIndex = 0;
+
+  for (const match of text.matchAll(RICH_LINK_PATTERN)) {
+    const index = match.index ?? 0;
+    const isMarkdownLink = Boolean(match[2]);
+    const matchedUrl = match[2] ?? match[3];
+    const punctuation = isMarkdownLink ? '' : matchedUrl.match(/[.,!?;:]+$/)?.[0] ?? '';
+    const href = matchedUrl.slice(0, matchedUrl.length - punctuation.length);
+    const label = isMarkdownLink ? match[1] : href;
+
+    if (index > lastIndex) {
+      tokens.push({ type: 'text', value: text.slice(lastIndex, index) });
+    }
+    tokens.push({ type: 'link', href, label });
+    lastIndex = index + match[0].length - punctuation.length;
+  }
+
+  if (lastIndex < text.length || tokens.length === 0) {
+    tokens.push({ type: 'text', value: text.slice(lastIndex) });
+  }
+
+  return tokens;
 }
 
 export function shortenLinksText(value) {

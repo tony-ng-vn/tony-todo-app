@@ -138,8 +138,23 @@ async function inspectMobileTaskDetail(viewport) {
 
   let noteValue = '';
   let noteFillError = '';
+  let noteLinkPresentation = null;
   try {
+    const noteUrl = 'https://www.youtube.com/watch?v=8wysIxzqgPI&t=6s';
     await page.locator('#detail-note').tap();
+    await page.locator('#detail-note').fill(`- watching: [${noteUrl}](${noteUrl})`);
+    await page.locator('.detail-title-display').tap();
+    const notePreview = page.locator('[data-note-link-preview]');
+    await notePreview.waitFor();
+    noteLinkPresentation = {
+      text: (await notePreview.textContent()).trim(),
+      href: await notePreview.locator('[data-note-link]').getAttribute('href'),
+      raw: await page.locator('#detail-note').inputValue(),
+    };
+    await notePreview.locator('[data-note-link-edit]').press('Enter');
+    noteLinkPresentation.keyboardEdit = await page.evaluate(
+      () => document.activeElement?.id === 'detail-note',
+    );
     await page.locator('#detail-note').fill('iPhone note');
     noteValue = await page.locator('#detail-note').inputValue();
   } catch (error) {
@@ -171,7 +186,7 @@ async function inspectMobileTaskDetail(viewport) {
   });
 
   await page.close();
-  return { layout, noteValue, noteFillError, calendar };
+  return { layout, noteValue, noteFillError, noteLinkPresentation, calendar };
 }
 
 function assertMobileTaskDetail(result) {
@@ -189,6 +204,18 @@ function assertMobileTaskDetail(result) {
       noteValue: result.noteValue,
       noteFillError: result.noteFillError,
     })}`);
+  }
+  const expectedNoteUrl = 'https://www.youtube.com/watch?v=8wysIxzqgPI&t=6s';
+  if (
+    result.noteLinkPresentation?.text !== `- watching: ${expectedNoteUrl}` ||
+    result.noteLinkPresentation?.href !== expectedNoteUrl ||
+    result.noteLinkPresentation?.raw !==
+      `- watching: [${expectedNoteUrl}](${expectedNoteUrl})` ||
+    !result.noteLinkPresentation?.keyboardEdit
+  ) {
+    failures.push(
+      `task note link was not rendered cleanly or could not return to editing: ${JSON.stringify(result.noteLinkPresentation)}`,
+    );
   }
   if (!result.calendar.inViewport) {
     failures.push(`iPhone time picker opened off screen: ${JSON.stringify(result.calendar)}`);

@@ -4,6 +4,7 @@
   import { canShowNativeMenuBar, requestNativeMenuBar } from '../../nativeMenuBar.js';
   import { getTextareaCaretRestore, getTextareaKeyEdit } from '../../textareaEditing.js';
   import { stripNoteStampsForEditor } from '../../todoStore.js';
+  import RichNoteTextarea from './RichNoteTextarea.svelte';
 
   export let todo;
   export let noteSaveStatus = 'saved';
@@ -139,15 +140,15 @@
     </div>
   </header>
 
-  <textarea
+  <RichNoteTextarea
     bind:this={noteInput}
-    class="floating-note-input"
-    aria-label={`Note for ${todo.title}`}
+    variant="floating"
+    ariaLabel={`Note for ${todo.title}`}
     placeholder="Add context, links, or reminders for this task."
     value={noteDraft}
-    on:input={handleInput}
-    on:keydown={handleKeydown}
-  ></textarea>
+    onInput={handleInput}
+    onKeydown={handleKeydown}
+  />
 
   {#if noteTodos.length}
     <div class="floating-note-todos" aria-label="Note todos">
@@ -268,22 +269,6 @@
     font-weight: 600;
   }
 
-  .floating-note-input {
-    width: 100%;
-    height: 100%;
-    min-height: 180px;
-    resize: none;
-    border: 1px solid var(--border);
-    border-radius: 14px;
-    padding: 13px;
-    background: var(--field-surface);
-    color: var(--strong);
-    font: inherit;
-    font-size: 14px;
-    line-height: 1.5;
-  }
-
-  .floating-note-input:focus-visible,
   .floating-note-header button:focus-visible,
   .floating-note-todos button:focus-visible {
     outline: 2px solid var(--focus-ring);

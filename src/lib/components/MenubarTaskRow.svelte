@@ -14,6 +14,7 @@
   import CalendarPicker from './CalendarPicker.svelte';
   import { iconCheck, iconDetails, iconPage, iconPause, iconPlay, iconX } from './icons.js';
   import MenubarLinkTitle from './MenubarLinkTitle.svelte';
+  import RichNoteTextarea from './RichNoteTextarea.svelte';
 
   export let todo;
   export let expanded = false;
@@ -361,16 +362,18 @@
         />
       </label>
 
-      <label>
-        <span>Note</span>
-        <textarea
-          class="menubar-note-input"
+      <div class="menubar-note-field">
+        <label for={`menubar-note-${todo.id}`}>Note</label>
+        <RichNoteTextarea
+          id={`menubar-note-${todo.id}`}
+          variant="menubar"
+          ariaLabel={`Note for ${todo.title}`}
           value={noteDraft}
           rows="3"
-          on:input={handleNoteTextareaInput}
-          on:keydown={(event) => handleTextareaKeydown(event, updateNoteDraft)}
-        ></textarea>
-      </label>
+          onInput={handleNoteTextareaInput}
+          onKeydown={(event) => handleTextareaKeydown(event, updateNoteDraft)}
+        />
+      </div>
       {#if noteTodos.length}
         <div class="note-todo-list" aria-label="Note todos">
           {#each noteTodos as item (item.lineIndex)}
@@ -679,7 +682,8 @@
     animation: panel-enter var(--motion-reveal) var(--ease-out);
   }
 
-  .menubar-task-details label {
+  .menubar-task-details label,
+  .menubar-note-field {
     display: grid;
     gap: 5px;
     color: var(--subtle);
