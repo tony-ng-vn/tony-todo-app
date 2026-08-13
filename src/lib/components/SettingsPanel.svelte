@@ -125,7 +125,7 @@
   }
 
   async function copyAgentKey() {
-    const token = revealedToken ?? agentRecord?.token;
+    const token = revealedToken;
     if (!token) return;
     try {
       await navigator.clipboard.writeText(buildAgentSetupPrompt({ token }));
@@ -135,9 +135,7 @@
         copiedKey = false;
       }, 2000);
     } catch {
-      agentTokenError = revealedToken
-        ? 'Could not copy. Select the key and copy it manually.'
-        : 'Could not copy the key.';
+      agentTokenError = 'Could not copy. Select the key and copy it manually.';
     }
   }
 
@@ -224,9 +222,6 @@
         <div class="source-row">
           <span class="source-name">{agentRecord.name}</span>
           <div class="agent-actions">
-            <button type="button" class="sign-out-button" disabled={agentBusy} on:click={copyAgentKey}>
-              {copiedKey ? 'Copied' : 'Copy key'}
-            </button>
             <button type="button" class="sign-out-button" disabled={agentBusy} on:click={startReplaceAgentKey}>
               Replace
             </button>

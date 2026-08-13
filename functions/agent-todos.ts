@@ -819,7 +819,7 @@ export default async function (req: Request): Promise<Response> {
     const { data } = await lookupClient.database
       .from('agent_tokens')
       .select('user_id')
-      .eq('token', providedToken)
+      .eq('token_hash', await sha256Hex(providedToken))
       .limit(1);
     agentTokenUserId = data?.[0]?.user_id ?? null;
   } else if (!isTrustedInternalCaller && providedToken) {
@@ -949,4 +949,11 @@ function json(body, status) {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
+}
+
+// Keys are stored hashed (migrations/20260813160200_hash-agent-tokens.sql),
+// so the incoming plaintext dlg_ key is hashed before lookup.
+async function sha256Hex(value) {
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(String(value)));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
