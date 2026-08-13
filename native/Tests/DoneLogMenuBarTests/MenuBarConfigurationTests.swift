@@ -64,33 +64,18 @@ struct MenuBarConfigurationTests {
     )
   }
 
-  @Test("Turns the Control Center extra on before creating it")
-  func revealsStatusItemInControlCenter() {
-    let defaults = UserDefaults(suiteName: "done-log.status-item.visible-test")!
+  @Test("Keeps the status item outside Control Center placement")
+  @MainActor
+  func keepsStatusItemOutsideControlCenterPlacement() {
+    let statusItem = NSStatusBar.system.statusItem(
+      withLength: NSStatusItem.variableLength
+    )
+    defer { NSStatusBar.system.removeStatusItem(statusItem) }
 
-    MenuBarConfiguration.revealStatusItemInControlCenter(defaults: defaults)
+    statusItem.autosaveName = "HiddenManagedItem"
+    MenuBarConfiguration.configureAlwaysVisiblePlacement(for: statusItem)
 
-    #expect(
-      defaults.bool(
-        forKey: MenuBarConfiguration.statusItemVisibleDefaultsKey(
-          prefix: "NSStatusItem Visible"
-        )
-      )
-    )
-    #expect(
-      defaults.bool(
-        forKey: MenuBarConfiguration.statusItemVisibleDefaultsKey(
-          prefix: "NSStatusItem VisibleCC"
-        )
-      )
-    )
-    #expect(
-      defaults.integer(
-        forKey: MenuBarConfiguration.statusItemVisibleDefaultsKey(
-          prefix: "NSStatusItem Preferred Position"
-        )
-      ) == 450
-    )
+    #expect(statusItem.autosaveName == nil)
   }
 
   @Test("Builds a visible native template icon")
