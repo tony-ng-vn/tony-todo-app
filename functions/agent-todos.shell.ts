@@ -71,7 +71,21 @@ export default async function (req: Request): Promise<Response> {
 
   const parsed = parseTodoCommand(body);
   if (!parsed.ok) {
-    return json({ error: parsed.error }, 400);
+    return json(
+      parsed.catalog ? { error: parsed.error, ...parsed.catalog } : { error: parsed.error },
+      statusFor(parsed.error.code),
+    );
+  }
+
+  if (!commandNeedsTodos(parsed.command)) {
+    const result = runTodoCommand(createInitialState(), parsed.command, new Date());
+    if (!result.ok) {
+      return json(
+        result.catalog ? { error: result.error, ...result.catalog } : { error: result.error },
+        statusFor(result.error.code),
+      );
+    }
+    return json(result.view, 200);
   }
 
   const client =
@@ -151,6 +165,7 @@ function statusFor(code) {
   switch (code) {
     case 'empty_title':
     case 'invalid':
+    case 'unknown_command':
       return 400;
     case 'not_found':
       return 404;
@@ -163,7 +178,11 @@ function statusFor(code) {
 }
 
 function json(body, status) {
-  return new Response(JSON.stringify(body), {
+  const payload =
+    body && typeof body === 'object' && !Array.isArray(body) && body.apiVersion === undefined
+      ? { ...body, apiVersion: AGENT_API_VERSION }
+      : body;
+  return new Response(JSON.stringify(payload), {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });

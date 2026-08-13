@@ -474,12 +474,72 @@ function applyTodoNote(previousNote, nextNote, now = new Date()) {
   return serializeNoteEntries(stamped);
 }
 
+// Bump this when AGENT_COMMANDS changes so callers can refresh with describe.
+const AGENT_API_VERSION = 1;
+
+const AGENT_COMMANDS = [
+  {
+    command: 'describe',
+    summary: 'Current command list and apiVersion.',
+    bodies: [{ command: 'describe' }],
+  },
+  {
+    command: 'list',
+    summary: 'Open tasks with now, nowLocal, and notes[] (at, atLocal, text).',
+    bodies: [{ command: 'list' }],
+  },
+  {
+    command: 'create',
+    summary: 'Create a task. A duplicate open title returns the existing task.',
+    bodies: [{ command: 'create', title: '...' }],
+  },
+  {
+    command: 'complete',
+    summary: 'Complete by id or title, not both.',
+    bodies: [
+      { command: 'complete', id: '...' },
+      { command: 'complete', title: '...' },
+    ],
+  },
+  {
+    command: 'appendNote',
+    summary: 'Append a dated note. Blank lines start a new note.',
+    bodies: [
+      { command: 'appendNote', id: '...', text: '...' },
+      { command: 'appendNote', title: '...', text: '...' },
+    ],
+  },
+  {
+    command: 'daySummary',
+    summary: 'Completed work for a day (default today).',
+    bodies: [
+      { command: 'daySummary' },
+      { command: 'daySummary', day: 'YYYY-MM-DD' },
+    ],
+  },
+];
+
+function describeCatalog() {
+  return {
+    kind: 'describe',
+    apiVersion: AGENT_API_VERSION,
+    timeZone: SAN_FRANCISCO_TIME_ZONE,
+    commands: AGENT_COMMANDS,
+  };
+}
+
+function commandNeedsTodos(command) {
+  return command?.kind !== 'describe';
+}
+
 function parseTodoCommand(body) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     return invalidCommand('Expected a JSON object');
   }
 
   switch (body.command) {
+    case 'describe':
+      return { ok: true, command: { kind: 'describe' } };
     case 'list':
       return { ok: true, command: { kind: 'list' } };
     case 'create':
@@ -494,12 +554,18 @@ function parseTodoCommand(body) {
     case 'daySummary':
       return parseDaySummaryCommand(body);
     default:
-      return invalidCommand('Unknown command');
+      return unknownCommandResult();
   }
 }
 
 function runTodoCommand(state, command, now) {
+  return withApiVersion(runTodoCommandBody(state, command, now));
+}
+
+function runTodoCommandBody(state, command, now) {
   switch (command.kind) {
+    case 'describe':
+      return runDescribeCommand();
     case 'list':
       return runListCommand(state, now);
     case 'create':
@@ -511,7 +577,7 @@ function runTodoCommand(state, command, now) {
     case 'daySummary':
       return runDaySummaryCommand(state, command.day, now);
     default:
-      return { ok: false, error: { code: 'invalid', message: 'Unknown command' } };
+      return unknownCommandResult();
   }
 }
 
@@ -564,6 +630,14 @@ function parseDaySummaryCommand(body) {
   }
 
   return { ok: true, command: { kind: 'daySummary', day: body.day } };
+}
+
+function runDescribeCommand() {
+  return {
+    ok: true,
+    view: describeCatalog(),
+    persist: { kind: 'none' },
+  };
 }
 
 function runListCommand(state, now) {
@@ -746,6 +820,28 @@ function agentDueDateFromCreatedAt(createdAt) {
 
 function invalidCommand(message) {
   return { ok: false, error: { code: 'invalid', message } };
+}
+
+function unknownCommandResult() {
+  return {
+    ok: false,
+    error: {
+      code: 'unknown_command',
+      message: 'Unknown command. Call describe for the current list.',
+    },
+    catalog: describeCatalog(),
+  };
+}
+
+function withApiVersion(result) {
+  if (!result.ok) {
+    return result;
+  }
+
+  return {
+    ...result,
+    view: { ...result.view, apiVersion: AGENT_API_VERSION },
+  };
 }
 
 function normalizeTaskTitle(title) {
@@ -1014,7 +1110,21 @@ export default async function (req: Request): Promise<Response> {
 
   const parsed = parseTodoCommand(body);
   if (!parsed.ok) {
-    return json({ error: parsed.error }, 400);
+    return json(
+      parsed.catalog ? { error: parsed.error, ...parsed.catalog } : { error: parsed.error },
+      statusFor(parsed.error.code),
+    );
+  }
+
+  if (!commandNeedsTodos(parsed.command)) {
+    const result = runTodoCommand(createInitialState(), parsed.command, new Date());
+    if (!result.ok) {
+      return json(
+        result.catalog ? { error: result.error, ...result.catalog } : { error: result.error },
+        statusFor(result.error.code),
+      );
+    }
+    return json(result.view, 200);
   }
 
   const client =
@@ -1094,6 +1204,7 @@ function statusFor(code) {
   switch (code) {
     case 'empty_title':
     case 'invalid':
+    case 'unknown_command':
       return 400;
     case 'not_found':
       return 404;
@@ -1106,7 +1217,11 @@ function statusFor(code) {
 }
 
 function json(body, status) {
-  return new Response(JSON.stringify(body), {
+  const payload =
+    body && typeof body === 'object' && !Array.isArray(body) && body.apiVersion === undefined
+      ? { ...body, apiVersion: AGENT_API_VERSION }
+      : body;
+  return new Response(JSON.stringify(payload), {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
