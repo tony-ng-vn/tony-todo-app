@@ -107,6 +107,23 @@ describe('syncInsforgeFunctions', () => {
     });
   });
 
+  it('rejects deleted function files before making any deployment writes', () => {
+    const calls = [];
+
+    expect(() =>
+      syncInsforgeFunctions({
+        root: '/repo',
+        argv: ['--deploy-changed', '--base', 'abc', '--head', 'def'],
+        listFiles: () => ['agent-todos.ts'],
+        gitDiff: () => ['functions/agent-todos.ts', 'functions/removed-function.ts'],
+        runInsforge: (args) => calls.push(args),
+        log: { error() {} },
+      }),
+    ).toThrow(/deleted function source files.*removed-function/);
+
+    expect(calls).toEqual([]);
+  });
+
   it('fails when live source does not match the repo', () => {
     expect(() =>
       syncInsforgeFunctions({
