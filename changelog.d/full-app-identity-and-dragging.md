@@ -8,3 +8,4 @@
 - Opening Done Log now activates its full window once, so menu-bar recovery no longer steals focus back from the next app you click.
 - The full window now stays visible behind other apps instead of disappearing when Done Log loses focus.
 - Empty header space now moves the window with a normal macOS drag instead of leaving the window stuck in place.
+- Resizing the full window down to its minimum size now keeps a compact desktop layout across tasks, details, board, and calendar instead of collapsing into the phone layout.
