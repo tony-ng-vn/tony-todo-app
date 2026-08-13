@@ -154,6 +154,7 @@
 .section-heading {
   justify-content: space-between;
   gap: 18px;
+  flex-shrink: 0;
 }
 
 .brand-row,
@@ -506,11 +507,21 @@ h2 {
 }
 
 .panel-note {
-  max-width: 420px;
-  margin-bottom: 0;
+  max-width: 42rem;
+  margin: 0;
   color: var(--default);
   font-size: 14px;
   font-weight: 400;
+}
+
+.task-panel > .panel-note,
+.board-panel > .panel-note {
+  margin-top: 4px;
+}
+
+.panel-heading {
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .sync-status {
@@ -575,18 +586,16 @@ h2 {
   display: flex;
   align-items: center;
   flex: 0 0 auto;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   gap: 2px;
   max-width: 100%;
   min-height: 34px;
+  height: auto;
   padding: 2px;
   border: 1px solid var(--border);
   border-radius: 16px;
   background: var(--surface-strong);
-  overflow-x: auto;
-  overflow-y: hidden;
-  overscroll-behavior-x: contain;
-  -webkit-overflow-scrolling: touch;
+  overflow: visible;
 }
 
 /* In the Flow and Board headers the toggle sits on its own row under the
@@ -625,7 +634,6 @@ h2 {
   display: flex;
   align-items: center;
   flex-shrink: 0;
-  margin-left: auto;
   padding-left: 10px;
 }
 
@@ -651,6 +659,28 @@ h2 {
   background: var(--surface);
   backdrop-filter: blur(24px) saturate(1.12);
   -webkit-backdrop-filter: blur(24px) saturate(1.12);
+}
+
+.inbox-panel,
+.waiting-panel,
+.history-panel,
+.meetings-panel,
+.settings-panel {
+  min-width: 0;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.inbox-panel .loop-list,
+.waiting-panel .loop-list,
+.history-panel .loop-list,
+.meetings-panel .meeting-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 
 .board-header {
@@ -1116,6 +1146,7 @@ h2 {
 }
 
 .new-task-form {
+  flex-shrink: 0;
   margin: clamp(28px, 5vw, 52px) 0 26px;
 }
 
@@ -1256,11 +1287,12 @@ h2 {
 .todo-item {
   display: grid;
   grid-template-columns: 10px minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: start;
   align-self: start;
   gap: 12px;
-  min-height: 88px;
-  height: fit-content;
+  min-height: min-content;
+  height: auto;
+  overflow: visible;
   padding: 16px 12px;
   border: 1px solid var(--block-border);
   border-radius: 8px;
@@ -1756,9 +1788,11 @@ h2 {
   position: relative;
   display: grid;
   grid-template-columns: 72px minmax(0, 1fr) auto;
-  align-items: center;
+  align-items: start;
   gap: 10px;
-  min-height: 54px;
+  min-height: min-content;
+  height: auto;
+  overflow: visible;
   padding: 10px 10px 10px 11px;
   border: 1px solid var(--block-border);
   border-radius: 8px;
@@ -2574,8 +2608,22 @@ h2 {
 
   .todo-list,
   .summary-list,
-  .board-columns {
+  .board-columns,
+  .inbox-panel .loop-list,
+  .waiting-panel .loop-list,
+  .history-panel .loop-list,
+  .meetings-panel .meeting-list {
     flex: 0 0 auto;
+    overflow: visible;
+  }
+
+  .inbox-panel,
+  .waiting-panel,
+  .history-panel,
+  .meetings-panel,
+  .settings-panel {
+    height: auto;
+    min-height: auto;
     overflow: visible;
   }
 
@@ -2693,7 +2741,7 @@ h2 {
   .summary-section li {
     grid-template-columns: 56px minmax(0, 1fr) auto;
     gap: 8px;
-    align-items: center;
+    align-items: start;
   }
 
   .summary-section li.summary-empty-bucket {
@@ -2899,7 +2947,23 @@ html.is-native-host .task-panel {
 }
 
 html.is-native-host .brand-row {
-  align-items: flex-start;
+  min-height: 44px;
+  padding-inline-start: 0;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+html.is-native-host .view-toggle {
+  flex-wrap: wrap;
+  overflow: visible;
+  height: auto;
+}
+
+html.is-native-host .summary-section li,
+html.is-native-host .todo-item {
+  align-items: start;
+  overflow: visible;
+  height: auto;
 }
 
 html.is-native-host .flow-rail {
@@ -2914,5 +2978,6 @@ html.is-native-host .workspace.has-detail .task-detail {
 
 html.is-native-host .summary-top,
 html.is-native-host .detail-header {
-  align-items: flex-start;
+  min-height: 44px;
+  align-items: center;
 }

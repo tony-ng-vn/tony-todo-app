@@ -73,6 +73,19 @@ struct MenuBarConfigurationTests {
     #expect(icon.size == NSSize(width: 16, height: 16))
   }
 
+  @Test("Leaves native layout styling in the shared stylesheet")
+  @MainActor
+  func doesNotInjectNativeLayoutCSS() {
+    let source = MenuBarWebViewController.nativeHostScriptSource(
+      usesWindowChrome: true
+    )
+
+    #expect(source.contains("classList.add('is-native-host')"))
+    #expect(source.contains("--native-titlebar-inset"))
+    #expect(!source.contains("createElement('style')"))
+    #expect(!source.contains("padding-top"))
+  }
+
   @Test("Rejects an offscreen status item as ready")
   func rejectsOffscreenStatusItem() {
     #expect(

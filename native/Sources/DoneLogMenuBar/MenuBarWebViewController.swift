@@ -216,7 +216,7 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     }
   }
 
-  private static func nativeHostScriptSource(usesWindowChrome: Bool) -> String {
+  static func nativeHostScriptSource(usesWindowChrome: Bool) -> String {
     let chromeFlag = usesWindowChrome ? "true" : "false"
     return """
     window.__doneLogNativeHost = true;
@@ -224,26 +224,6 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     if (\(chromeFlag)) {
       document.documentElement.classList.add('is-native-host');
       document.documentElement.style.setProperty('--native-titlebar-inset', '28px');
-      const nativeChromeStyle = document.createElement('style');
-      nativeChromeStyle.textContent = `
-        html.is-native-host .workspace,
-        html.is-native-host .workspace.has-detail,
-        html.is-native-host .workspace.is-board-view,
-        html.is-native-host .workspace.is-board-view.has-detail {
-          padding-top: var(--native-titlebar-inset) !important;
-        }
-        html.is-native-host .task-panel,
-        html.is-native-host .summary-panel,
-        html.is-native-host .flow-rail,
-        html.is-native-host .task-detail {
-          padding-top: clamp(24px, 4vw, 42px) !important;
-        }
-        html.is-native-host .brand-row {
-          padding-inline-start: 0 !important;
-          align-items: flex-start !important;
-        }
-      `;
-      document.documentElement.appendChild(nativeChromeStyle);
     }
     """
   }

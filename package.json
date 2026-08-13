@@ -6,6 +6,7 @@
   "scripts": {
     "audit:dependencies": "npm audit --audit-level=high",
     "check:node-toolchain": "node scripts/check-node-toolchain.mjs",
+    "check:contribution-policy": "node scripts/check-contribution-policy.mjs",
     "check:swift-toolchain": "node scripts/check-swift-toolchain.mjs",
     "prepare": "node scripts/install-git-hooks.mjs",
     "setup:hooks": "node scripts/install-git-hooks.mjs",

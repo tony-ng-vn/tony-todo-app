@@ -4,6 +4,10 @@
   "scopes": {
     "web": [
       {
+        "phase": "web.contribution-policy",
+        "command": "npm run check:contribution-policy"
+      },
+      {
         "phase": "web.node-toolchain",
         "command": "node scripts/check-node-toolchain.mjs"
       },
