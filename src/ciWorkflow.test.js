@@ -243,7 +243,9 @@ describe('CI workflow', () => {
     expect(deploy.if).toContain("github.ref == 'refs/heads/main'");
     expect(deploy.if).toContain("github.event.workflow_run.conclusion == 'success'");
     expect(deploy.if).toContain("github.event.workflow_run.head_branch == 'main'");
-    expect(deploy.env.INSFORGE_PROJECT_ID).toBe('7e77e15d-9e4d-4591-9951-8b99289200cd');
+    expect(deploy.env.INSFORGE_API_BASE_URL).toBe(
+      'https://y26ze9je.us-east.insforge.app',
+    );
     expect(packageJson.devDependencies['@insforge/cli']).toBe('0.2.6');
 
     const stepsByName = Object.fromEntries(deploy.steps.map((step) => [step.name, step]));
@@ -256,14 +258,17 @@ describe('CI workflow', () => {
       'git diff --quiet HEAD^ HEAD -- migrations insforge.toml',
     );
     expect(stepsByName['Deploy changed functions and verify live source'].run).toContain(
-      'npx -y --offline @insforge/cli@0.2.6 login --user-api-key',
+      'link --api-base-url "$INSFORGE_API_BASE_URL" --api-key "$INSFORGE_API_KEY"',
+    );
+    expect(stepsByName['Deploy changed functions and verify live source'].run).not.toContain(
+      'login',
     );
     expect(stepsByName['Deploy changed functions and verify live source'].run).toContain(
       'sync:insforge-functions',
     );
     expect(stepsByName['Deploy changed functions and verify live source'].run).toContain('--check');
     expect(stepsByName['Deploy changed functions and verify live source'].env).toEqual({
-      INSFORGE_USER_API_KEY: '${{ secrets.INSFORGE_USER_API_KEY }}',
+      INSFORGE_API_KEY: '${{ secrets.INSFORGE_API_KEY }}',
     });
   });
 });
