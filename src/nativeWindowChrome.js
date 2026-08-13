@@ -40,6 +40,16 @@ export function installNativeWindowChrome(targetWindow = globalThis) {
   }
 
   targetWindow.__doneLogNativeWindowChromeInstalled = true;
+  documentRef.addEventListener('mousedown', (event) => {
+    if (event.button !== 0 || !isNativeWindowDragTarget(event.target)) {
+      return;
+    }
+
+    event.preventDefault?.();
+    targetWindow.webkit?.messageHandlers?.doneLogWindow?.postMessage({
+      command: 'drag',
+    });
+  });
   documentRef.addEventListener('dblclick', (event) => {
     if (!isNativeWindowDragTarget(event.target)) {
       return;
