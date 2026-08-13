@@ -59,7 +59,6 @@
     <div>
       <p class="eyebrow">Done Log</p>
       <h1 id="task-heading">Today</h1>
-      <p class="panel-note">A quiet workspace for the next thing, and proof of what already moved.</p>
     </div>
     <div class="header-actions">
       <output class="sync-status" id="sync-status" aria-live="polite">{syncMessage}</output>
@@ -69,6 +68,7 @@
       {/if}
     </div>
   </div>
+  <p class="panel-note">A quiet workspace for the next thing, and proof of what already moved.</p>
 
   <WorkspaceTabs currentView={viewMode} {inboxCount} {waitingCount} {onViewChange} />
 

@@ -140,5 +140,6 @@ describe('menu bar app bundle', () => {
 
     expect(controller).toContain('window.__doneLogNativeHost = true');
     expect(controller).toContain('injectionTime: .atDocumentStart');
+    expect(controller).toContain('flex-wrap: wrap !important');
   });
 });

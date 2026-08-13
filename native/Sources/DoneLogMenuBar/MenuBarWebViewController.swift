@@ -241,6 +241,21 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
         html.is-native-host .brand-row {
           padding-inline-start: 0 !important;
           align-items: flex-start !important;
+          flex-shrink: 0 !important;
+        }
+        html.is-native-host .view-toggle {
+          flex-wrap: wrap !important;
+          overflow: visible !important;
+          height: auto !important;
+        }
+        html.is-native-host .settings-tab-group {
+          margin-left: 0 !important;
+        }
+        html.is-native-host .summary-section li,
+        html.is-native-host .todo-item {
+          align-items: start !important;
+          overflow: visible !important;
+          height: auto !important;
         }
       `;
       document.documentElement.appendChild(nativeChromeStyle);
