@@ -625,7 +625,7 @@ export function getCalendarMonth(state, { year, month, now = new Date() } = {}) 
 // through many similar intermediate pairs and never mints a new time even
 // though the final wording is unrecognizable from where it started. Module
 // state, not part of `state`, so it never gets persisted; resetNoteBurstBaselines
-// exists so tests can isolate bursts from each other.
+// and hasNoteBurstBaseline exist so tests can isolate and inspect bursts.
 const NOTE_BURST_GAP_MS = 5000;
 const noteBurstBaselines = new Map();
 
@@ -633,12 +633,29 @@ export function resetNoteBurstBaselines() {
   noteBurstBaselines.clear();
 }
 
+export function hasNoteBurstBaseline(todoId) {
+  return noteBurstBaselines.has(todoId);
+}
+
 export function updateTodoNote(state, todoId, note, now = new Date()) {
   const todo = state.todos.find((item) => item.id === todoId);
+  if (!todo) {
+    return state;
+  }
+
   const nowMs = now.getTime();
+  // A todo can be deleted (or a burst can simply go stale) without this
+  // function ever being called for that id again, so sweep on every call
+  // instead of only cleaning up the current todo's own entry.
+  for (const [id, entry] of noteBurstBaselines) {
+    if (nowMs - entry.updatedAt >= NOTE_BURST_GAP_MS) {
+      noteBurstBaselines.delete(id);
+    }
+  }
+
   const tracked = noteBurstBaselines.get(todoId);
   const withinBurst = Boolean(tracked) && nowMs - tracked.updatedAt < NOTE_BURST_GAP_MS;
-  const baseline = withinBurst ? tracked.note : (todo?.note ?? '');
+  const baseline = withinBurst ? tracked.note : (todo.note ?? '');
   noteBurstBaselines.set(todoId, { note: baseline, updatedAt: nowMs });
 
   return {
