@@ -13,6 +13,13 @@ describe('agent-todos bundle', () => {
     expect(shell).not.toContain('INLINE:');
   });
 
+  it('looks up per-user dlg_ keys and ignores body ownerUserId on that path', () => {
+    const shell = readFileSync(join(ROOT, 'functions/agent-todos.shell.ts'), 'utf8');
+    expect(shell).toContain("from('agent_tokens')");
+    expect(shell).toContain('agentTokenUserId');
+    expect(shell).toContain('agentTokenUserId ?? verifiedUserId');
+  });
+
   it('keeps functions/agent-todos.ts generated from the domain module', () => {
     expect(() => inlineAgentTodos({ check: true })).not.toThrow();
   });

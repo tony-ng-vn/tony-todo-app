@@ -1405,6 +1405,8 @@
       showSignOut={useRemote && Boolean(authUser)}
       onSignOut={handleSignOut}
       onViewChange={setViewMode}
+      insforge={useRemote ? insforge : null}
+      userId={authUser?.id ?? null}
     />
   {:else}
     <TaskPanel

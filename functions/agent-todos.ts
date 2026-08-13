@@ -779,9 +779,23 @@ export default async function (req: Request): Promise<Response> {
   const providedToken = req.headers.get('Authorization')?.replace(/^Bearer\s+/i, '');
   const expectedToken = Deno.env.get('INGEST_FUNCTION_TOKEN');
   const isTrustedInternalCaller = Boolean(expectedToken) && providedToken === expectedToken;
+  const isAgentAccessToken =
+    typeof providedToken === 'string' && /^dlg_[0-9a-f]{64}$/.test(providedToken);
 
+  let agentTokenUserId = null;
   let verifiedUserId = null;
-  if (!isTrustedInternalCaller && providedToken) {
+  if (!isTrustedInternalCaller && isAgentAccessToken) {
+    const lookupClient = createAdminClient({
+      baseUrl: Deno.env.get('INSFORGE_BASE_URL'),
+      apiKey: Deno.env.get('API_KEY'),
+    });
+    const { data } = await lookupClient.database
+      .from('agent_tokens')
+      .select('user_id')
+      .eq('token', providedToken)
+      .limit(1);
+    agentTokenUserId = data?.[0]?.user_id ?? null;
+  } else if (!isTrustedInternalCaller && providedToken) {
     const userClient = createClient({
       baseUrl: Deno.env.get('INSFORGE_BASE_URL'),
       accessToken: providedToken,
@@ -790,7 +804,7 @@ export default async function (req: Request): Promise<Response> {
     verifiedUserId = data?.user?.id ?? null;
   }
 
-  if (!isTrustedInternalCaller && !verifiedUserId) {
+  if (!isTrustedInternalCaller && !agentTokenUserId && !verifiedUserId) {
     return json({ error: { code: 'unauthorized', message: 'Unauthorized' } }, 401);
   }
 
@@ -801,7 +815,9 @@ export default async function (req: Request): Promise<Response> {
     body = {};
   }
 
-  const ownerUserId = isTrustedInternalCaller ? (body.ownerUserId ?? null) : verifiedUserId;
+  const ownerUserId = isTrustedInternalCaller
+    ? (body.ownerUserId ?? null)
+    : (agentTokenUserId ?? verifiedUserId);
   if (!ownerUserId || typeof ownerUserId !== 'string') {
     return json(
       { error: { code: 'invalid', message: 'ownerUserId is required for the shared-secret path' } },
@@ -814,15 +830,16 @@ export default async function (req: Request): Promise<Response> {
     return json({ error: parsed.error }, 400);
   }
 
-  const client = isTrustedInternalCaller
-    ? createAdminClient({
-        baseUrl: Deno.env.get('INSFORGE_BASE_URL'),
-        apiKey: Deno.env.get('API_KEY'),
-      })
-    : createClient({
-        baseUrl: Deno.env.get('INSFORGE_BASE_URL'),
-        accessToken: providedToken,
-      });
+  const client =
+    isTrustedInternalCaller || agentTokenUserId
+      ? createAdminClient({
+          baseUrl: Deno.env.get('INSFORGE_BASE_URL'),
+          apiKey: Deno.env.get('API_KEY'),
+        })
+      : createClient({
+          baseUrl: Deno.env.get('INSFORGE_BASE_URL'),
+          accessToken: providedToken,
+        });
 
   const { data, error } = await client.database
     .from('todos')
