@@ -85,6 +85,7 @@ describe('todo remote mapping', () => {
       title: 'Send invoice',
       created_at: '2026-06-08T08:00:00.000Z',
       completed_at: null,
+      kind: 'task',
       someday_at: '2026-06-08T09:30:00.000Z',
       due_date: '2026-06-12T00:00:00.000Z',
       note: 'Bring account number',
@@ -141,6 +142,7 @@ describe('todo remote mapping', () => {
       title: 'Send invoice',
       createdAt: '2026-06-08T08:00:00.000Z',
       completedAt: '2026-06-08T09:00:00.000Z',
+      kind: 'task',
       somedayAt: null,
       dueDate: '2026-06-12T00:00:00.000Z',
       note: 'Bring account number',
@@ -215,6 +217,21 @@ describe('todo remote mapping', () => {
       ).someday_at,
     ).toBeNull();
     expect(fromRemoteRecord({ id: 'todo-1', title: 'Active task' }).somedayAt).toBeNull();
+  });
+
+  it('maps a missing kind to task and round-trips project', () => {
+    expect(fromRemoteRecord({ id: 'todo-1', title: 'Legacy row' }).kind).toBe('task');
+    expect(
+      toRemoteRecord(
+        {
+          id: 'todo-2',
+          title: 'Garden studio',
+          createdAt: '2026-06-08T08:00:00.000Z',
+          kind: 'project',
+        },
+        'user-123',
+      ).kind,
+    ).toBe('project');
   });
 
   it('updates the complete workflow state when a task moves to someday', async () => {

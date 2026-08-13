@@ -373,6 +373,7 @@ function toRemoteRecord(todo, userId) {
     title: todo.title,
     created_at: todo.createdAt,
     completed_at: todo.completedAt,
+    kind: parseTodoKind(todo.kind),
     someday_at: todo.somedayAt ?? null,
     due_date: todo.dueDate ?? null,
     note: todo.note ?? '',
@@ -397,6 +398,7 @@ function fromRemoteRecord(record) {
     title: record.title,
     createdAt: record.created_at,
     completedAt: record.completed_at,
+    kind: parseTodoKind(record.kind),
     somedayAt: record.someday_at ?? null,
     dueDate: record.due_date ?? null,
     note: record.note ?? '',
@@ -789,7 +791,7 @@ const corsHeaders = {
 };
 
 const AGENT_TODO_COLUMNS =
-  'id,title,created_at,completed_at,someday_at,due_date,note,source,notion_page_id,notion_database_id,notion_status,first_started_at,active_started_at,tracked_seconds,time_segments,is_progressive,parent_task_id,is_progress_session,progress_label';
+  'id,title,created_at,completed_at,kind,someday_at,due_date,note,source,notion_page_id,notion_database_id,notion_status,first_started_at,active_started_at,tracked_seconds,time_segments,is_progressive,parent_task_id,is_progress_session,progress_label';
 
 export default async function (req: Request): Promise<Response> {
   if (req.method === 'OPTIONS') {
