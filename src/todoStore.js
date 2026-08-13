@@ -23,6 +23,7 @@ import {
   normalizeTodo,
   normalizedTrackedSeconds,
 } from './todoCommands.js';
+import { stripNoteStampsForEditor } from './noteEntries.js';
 
 export {
   addTodo,
@@ -40,6 +41,7 @@ export {
   getPendingTodos,
   getProjectTodos,
   parseTodoKind,
+  stripNoteStampsForEditor,
 };
 
 export const BOARD_COLUMNS = [
@@ -618,11 +620,31 @@ export function getCalendarMonth(state, { year, month, now = new Date() } = {}) 
   };
 }
 
+// Matching runs against a baseline captured before the current typing burst,
+// not the per-keystroke previous state - otherwise a gradual rewrite chains
+// through many similar intermediate pairs and never mints a new time even
+// though the final wording is unrecognizable from where it started. Module
+// state, not part of `state`, so it never gets persisted; resetNoteBurstBaselines
+// exists so tests can isolate bursts from each other.
+const NOTE_BURST_GAP_MS = 5000;
+const noteBurstBaselines = new Map();
+
+export function resetNoteBurstBaselines() {
+  noteBurstBaselines.clear();
+}
+
 export function updateTodoNote(state, todoId, note, now = new Date()) {
+  const todo = state.todos.find((item) => item.id === todoId);
+  const nowMs = now.getTime();
+  const tracked = noteBurstBaselines.get(todoId);
+  const withinBurst = Boolean(tracked) && nowMs - tracked.updatedAt < NOTE_BURST_GAP_MS;
+  const baseline = withinBurst ? tracked.note : (todo?.note ?? '');
+  noteBurstBaselines.set(todoId, { note: baseline, updatedAt: nowMs });
+
   return {
     ...state,
-    todos: state.todos.map((todo) =>
-      todo.id === todoId ? { ...todo, note: applyTodoNote(todo.note ?? '', note, now) } : todo,
+    todos: state.todos.map((item) =>
+      item.id === todoId ? { ...item, note: applyTodoNote(baseline, note, now) } : item,
     ),
   };
 }

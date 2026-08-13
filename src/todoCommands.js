@@ -1,17 +1,11 @@
 import { getTimes } from 'suncalc';
+import { applyTodoNote, formatNoteAtLocal, isEmptyNoteUnitText, parseNoteEntries } from './noteEntries.js';
+import { SAN_FRANCISCO_TIME_ZONE, dateAtSanFranciscoTime, getSanFranciscoDateTimeParts } from './sanFranciscoTime.js';
+
+export { applyTodoNote, dateAtSanFranciscoTime, formatNoteAtLocal, parseNoteEntries };
 
 const SAN_FRANCISCO = { latitude: 37.774929, longitude: -122.419418 };
-const SAN_FRANCISCO_TIME_ZONE = 'America/Los_Angeles';
 const DEFAULT_SUNRISE_HOUR = 6;
-const SAN_FRANCISCO_DATE_TIME_FORMATTER = new Intl.DateTimeFormat('en-US-u-nu-latn', {
-  timeZone: SAN_FRANCISCO_TIME_ZONE,
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  hourCycle: 'h23',
-});
 const DAY_KEY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 export const SUMMARY_BUCKETS = [
@@ -343,28 +337,6 @@ export function formatSummaryDayKey(date) {
   return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
-export function dateAtSanFranciscoTime(dayKey, minutesAfterMidnight) {
-  const [year, month, day] = dayKey.split('-').map(Number);
-  const hour = Math.floor(minutesAfterMidnight / 60);
-  const minute = minutesAfterMidnight % 60;
-  const desiredWallTime = Date.UTC(year, month - 1, day, hour, minute);
-  let result = new Date(desiredWallTime);
-
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const parts = getSanFranciscoDateTimeParts(result);
-    const renderedWallTime = Date.UTC(
-      Number(parts.year),
-      Number(parts.month) - 1,
-      Number(parts.day),
-      Number(parts.hour),
-      Number(parts.minute),
-    );
-    result = new Date(result.getTime() + desiredWallTime - renderedWallTime);
-  }
-
-  return result;
-}
-
 export function toRemoteRecord(todo, userId) {
   return {
     id: todo.id,
@@ -429,51 +401,8 @@ export function toRemoteCompletionFields(todo) {
   };
 }
 
-const NOTE_STAMP_PATTERN = /^@ (\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2})\s*$/;
-
-export function formatNoteAtLocal(date) {
-  const parts = getSanFranciscoDateTimeParts(new Date(date));
-  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
-}
-
-export function parseNoteEntries(note) {
-  const raw = String(note ?? '').replace(/\s+$/, '');
-  if (!raw) {
-    return [];
-  }
-
-  const lines = raw.split('\n');
-  const hasStamp = lines.some((line) => NOTE_STAMP_PATTERN.test(line));
-  const entries = hasStamp ? parseStampedNoteEntries(lines) : splitNoteParagraphs(raw, null);
-
-  return entries.flatMap((entry) => splitNoteParagraphs(entry.text, entry.at));
-}
-
-export function applyTodoNote(previousNote, nextNote, now = new Date()) {
-  const nextEntries = parseNoteEntries(nextNote);
-  if (nextEntries.length === 0) {
-    return '';
-  }
-
-  const previousEntries = parseNoteEntries(previousNote);
-  const stamped = nextEntries.map((entry, index) => {
-    if (entry.at) {
-      return entry;
-    }
-
-    const previous = previousEntries[index];
-    if (previous?.at) {
-      return { ...entry, at: previous.at };
-    }
-
-    return { ...entry, at: now.toISOString() };
-  });
-
-  return serializeNoteEntries(stamped);
-}
-
 // Bump this when AGENT_COMMANDS changes so callers can refresh with describe.
-export const AGENT_API_VERSION = 1;
+export const AGENT_API_VERSION = 2;
 
 export const AGENT_COMMANDS = [
   {
@@ -501,7 +430,7 @@ export const AGENT_COMMANDS = [
   },
   {
     command: 'appendNote',
-    summary: 'Append a dated note. Blank lines start a new note.',
+    summary: 'Append a note. Each list item is its own dated note.',
     bodies: [
       { command: 'appendNote', id: '...', text: '...' },
       { command: 'appendNote', title: '...', text: '...' },
@@ -969,72 +898,14 @@ function getSanFranciscoSunrise(dayKey) {
 }
 
 function toNoteViews(todo) {
-  return parseNoteEntries(todo.note ?? '').map((entry) => {
-    const at = entry.at ?? todo.updatedAt ?? todo.createdAt ?? null;
-    return {
-      at,
-      atLocal: at ? formatNoteAtLocal(at) : null,
-      text: entry.text,
-    };
-  });
-}
-
-function serializeNoteEntries(entries) {
-  return entries
-    .filter((entry) => entry.text.trim())
+  return parseNoteEntries(todo.note ?? '')
+    .filter((entry) => !isEmptyNoteUnitText(entry.text))
     .map((entry) => {
-      if (!entry.at) {
-        return entry.text;
-      }
-
-      return `@ ${formatNoteAtLocal(entry.at)}\n${entry.text}`;
-    })
-    .join('\n\n');
-}
-
-function parseStampedNoteEntries(lines) {
-  const entries = [];
-  let current = { at: null, lines: [] };
-
-  function flush() {
-    const text = current.lines.join('\n').replace(/^\n+|\n+$/g, '');
-    if (current.at || text.trim()) {
-      entries.push({ at: current.at, text });
-    }
-    current = { at: null, lines: [] };
-  }
-
-  for (const line of lines) {
-    const match = line.match(NOTE_STAMP_PATTERN);
-    if (match) {
-      flush();
-      current.at = dateAtSanFranciscoTime(match[1], Number(match[2]) * 60 + Number(match[3])).toISOString();
-      continue;
-    }
-
-    current.lines.push(line);
-  }
-
-  flush();
-  return entries;
-}
-
-function splitNoteParagraphs(text, at) {
-  const chunks = String(text ?? '')
-    .split(/\n{2,}/)
-    .map((chunk) => chunk.replace(/^\n+|\n+$/g, ''))
-    .filter((chunk) => chunk.trim());
-
-  return chunks.map((chunk, index) => ({
-    at: index === 0 ? at : null,
-    text: chunk,
-  }));
-}
-
-function getSanFranciscoDateTimeParts(date) {
-  return Object.fromEntries(
-    SAN_FRANCISCO_DATE_TIME_FORMATTER.formatToParts(date)
-      .filter((part) => part.type !== 'literal')
-      .map((part) => [part.type, part.value]),
-  );
+      const at = entry.at ?? todo.updatedAt ?? todo.createdAt ?? null;
+      return {
+        at,
+        atLocal: at ? formatNoteAtLocal(at) : null,
+        text: entry.text,
+      };
+    });
 }

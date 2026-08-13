@@ -3,6 +3,7 @@
   import { expandTodoCommand, parseNoteTodos, toggleNoteTodo } from '../../noteTodos.js';
   import { canShowNativeMenuBar, requestNativeMenuBar } from '../../nativeMenuBar.js';
   import { getTextareaCaretRestore, getTextareaKeyEdit } from '../../textareaEditing.js';
+  import { stripNoteStampsForEditor } from '../../todoStore.js';
 
   export let todo;
   export let noteSaveStatus = 'saved';
@@ -21,7 +22,7 @@
     noteInput?.focus();
   });
 
-  $: noteDraft = todo?.note ?? '';
+  $: noteDraft = stripNoteStampsForEditor(todo?.note ?? '');
   $: noteTodos = parseNoteTodos(noteDraft);
 
   function updateNote(nextNote) {

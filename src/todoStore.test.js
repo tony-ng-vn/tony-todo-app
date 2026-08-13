@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
   addTodo,
   completeTodo,
@@ -46,8 +46,14 @@ import {
   updateTodoProgress,
   updateTodoTitle,
   updateTodoNote,
+  resetNoteBurstBaselines,
 } from './todoStore.js';
 import { formatNoteAtLocal } from './todoCommands.js';
+import { parseNoteEntries } from './noteEntries.js';
+
+beforeEach(() => {
+  resetNoteBurstBaselines();
+});
 
 describe('day navigation', () => {
   it('moves one local calendar day in either direction', () => {
@@ -1218,6 +1224,68 @@ describe('todo day summary', () => {
 
     expect(state.todos).toHaveLength(1);
     expect(state.todos[0].completedAt).toBe(doneAt.toISOString());
+  });
+});
+
+describe('note editing bursts', () => {
+  const NOTE_BURST_GAP_MS = 5000;
+
+  it('mints a new time for a gradual rewrite within one typing burst, even though each step looks similar', () => {
+    // The stamp format only has minute precision, so the burst is timed to
+    // straddle a minute boundary: each gap stays under the 5s burst window,
+    // but the final call lands on a whole minute distinct from startedAt's,
+    // making "kept the original stamp" and "minted a fresh one" distinguishable.
+    const startedAt = new Date('2026-07-01T10:00:57.000Z');
+    let state = createInitialState();
+    state = addTodo(state, 'Lunch plan', startedAt);
+    const todoId = state.todos[0].id;
+    state = updateTodoNote(state, todoId, '- Getting lunch now', startedAt);
+
+    const steps = ['- Not getting lunch now', '- Not getting lunch soon', '- Not getting lunch yet'];
+    let now = startedAt;
+    for (const draft of steps) {
+      now = new Date(now.getTime() + 1000);
+      state = updateTodoNote(state, todoId, draft, now);
+    }
+
+    expect(now.toISOString()).not.toBe(startedAt.toISOString());
+    expect(parseNoteEntries(state.todos[0].note)).toEqual([
+      { at: now.toISOString(), text: '- Not getting lunch yet' },
+    ]);
+  });
+
+  it('keeps the original time for a typo fix made in a later burst', () => {
+    const first = new Date('2026-07-01T10:00:00.000Z');
+    let state = createInitialState();
+    state = addTodo(state, 'Call plan', first);
+    const todoId = state.todos[0].id;
+    state = updateTodoNote(state, todoId, '- Cal mom', first);
+
+    // A later burst: the gap since the last tracked update is >= the burst
+    // window, so the baseline refreshes to whatever is currently stored
+    // (not a frozen baseline from before the first bullet even existed).
+    const laterBurstAt = new Date(first.getTime() + NOTE_BURST_GAP_MS);
+    state = updateTodoNote(state, todoId, '- Call mom', laterBurstAt);
+
+    expect(parseNoteEntries(state.todos[0].note)).toEqual([{ at: first.toISOString(), text: '- Call mom' }]);
+  });
+
+  it('keeps both original times when reordering two bullets in a later burst', () => {
+    const first = new Date('2026-07-01T10:00:00.000Z');
+    const laterStamp = new Date('2026-07-01T10:05:00.000Z');
+    let state = createInitialState();
+    state = addTodo(state, 'Errands plan', first);
+    const todoId = state.todos[0].id;
+    state = updateTodoNote(state, todoId, '- Buy milk', first);
+    state = updateTodoNote(state, todoId, '- Buy milk\n- Walk the dog', laterStamp);
+
+    const laterBurstAt = new Date(laterStamp.getTime() + NOTE_BURST_GAP_MS);
+    state = updateTodoNote(state, todoId, '- Walk the dog\n- Buy milk', laterBurstAt);
+
+    expect(parseNoteEntries(state.todos[0].note)).toEqual([
+      { at: laterStamp.toISOString(), text: '- Walk the dog' },
+      { at: first.toISOString(), text: '- Buy milk' },
+    ]);
   });
 });
 
