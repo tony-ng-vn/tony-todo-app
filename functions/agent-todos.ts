@@ -474,6 +474,8 @@ function addTodo(
         parentTaskId: null,
         isProgressSession: false,
         progressLabel: '',
+        photoUrl: null,
+        photoKey: null,
       },
     ],
   };
@@ -733,6 +735,8 @@ function normalizeTodo(todo) {
     parentTaskId: todo.parentTaskId ?? null,
     isProgressSession: Boolean(todo.isProgressSession),
     progressLabel: todo.progressLabel ?? '',
+    photoUrl: todo.photoUrl ?? null,
+    photoKey: todo.photoKey ?? null,
   };
 }
 
@@ -768,6 +772,8 @@ function toRemoteRecord(todo, userId) {
     parent_task_id: todo.parentTaskId ?? null,
     is_progress_session: Boolean(todo.isProgressSession),
     progress_label: todo.progressLabel ?? '',
+    photo_url: todo.photoUrl ?? null,
+    photo_key: todo.photoKey ?? null,
   };
 }
 
@@ -793,6 +799,8 @@ function fromRemoteRecord(record) {
     parentTaskId: record.parent_task_id ?? null,
     isProgressSession: Boolean(record.is_progress_session),
     progressLabel: record.progress_label ?? '',
+    photoUrl: record.photo_url ?? null,
+    photoKey: record.photo_key ?? null,
     updatedAt: record.updated_at ?? null,
   };
 }

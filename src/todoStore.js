@@ -685,6 +685,15 @@ export function setTodoDueDate(state, todoId, dueDate) {
   };
 }
 
+export function setTodoPhoto(state, todoId, { photoUrl = null, photoKey = null } = {}) {
+  return {
+    ...state,
+    todos: state.todos.map((todo) =>
+      todo.id === todoId ? { ...todo, photoUrl: photoUrl ?? null, photoKey: photoKey ?? null } : todo,
+    ),
+  };
+}
+
 export function formatDueDate(dueDate) {
   if (!dueDate) {
     return '';

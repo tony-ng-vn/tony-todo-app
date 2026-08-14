@@ -7,6 +7,7 @@ import {
   logRemoteProgressSession,
   toRemoteRecord,
   updateRemoteTodoDueDate,
+  updateRemoteTodoPhoto,
   updateRemoteTodoProgress,
   updateRemoteTodoTimer,
   updateRemoteTodoTitle,
@@ -107,6 +108,8 @@ describe('todo remote mapping', () => {
       parent_task_id: null,
       is_progress_session: false,
       progress_label: 'pages 41-52',
+      photo_url: null,
+      photo_key: null,
     });
   });
 
@@ -165,6 +168,8 @@ describe('todo remote mapping', () => {
       parentTaskId: null,
       isProgressSession: false,
       progressLabel: 'Chapter 4',
+      photoUrl: null,
+      photoKey: null,
       updatedAt: '2026-08-13T16:44:21.431Z',
     });
   });
@@ -210,6 +215,33 @@ describe('todo remote mapping', () => {
       ).due_date,
     ).toBeNull();
     expect(fromRemoteRecord({ id: 'todo-1', title: 'No due date' }).dueDate).toBeNull();
+  });
+
+  it('maps a missing photo to null in both directions', () => {
+    expect(
+      toRemoteRecord(
+        { id: 'todo-1', title: 'No photo', createdAt: '2026-06-08T08:00:00.000Z', completedAt: null },
+        'user-123',
+      ),
+    ).toMatchObject({ photo_url: null, photo_key: null });
+    expect(fromRemoteRecord({ id: 'todo-1', title: 'No photo' })).toMatchObject({
+      photoUrl: null,
+      photoKey: null,
+    });
+  });
+
+  it('round-trips a task photo url and key', () => {
+    expect(
+      fromRemoteRecord({
+        id: 'todo-1',
+        title: 'Receipt',
+        photo_url: 'https://files.example/photo.jpg',
+        photo_key: 'user-123/todo-1/photo.jpg',
+      }),
+    ).toMatchObject({
+      photoUrl: 'https://files.example/photo.jpg',
+      photoKey: 'user-123/todo-1/photo.jpg',
+    });
   });
 
   it('maps a missing someday timestamp to null in both directions', () => {
@@ -317,6 +349,45 @@ describe('todo remote mapping', () => {
 
     expect(calls[1][0]).toBe('update');
     expect(calls[1][1]).toMatchObject({ due_date: '2026-06-12T00:00:00.000Z' });
+    expect(calls).toContainEqual(['eq', 'id', 'todo-1']);
+    expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
+  });
+
+  it('updates remote photo fields scoped by user id', async () => {
+    const calls = [];
+    const client = {
+      database: {
+        from(table) {
+          calls.push(['from', table]);
+          return {
+            update(values) {
+              calls.push(['update', values]);
+              return {
+                eq(column, value) {
+                  calls.push(['eq', column, value]);
+                  return this;
+                },
+                then(resolve) {
+                  resolve({ error: null });
+                },
+              };
+            },
+          };
+        },
+      },
+    };
+
+    await updateRemoteTodoPhoto(client, 'user-123', {
+      id: 'todo-1',
+      photoUrl: 'https://files.example/photo.jpg',
+      photoKey: 'user-123/todo-1/photo.jpg',
+    });
+
+    expect(calls[1][0]).toBe('update');
+    expect(calls[1][1]).toMatchObject({
+      photo_url: 'https://files.example/photo.jpg',
+      photo_key: 'user-123/todo-1/photo.jpg',
+    });
     expect(calls).toContainEqual(['eq', 'id', 'todo-1']);
     expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
   });
