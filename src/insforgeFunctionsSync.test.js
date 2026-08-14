@@ -206,6 +206,27 @@ describe('syncInsforgeFunctions', () => {
     expect(calls.filter((args) => args[1] === 'deploy')).toEqual([]);
   });
 
+  it('no longer exempts the once-untracked live functions from the guard', () => {
+    // claim-preauth-todos and extract-video-knowledge are tracked in the repo
+    // now; a live copy without a repo file must be flagged like any other.
+    expect(() =>
+      syncInsforgeFunctions({
+        root: '/repo',
+        argv: ['--deploy-all', '--check'],
+        listFiles: () => ['agent-todos.ts'],
+        runInsforge: (args) => {
+          if (args[1] === 'list') {
+            return JSON.stringify({
+              functions: [{ slug: 'agent-todos' }, { slug: 'claim-preauth-todos' }],
+            });
+          }
+          return '';
+        },
+        log: { error() {} },
+      }),
+    ).toThrow(/unexpected live functions.*claim-preauth-todos/);
+  });
+
   it('fails when live source does not match the repo', () => {
     expect(() =>
       syncInsforgeFunctions({
