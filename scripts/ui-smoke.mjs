@@ -334,6 +334,15 @@ async function captureNativeLayout(page) {
 
     return {
       workspace: measure('.workspace'),
+      workspaceInsets: (() => {
+        const style = getComputedStyle(document.querySelector('.workspace'));
+        return {
+          top: Number.parseFloat(style.paddingTop),
+          right: Number.parseFloat(style.paddingRight),
+          bottom: Number.parseFloat(style.paddingBottom),
+          left: Number.parseFloat(style.paddingLeft),
+        };
+      })(),
       taskPanel: measure('.task-panel'),
       quickAddTitle: measure('#todo-title'),
       taskContent: measure('[data-todo-id="ui-smoke-native-paused"] .task-content'),
@@ -348,7 +357,7 @@ async function captureNativeLayout(page) {
         ':scope > button',
       ),
       summaryPanel: measure('.summary-panel'),
-      summaryProgress: measure('.summary-progress'),
+      summaryProgress: measure('.recap-completion-count'),
       taskDetail: measure('.task-detail'),
       taskDetailContent: measure('.task-detail .detail-title-display'),
       flowRailDisplay: getComputedStyle(document.querySelector('.flow-rail')).display,
@@ -378,6 +387,11 @@ function assertNativeWorkspaceLayout(result) {
   }
   if (result.defaultLayout.flowRailDisplay !== 'none') {
     failures.push('native focus rail still consumes a layout column');
+  }
+  for (const [edge, inset] of Object.entries(result.defaultLayout.workspaceInsets)) {
+    if (inset < 10) {
+      failures.push(`native workspace ${edge} inset is only ${inset}px`);
+    }
   }
   if (result.defaultLayout.summaryProgress.width < 44) {
     failures.push('native recap header is missing the completed-today status');
