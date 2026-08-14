@@ -46,7 +46,7 @@ export function tokenizeLinks(value) {
     const index = match.index ?? 0;
     const isMarkdownLink = Boolean(match[2]);
     const matchedUrl = match[2] ?? match[3];
-    const punctuation = isMarkdownLink ? '' : matchedUrl.match(/[.,!?;:]+$/)?.[0] ?? '';
+    const punctuation = isMarkdownLink ? '' : trailingUrlPunctuation(matchedUrl);
     const href = matchedUrl.slice(0, matchedUrl.length - punctuation.length);
     const label = isMarkdownLink ? match[1] : href;
 
@@ -62,6 +62,24 @@ export function tokenizeLinks(value) {
   }
 
   return tokens;
+}
+
+function trailingUrlPunctuation(url) {
+  const sentenceMarks = url.match(/[.,!?;:]+$/)?.[0] ?? '';
+  let href = url.slice(0, url.length - sentenceMarks.length);
+  let wrapping = '';
+
+  while (href.endsWith(')')) {
+    const opens = (href.match(/\(/g) ?? []).length;
+    const closes = (href.match(/\)/g) ?? []).length;
+    if (closes <= opens) {
+      break;
+    }
+    href = href.slice(0, -1);
+    wrapping = `)${wrapping}`;
+  }
+
+  return `${wrapping}${sentenceMarks}`;
 }
 
 export function shortenLinksText(value) {
