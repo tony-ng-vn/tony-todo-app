@@ -332,3 +332,22 @@ describe('CI workflow', () => {
     );
   });
 });
+
+describe('cloud agent bootstrap', () => {
+  const startScript = readFileSync(new URL('../.cursor/start.sh', import.meta.url), 'utf8');
+  const agentsMd = readFileSync(new URL('../AGENTS.md', import.meta.url), 'utf8');
+  const pinnedCli = packageJson.devDependencies['@insforge/cli'];
+
+  it('pins the InsForge CLI to the audited devDependency version', () => {
+    // The boot script runs with the production user API key in scope, so it
+    // must execute the npm-ci-installed copy, never a floating registry build.
+    expect(pinnedCli).toMatch(/^\d+\.\d+\.\d+$/);
+    expect(startScript).not.toContain('@insforge/cli@latest');
+    expect(startScript).toContain(`npx -y --offline @insforge/cli@${pinnedCli} login`);
+    expect(startScript).toContain(`npx -y --offline @insforge/cli@${pinnedCli} link`);
+  });
+
+  it('keeps the agent instructions on the pinned invocation', () => {
+    expect(agentsMd).not.toContain('@insforge/cli@latest');
+  });
+});
