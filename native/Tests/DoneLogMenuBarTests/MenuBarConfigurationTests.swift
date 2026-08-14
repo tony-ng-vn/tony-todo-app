@@ -76,20 +76,23 @@ struct MenuBarConfigurationTests {
   @Test(
     "Refreshes an existing document when the full app is presented",
     arguments: [
-      (URL(string: "https://tony-todo-app.vercel.app/")!, false, true),
-      (URL(string: "https://tony-todo-app.vercel.app/")!, true, false),
-      (nil, false, false),
+      (URL(string: "https://tony-todo-app.vercel.app/")!, false, false, true),
+      (URL(string: "https://tony-todo-app.vercel.app/")!, false, true, false),
+      (URL(string: "https://tony-todo-app.vercel.app/")!, true, false, false),
+      (nil, false, false, false),
     ]
   )
   func refreshesExistingDocumentForPresentation(
     currentURL: URL?,
     isLoading: Bool,
+    windowWasVisible: Bool,
     expected: Bool
   ) {
     #expect(
       MenuBarConfiguration.shouldRefreshWebContentForPresentation(
         currentURL: currentURL,
-        isLoading: isLoading
+        isLoading: isLoading,
+        windowWasVisible: windowWasVisible
       ) == expected
     )
   }
