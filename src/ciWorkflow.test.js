@@ -32,6 +32,8 @@ const gitignore = readFileSync(new URL('../.gitignore', import.meta.url), 'utf8'
 const verificationPlan = JSON.parse(
   readFileSync(new URL('../.ci/verification.json', import.meta.url), 'utf8'),
 );
+const startScript = readFileSync(new URL('../.cursor/start.sh', import.meta.url), 'utf8');
+const agentsMd = readFileSync(new URL('../AGENTS.md', import.meta.url), 'utf8');
 
 describe('CI workflow', () => {
   it('gates pull requests and main pushes with the deploy-critical checks', () => {
@@ -334,20 +336,26 @@ describe('CI workflow', () => {
 });
 
 describe('cloud agent bootstrap', () => {
-  const startScript = readFileSync(new URL('../.cursor/start.sh', import.meta.url), 'utf8');
-  const agentsMd = readFileSync(new URL('../AGENTS.md', import.meta.url), 'utf8');
   const pinnedCli = packageJson.devDependencies['@insforge/cli'];
 
   it('pins the InsForge CLI to the audited devDependency version', () => {
     // The boot script runs with the production user API key in scope, so it
     // must execute the npm-ci-installed copy, never a floating registry build.
     expect(pinnedCli).toMatch(/^\d+\.\d+\.\d+$/);
-    expect(startScript).not.toContain('@insforge/cli@latest');
     expect(startScript).toContain(`npx -y --offline @insforge/cli@${pinnedCli} login`);
     expect(startScript).toContain(`npx -y --offline @insforge/cli@${pinnedCli} link`);
   });
 
-  it('keeps the agent instructions on the pinned invocation', () => {
-    expect(agentsMd).not.toContain('@insforge/cli@latest');
+  it('keeps every versioned CLI reference in lockstep with the pin', () => {
+    // A version bump edits package.json; the bootstrap and the agent
+    // instructions must move with it instead of drifting to a stale pin or
+    // back to a floating tag.
+    for (const source of [startScript, agentsMd]) {
+      const references = [...source.matchAll(/@insforge\/cli@([^\s'"`)\]]+)/g)];
+      for (const [, version] of references) {
+        expect(version).toBe(pinnedCli);
+      }
+    }
+    expect(agentsMd).toContain(`@insforge/cli@${pinnedCli}`);
   });
 });

@@ -19,6 +19,8 @@ export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 # instead of executing a floating registry build while the key is in scope.
 # Keep the version in lockstep with package.json's @insforge/cli devDependency;
 # src/ciWorkflow.test.js enforces the match.
+# The key rides argv because CLI 0.2.6's login has no env/stdin alternative
+# (only INSFORGE_ACCESS_TOKEN session tokens are read from env, not uak_ keys).
 if [ -n "${INSFORGE_USER_API_KEY:-}" ]; then
   echo "Authenticating InsForge CLI (non-interactive)..."
   if npx -y --offline @insforge/cli@0.2.6 login --user-api-key "$INSFORGE_USER_API_KEY" >/dev/null 2>&1 \
