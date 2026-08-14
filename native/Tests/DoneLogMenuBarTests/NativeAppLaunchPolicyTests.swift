@@ -150,42 +150,4 @@ struct NativeAppLaunchPolicyTests {
     )
   }
 
-  @Test("Recreates an unhosted status extra a few times during launch")
-  func recreatesUnhostedStatusItemAFewTimes() {
-    #expect(
-      NativeAppLaunchPolicy.shouldRecreateStatusItem(
-        statusItemIsReady: false,
-        recreateCount: 0,
-        elapsed: 0.5
-      )
-    )
-    #expect(
-      !NativeAppLaunchPolicy.shouldRecreateStatusItem(
-        statusItemIsReady: false,
-        recreateCount: 1,
-        elapsed: 0.5
-      )
-    )
-    #expect(
-      NativeAppLaunchPolicy.shouldRecreateStatusItem(
-        statusItemIsReady: false,
-        recreateCount: 1,
-        elapsed: 0.8
-      )
-    )
-    #expect(
-      !NativeAppLaunchPolicy.shouldRecreateStatusItem(
-        statusItemIsReady: false,
-        recreateCount: 3,
-        elapsed: 2
-      )
-    )
-    #expect(
-      !NativeAppLaunchPolicy.shouldRecreateStatusItem(
-        statusItemIsReady: true,
-        recreateCount: 0,
-        elapsed: 0.5
-      )
-    )
-  }
 }

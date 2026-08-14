@@ -64,18 +64,9 @@ struct MenuBarConfigurationTests {
     )
   }
 
-  @Test("Keeps the status item outside Control Center placement")
-  @MainActor
-  func keepsStatusItemOutsideControlCenterPlacement() {
-    let statusItem = NSStatusBar.system.statusItem(
-      withLength: NSStatusItem.variableLength
-    )
-    defer { NSStatusBar.system.removeStatusItem(statusItem) }
-
-    statusItem.autosaveName = "HiddenManagedItem"
-    MenuBarConfiguration.configureAlwaysVisiblePlacement(for: statusItem)
-
-    #expect(statusItem.autosaveName == nil)
+  @Test("Uses one stable status item identity")
+  func usesOneStableStatusItemIdentity() {
+    #expect(MenuBarConfiguration.statusItemAutosaveName == "DoneLogStatusItem")
   }
 
   @Test("Builds a visible native template icon")

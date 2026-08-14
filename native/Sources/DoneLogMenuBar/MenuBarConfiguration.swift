@@ -10,6 +10,7 @@ enum MenuBarConfiguration {
   static let fullAppMinimumSize = NSSize(width: 900, height: 600)
   static let floatingNoteSize = NSSize(width: 360, height: 440)
   static let floatingNoteMinimumSize = NSSize(width: 320, height: 400)
+  static let statusItemAutosaveName = "DoneLogStatusItem"
 
   static func resolveURL(
     environment: [String: String] = ProcessInfo.processInfo.environment
@@ -94,22 +95,18 @@ enum MenuBarConfiguration {
     return image
   }
 
-  static let statusItemAutosaveName = "DoneLogStatusItem"
-
-  static func statusItemVisibleDefaultsKey(
-    prefix: String
-  ) -> String {
-    "\(prefix) \(statusItemAutosaveName)"
-  }
-
-  static func revealStatusItemInControlCenter(
-    defaults: UserDefaults = .standard
-  ) {
-    defaults.set(true, forKey: statusItemVisibleDefaultsKey(prefix: "NSStatusItem Visible"))
-    defaults.set(true, forKey: statusItemVisibleDefaultsKey(prefix: "NSStatusItem VisibleCC"))
-    defaults.set(
-      450,
-      forKey: statusItemVisibleDefaultsKey(prefix: "NSStatusItem Preferred Position")
+  @MainActor
+  static func makeStatusItem() -> NSStatusItem {
+    let statusItem = NSStatusBar.system.statusItem(
+      withLength: NSStatusItem.squareLength
     )
+    statusItem.autosaveName = statusItemAutosaveName
+    if let button = statusItem.button {
+      button.image = makeStatusIcon()
+      button.imagePosition = .imageOnly
+      button.toolTip = "Done Log"
+    }
+    statusItem.isVisible = true
+    return statusItem
   }
 }

@@ -8,7 +8,6 @@ final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
   private var menuBarController: MenuBarController?
   private var smokeTimeout: DispatchWorkItem?
   private var didFinishSmokeCheck = false
-  private var statusItemRecreateCount = 0
 
   func applicationDidFinishLaunching(_ notification: Notification) {
     let controller = MenuBarController(
@@ -75,15 +74,6 @@ final class DoneLogApplicationDelegate: NSObject, NSApplicationDelegate {
 
     if controller.isReady {
       return
-    }
-
-    if NativeAppLaunchPolicy.shouldRecreateStatusItem(
-      statusItemIsReady: controller.isReady,
-      recreateCount: statusItemRecreateCount,
-      elapsed: elapsed
-    ) {
-      statusItemRecreateCount += 1
-      controller.recreateStatusItem()
     }
 
     if NativeAppLaunchPolicy.shouldKeepWaitingForStatusItem(
