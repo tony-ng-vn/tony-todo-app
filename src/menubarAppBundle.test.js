@@ -11,7 +11,7 @@ describe('menu bar app bundle', () => {
     const plist = readFileSync(path.join(repoRoot, 'native/App/Info.plist'), 'utf8');
     const packageJson = JSON.parse(readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
 
-    expect(plist).toContain('<string>com.tonynguyen.donelog</string>');
+    expect(plist).toContain('<string>com.tonynguyen.donelog.menubar</string>');
     expect(plist).toContain('<string>done-log-menubar</string>');
     expect(plist).toMatch(/<key>LSUIElement<\/key>\s*<true\/>/);
     expect(plist).toMatch(/<key>LSMinimumSystemVersion<\/key>\s*<string>14\.0<\/string>/);
@@ -78,6 +78,8 @@ describe('menu bar app bundle', () => {
     expect(installer).toContain('unset DONE_LOG_INSTANCE');
     expect(builder).toContain('DONE_LOG_BUNDLE_IDENTIFIER');
     expect(installer).toContain('refusing to install a development Done Log');
+    expect(installer).toContain('com.tonynguyen.donelog.menubar');
+    expect(installer).toContain('com.tonynguyen.donelog');
     expect(installer).toContain('Sparkle.framework');
   });
 
