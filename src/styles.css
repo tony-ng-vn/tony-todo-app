@@ -2431,24 +2431,14 @@ h2 {
   gap: 10px;
 }
 
-.task-photo-preview img,
-.task-photo-thumb {
-  display: block;
-  border: 1px solid var(--border);
-  background: var(--block-surface);
-  object-fit: cover;
-}
-
 .task-photo-preview img {
+  display: block;
   width: 100%;
   max-height: 220px;
+  border: 1px solid var(--border);
   border-radius: 14px;
-}
-
-.task-photo-thumb {
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  background: var(--block-surface);
+  object-fit: cover;
 }
 
 .task-photo-actions {
