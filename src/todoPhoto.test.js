@@ -212,4 +212,35 @@ describe('resolveTaskPhotoSrc caching', () => {
     expect(after).toBe('signed-2');
     expect(client.calls).toBe(2);
   });
+
+  it('drops the cached url when a same-key upload replaces the photo', async () => {
+    const key = 'user-1/cache-d/photo.jpg';
+    let signedCalls = 0;
+    const client = {
+      storage: {
+        from() {
+          return {
+            async createSignedUrl() {
+              signedCalls += 1;
+              return { data: { signedUrl: `signed-${signedCalls}` }, error: null };
+            },
+            async upload(path) {
+              return { data: { url: 'https://files.example/photo.jpg', key: path }, error: null };
+            },
+            async remove() {
+              return { error: null };
+            },
+          };
+        },
+      },
+    };
+    const todo = { id: 'cache-d', photoUrl: 'https://example.test/p', photoKey: key };
+
+    await resolveTaskPhotoSrc(client, todo);
+    await uploadTaskPhoto(client, { userId: 'user-1', todo, file: photoFile() });
+    const after = await resolveTaskPhotoSrc(client, todo);
+
+    expect(after).toBe('signed-2');
+    expect(signedCalls).toBe(2);
+  });
 });
