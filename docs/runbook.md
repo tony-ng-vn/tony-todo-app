@@ -20,7 +20,7 @@ Migrations and `insforge.toml` config apply stay manual.
   A stale or reordered run cannot move the tag backward.
 - An automatic function deploy stops before authentication or production writes when the not-yet-deployed range changes `migrations/` or `insforge.toml`.
 - The deploy preflight blocks unexpected live endpoints before writes.
-  `claim-preauth-todos` and `extract-video-knowledge` are temporary exceptions owned by unmerged feature branches; this workflow must not alter them.
+  Every live function is repo-managed; there are no exempt slugs, so a live endpoint without a matching `functions/*.ts` file fails the deploy.
 - One-time: add GitHub repository secret `INSFORGE_API_KEY` from the linked Todo App project.
 - One-time: add GitHub repository secret `INSFORGE_MARKER_TOKEN` from a fine-grained token limited to repository contents write access.
   The workflow exposes it only to the final deployment-marker update after live source verification.
