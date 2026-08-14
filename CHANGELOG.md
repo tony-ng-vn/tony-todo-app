@@ -49,6 +49,7 @@
 - Main CI runs stay queued instead of cancelling each other, and a deployment marker makes every run reconcile the full not-yet-deployed range without rolling production back to an older commit.
 - Deploy preflight catches renamed or unexpected live endpoints before writes.
 - Native releases now build, sign, notarize, and publish the update archive and feed through one guarded workflow.
+- Native releases now use the same verified checkout action as normal CI, so the signing workflow can start reliably from a version tag.
 
 **Docs**
 
