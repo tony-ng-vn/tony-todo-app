@@ -65,16 +65,20 @@ alter policy agent_tokens_delete_own on public.agent_tokens
 -- 2) Drop the client_id-era indexes on todos. client_id has been NULL on
 -- every row written since the auth migration (2026-07-13) and no query
 -- filters on it; each index still taxes every insert and timer/note update.
--- todos_parent_task_id_idx stays: it serves the parent-task FK cascade.
+-- todos_client_notion_page_idx is UNIQUE, but with client_id NULL on every
+-- row it enforces nothing (nulls are distinct) and no code or test assumes
+-- notion_page_id uniqueness; if Notion sync returns, recreate it keyed on
+-- user_id. todos_parent_task_id_idx stays: it serves the parent-task FK
+-- cascade.
 
-drop index if exists todos_client_created_idx;
-drop index if exists todos_client_completed_idx;
-drop index if exists todos_client_open_idx;
-drop index if exists todos_client_source_idx;
-drop index if exists todos_client_notion_page_idx;
-drop index if exists todos_client_active_timer_idx;
-drop index if exists todos_client_parent_task_idx;
-drop index if exists todos_client_progressive_open_idx;
+drop index if exists public.todos_client_created_idx;
+drop index if exists public.todos_client_completed_idx;
+drop index if exists public.todos_client_open_idx;
+drop index if exists public.todos_client_source_idx;
+drop index if exists public.todos_client_notion_page_idx;
+drop index if exists public.todos_client_active_timer_idx;
+drop index if exists public.todos_client_parent_task_idx;
+drop index if exists public.todos_client_progressive_open_idx;
 
 -- 3) Index the dismissed-history read (loopRemote loads it on every
 -- refresh, ordered by updated_at, and dismissed rows accumulate forever).
