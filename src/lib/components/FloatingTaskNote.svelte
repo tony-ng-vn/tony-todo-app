@@ -220,9 +220,6 @@
     grid-template-columns: minmax(0, 1fr) auto;
     align-items: flex-start;
     gap: 12px;
-  }
-
-  .is-overlay .floating-note-header {
     cursor: move;
     touch-action: none;
     user-select: none;

@@ -22,8 +22,12 @@ enum NativeAppLaunchPolicy {
     case keepCurrentWindows
   }
 
+  static let reopenIntentRestoreNanoseconds: UInt64 = 350_000_000
+
   @MainActor
   private static var currentReopenIntent = Reopen.user
+  @MainActor
+  private static var reopenIntentGeneration = 0
 
   static func initialIntent(
     launchDate: Date?,
@@ -93,9 +97,16 @@ enum NativeAppLaunchPolicy {
   ) rethrows -> Result {
     let previousIntent = currentReopenIntent
     currentReopenIntent = intent
-    defer {
+    reopenIntentGeneration += 1
+    let generation = reopenIntentGeneration
+    let result = try action()
+    Task { @MainActor in
+      try? await Task.sleep(nanoseconds: reopenIntentRestoreNanoseconds)
+      guard generation == reopenIntentGeneration else {
+        return
+      }
       currentReopenIntent = previousIntent
     }
-    return try action()
+    return result
   }
 }

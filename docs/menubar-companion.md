@@ -69,6 +69,7 @@ DONE_LOG_MENUBAR_URL=https://example.com/menubar npm run menubar
 - Open Done Log from Spotlight, Applications, or the menu-bar context menu to show the root app in a resizable native window.
 - Use the standard Mac window controls to move, resize, minimize, zoom, and enter full screen.
 - Task notes open in the same dark native chrome as the full window, with the system traffic lights over the page instead of a separate white title bar.
+- Opening a task note from the menu-bar list shows only that floating note. Drag the note header to move it.
 - Double-click the traffic-light area or an empty header to fill the usable screen, subject to the macOS Desktop & Dock title-bar preference.
 - Use the standard File, Edit, View, and Window menus and their usual keyboard shortcuts.
 - Close the full window to return to menu-bar-only mode.
@@ -107,6 +108,6 @@ For the manual native check:
 8. Reopen it and confirm the task state remains.
 9. Open Done Log from Spotlight and confirm the full root app opens in a resizable native window.
 10. Double-click the traffic-light area or an empty header and confirm the window fills the usable screen, then double-click again to restore it.
-11. Open a task note and confirm it uses the same dark chrome, with no white system title bar.
+11. Open a task note from the menu-bar list and confirm only the floating note appears, that dragging its header moves the window, and that it uses the same dark chrome with no white system title bar.
 12. Confirm Command+M minimizes, Window > Zoom works, and Control+Command+F enters and exits full screen.
 13. Right-click the tray icon and confirm Launch at Login, Open Done Log, and Quit are available.

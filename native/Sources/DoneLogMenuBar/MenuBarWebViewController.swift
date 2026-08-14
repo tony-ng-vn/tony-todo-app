@@ -419,8 +419,8 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
        document.documentElement.style.setProperty('--native-traffic-lights-inset', '78px');
        if (!window.__doneLogNativeDragInstalled) {
          window.__doneLogNativeDragInstalled = true;
-         const dragSelector = '.brand-row, .board-header, .panel-heading, .summary-top, .detail-header';
-         const noDragSelector = 'button, a, input, textarea, select, label, option, [role="button"], [role="tab"], [contenteditable="true"], .header-actions, .board-header-actions, .theme-toggle, .calendar-picker, .view-toggle, .summary-date-navigation, .detail-window-actions';
+         const dragSelector = '.brand-row, .board-header, .panel-heading, .summary-top, .detail-header, .floating-note-header';
+         const noDragSelector = 'button, a, input, textarea, select, label, option, [role="button"], [role="tab"], [contenteditable="true"], .header-actions, .board-header-actions, .theme-toggle, .calendar-picker, .view-toggle, .summary-date-navigation, .detail-window-actions, .floating-note-actions';
          document.addEventListener('mousedown', (event) => {
            const target = event.target;
            if (
