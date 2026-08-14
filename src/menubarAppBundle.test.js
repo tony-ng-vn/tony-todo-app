@@ -183,6 +183,7 @@ describe('menu bar app bundle', () => {
     );
 
     expect(config).toContain('statusItemAutosaveName');
+    expect(config).toContain('primary-status-item-v4');
     expect(config).not.toContain('DoneLogStatusItem');
     expect(config).not.toContain('NSStatusItem Preferred Position');
     expect(config).not.toContain('NSStatusItem VisibleCC');

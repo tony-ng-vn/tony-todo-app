@@ -64,12 +64,12 @@ struct MenuBarConfigurationTests {
     )
   }
 
-  @Test("Lets macOS place the status item automatically")
-  func letsMacOSPlaceStatusItemAutomatically() {
+  @Test("Uses the status item identity exposed in System Settings")
+  func usesSystemSettingsStatusItemIdentity() {
     #expect(
       MenuBarConfiguration.statusItemAutosaveName(
         bundleIdentifier: "com.tonynguyen.donelog"
-      ) == nil
+      ) == "com.tonynguyen.donelog.primary-status-item-v4"
     )
   }
 
