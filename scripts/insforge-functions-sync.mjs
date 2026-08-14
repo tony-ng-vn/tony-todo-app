@@ -7,8 +7,6 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const FUNCTIONS_DIR = 'functions';
 const SHELL_SUFFIX = '.shell.ts';
 const SOURCE_SUFFIX = '.ts';
-// These live endpoints belong to feature branches that have not merged their source yet.
-const UNMANAGED_LIVE_SLUGS = new Set(['claim-preauth-todos', 'extract-video-knowledge']);
 
 const LIVE_SOURCE_DELIMITER = '\n---\n';
 
@@ -192,9 +190,7 @@ export function syncInsforgeFunctions({
   const liveSlugs = parseLiveFunctionSlugs(
     runInsforge(['functions', 'list', '--json'], { capture: true, cwd: root }),
   );
-  const unexpectedLiveSlugs = liveSlugs.filter(
-    (slug) => !allSlugs.includes(slug) && !UNMANAGED_LIVE_SLUGS.has(slug),
-  );
+  const unexpectedLiveSlugs = liveSlugs.filter((slug) => !allSlugs.includes(slug));
   if (unexpectedLiveSlugs.length > 0) {
     throw new Error(
       `InsForge has unexpected live functions that are absent from the repo: ${unexpectedLiveSlugs.join(', ')}. Remove them explicitly before rerunning this deployment. No functions were deployed.`,
