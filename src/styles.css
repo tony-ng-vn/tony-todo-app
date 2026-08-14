@@ -2901,7 +2901,7 @@ html.is-native-host .workspace.is-board-view.has-detail {
   width: 100%;
   height: 100dvh;
   margin: 0;
-  padding: 0;
+  padding: 12px;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -2927,12 +2927,33 @@ html.is-native-host .settings-panel {
 
 html.is-native-host .task-panel {
   border-width: 0 1px 0 0;
+  border-radius: 14px 0 0 14px;
   padding-inline: clamp(20px, 3vw, 42px);
   padding-top: 0;
 }
 
 html.is-native-host .summary-panel {
+  border-radius: 0 14px 14px 0;
   padding-inline: clamp(20px, 2.5vw, 34px);
+}
+
+html.is-native-host .workspace.has-detail .summary-panel {
+  border-radius: 0;
+}
+
+html.is-native-host .workspace.has-detail .task-detail {
+  border-radius: 0 14px 14px 0;
+}
+
+html.is-native-host .board-panel,
+html.is-native-host .projects-panel,
+html.is-native-host .calendar-panel,
+html.is-native-host .inbox-panel,
+html.is-native-host .waiting-panel,
+html.is-native-host .history-panel,
+html.is-native-host .meetings-panel,
+html.is-native-host .settings-panel {
+  border-radius: 14px;
 }
 
 html.is-native-host .summary-panel,
@@ -3013,7 +3034,6 @@ html.is-native-host .recap-completion-count {
 html.is-native-host .summary-panel,
 html.is-native-host .workspace.has-detail .task-detail {
   border-width: 0 0 0 1px;
-  border-radius: 0;
 }
 
 html.is-native-host .summary-top,
