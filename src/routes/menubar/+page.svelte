@@ -283,7 +283,7 @@
     }
 
     updateInFlight = true;
-    syncMessage = 'Updating Done Log';
+    syncMessage = 'Updating Daymark';
     try {
       await noteAutosave.flushAll();
     } catch {
@@ -748,7 +748,7 @@
 </script>
 
 {#if !authChecked}
-  <main class="menubar-loading" aria-label="Loading Done Log">Connecting...</main>
+  <main class="menubar-loading" aria-label="Loading Daymark">Connecting...</main>
 {:else if useRemote && !authUser}
   <AuthGate
     mode={authMode}
@@ -768,11 +768,11 @@
 {:else if standaloneNoteId}
   <main class="menubar-loading" aria-label="Task note unavailable">This task is no longer available.</main>
 {:else}
-  <main class="menubar-shell" aria-label="Done Log menu bar companion">
+  <main class="menubar-shell" aria-label="Daymark menu bar companion">
     <header class="menubar-header">
       <div>
         <p class="menubar-eyebrow">Menu bar</p>
-        <h1 class="menubar-heading">Done Log</h1>
+        <h1 class="menubar-heading">Daymark</h1>
       </div>
       <div class="menubar-header-actions">
         <ThemeToggle {themeMode} onToggle={toggleThemeMode} compact={true} />

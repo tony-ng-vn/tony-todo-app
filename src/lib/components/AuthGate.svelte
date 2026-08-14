@@ -17,7 +17,7 @@
 
 <div class="auth-gate">
   <form class="auth-card" on:submit={handleSubmit}>
-    <h1 class="auth-title">Done Log</h1>
+    <h1 class="auth-title">Daymark</h1>
     <p class="auth-subtitle">
       {isSignUp ? 'Create an account to sync your tasks.' : 'Sign in to sync your tasks.'}
     </p>

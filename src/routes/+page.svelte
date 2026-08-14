@@ -1377,7 +1377,7 @@
   class="workspace"
   class:has-detail={selectedTask}
   class:is-board-view={viewMode === 'projects' || viewMode === 'board' || viewMode === 'calendar' || viewMode === 'inbox' || viewMode === 'waiting' || viewMode === 'history' || viewMode === 'meetings' || viewMode === 'settings'}
-  aria-label="Done Log todo app"
+  aria-label="Daymark todo app"
 >
   {#if viewMode === 'projects'}
     <ProjectsPanel

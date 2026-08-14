@@ -13,7 +13,7 @@ export function resolveUpdateAction({
     return {
       kind: 'native-check',
       label: 'Check for updates',
-      title: 'Check for and install a complete Done Log update',
+      title: 'Check for and install a complete Daymark update',
       isAvailable: false,
     };
   }
@@ -22,7 +22,7 @@ export function resolveUpdateAction({
     return {
       kind: 'legacy-bootstrap',
       label: 'Install desktop update',
-      title: 'Download the first Done Log release with complete app updates',
+      title: 'Download the first Daymark release with complete app updates',
       isAvailable: true,
     };
   }
@@ -30,7 +30,7 @@ export function resolveUpdateAction({
   return {
     kind: 'web-reload',
     label: webUpdateAvailable ? 'Reload latest' : 'Reload',
-    title: webUpdateAvailable ? 'Reload the latest Done Log website' : 'Reload Done Log',
+    title: webUpdateAvailable ? 'Reload the latest Daymark website' : 'Reload Daymark',
     isAvailable: webUpdateAvailable,
   };
 }

@@ -107,7 +107,7 @@
 
   async function removeAgentKey() {
     if (!insforge || !userId || agentBusy || !agentRecord) return;
-    if (!window.confirm('Remove this key? Agents using it will no longer be able to reach Done Log.')) {
+    if (!window.confirm('Remove this key? Agents using it will no longer be able to reach Daymark.')) {
       return;
     }
     agentBusy = true;
