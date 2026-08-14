@@ -15,7 +15,7 @@ describe('native menu bar bridge', () => {
     expect(canShowNativeMenuBar({})).toBe(false);
   });
 
-  it('requests the mini todo popover without closing the quick note', () => {
+  it('requests the mini todo popover and leaves native code to close the note', () => {
     const postMessage = vi.fn();
     const close = vi.fn();
     const targetWindow = {
