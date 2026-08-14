@@ -21,9 +21,10 @@ enum MenuBarConfiguration {
 
   static func shouldRefreshWebContentForPresentation(
     currentURL: URL?,
-    isLoading: Bool
+    isLoading: Bool,
+    windowWasVisible: Bool
   ) -> Bool {
-    currentURL != nil && !isLoading
+    currentURL != nil && !isLoading && !windowWasVisible
   }
 
   static func resolveURL(
