@@ -23,6 +23,17 @@ wait_for_app_exit() {
   return 1
 }
 
+is_done_log_identifier() {
+  case "$1" in
+    com.tonynguyen.donelog.menubar|com.tonynguyen.donelog|com.tonynguyen.donelog.macos)
+      return 0
+      ;;
+    *)
+      return 1
+      ;;
+  esac
+}
+
 unset DONE_LOG_INSTANCE || true
 unset DONE_LOG_INSTANCE_ID || true
 unset DONE_LOG_BUNDLE_IDENTIFIER || true
@@ -36,8 +47,7 @@ SOURCE_IDENTIFIER="$(
     raw \
     "$SOURCE_APP/Contents/Info.plist"
 )"
-if [[ "$SOURCE_IDENTIFIER" != "com.tonynguyen.donelog" ]] \
-  && [[ "$SOURCE_IDENTIFIER" != "com.tonynguyen.donelog.macos" ]]; then
+if ! is_done_log_identifier "$SOURCE_IDENTIFIER"; then
   echo "refusing to install a development Done Log ($SOURCE_IDENTIFIER)" >&2
   exit 1
 fi
@@ -72,8 +82,7 @@ if [[ -d "$INSTALLED_APP" ]]; then
       raw \
       "$INSTALLED_APP/Contents/Info.plist"
   )"
-  if [[ "$INSTALLED_IDENTIFIER" != "com.tonynguyen.donelog" ]] \
-    && [[ "$INSTALLED_IDENTIFIER" != "com.tonynguyen.donelog.macos" ]]; then
+  if ! is_done_log_identifier "$INSTALLED_IDENTIFIER"; then
     echo "refusing to replace an app with another bundle identifier" >&2
     exit 1
   fi
