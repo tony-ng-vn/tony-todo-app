@@ -1,5 +1,5 @@
 export const NATIVE_WINDOW_DRAG_SELECTOR =
-  '.brand-row, .board-header, .panel-heading, .summary-top, .detail-header';
+  '.brand-row, .board-header, .panel-heading, .summary-top, .detail-header, .floating-note-header';
 
 export const NATIVE_WINDOW_NO_DRAG_SELECTOR = [
   'button',
@@ -19,6 +19,7 @@ export const NATIVE_WINDOW_NO_DRAG_SELECTOR = [
   '.view-toggle',
   '.summary-date-navigation',
   '.detail-window-actions',
+  '.floating-note-actions',
 ].join(', ');
 
 export function isNativeWindowDragTarget(target) {

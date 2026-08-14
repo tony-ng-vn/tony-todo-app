@@ -116,6 +116,17 @@ struct MenuBarPolicyTests {
     )
   }
 
+  @Test("Lets the quick note header drag the native window")
+  @MainActor
+  func includesQuickNoteHeaderInNativeDragSelector() {
+    let source = MenuBarWebViewController.nativeHostScriptSource(
+      usesWindowChrome: true
+    )
+
+    #expect(source.contains(".floating-note-header"))
+    #expect(source.contains(".floating-note-actions"))
+  }
+
   @Test("Advertises menu bar return only to supported quick notes")
   @MainActor
   func advertisesMenuBarReturnCapability() {

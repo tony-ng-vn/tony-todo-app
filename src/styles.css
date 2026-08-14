@@ -3057,6 +3057,8 @@ html.is-native-host .board-header button,
 html.is-native-host .panel-heading button,
 html.is-native-host .summary-top button,
 html.is-native-host .detail-header button,
+html.is-native-host .floating-note-header button,
+html.is-native-host .floating-note-actions,
 html.is-native-host .summary-top a,
 html.is-native-host .detail-header a {
   -webkit-app-region: no-drag;
@@ -3069,6 +3071,11 @@ html.is-native-host .floating-note-shell {
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
+}
+
+html.is-native-host .floating-note-header {
+  -webkit-app-region: drag;
+  cursor: move;
 }
 
 html.is-native-host .workspace:not(.is-board-view) {

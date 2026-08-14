@@ -26,6 +26,15 @@ describe('native window chrome', () => {
     ).toBe(true);
   });
 
+  it('treats the quick note header as a native drag region', () => {
+    expect(
+      NATIVE_WINDOW_DRAG_SELECTOR.split(',').map((item) => item.trim()),
+    ).toContain('.floating-note-header');
+    expect(
+      NATIVE_WINDOW_NO_DRAG_SELECTOR.split(',').map((item) => item.trim()),
+    ).toContain('.floating-note-actions');
+  });
+
   it('keeps buttons and header actions clickable', () => {
     expect(
       isNativeWindowDragTarget(
