@@ -2,14 +2,14 @@
 
 ## Goal
 
-The Done Log update control must update the complete macOS application when it is running inside the native host.
+The Daymark update control must update the complete macOS application when it is running inside the native host.
 It must not describe a web-page reload as a desktop application update.
 
 ## User flow
 
 Current native releases expose `Check for Updates` in the menu bar page and in the application menu.
 That action asks the native updater to check the signed release feed.
-Sparkle presents the available version, verifies the downloaded archive, replaces `Done Log.app`, and relaunches the application.
+Sparkle presents the available version, verifies the downloaded archive, replaces `Daymark.app`, and relaunches the application.
 
 The browser-only menu bar route keeps a separate `Reload latest` action for refreshing deployed web content.
 A legacy native host without updater support shows `Install desktop update` and opens the stable bootstrap disk-image URL.
@@ -17,7 +17,7 @@ A legacy native host without updater support shows `Install desktop update` and 
 ## Ownership
 
 `AppUpdateCoordinator` owns Sparkle and is the only component allowed to initiate a native update check.
-`MenuBarWebViewController` exposes a narrow `doneLogUpdater` message bridge to trusted Done Log pages.
+`MenuBarWebViewController` exposes a narrow `doneLogUpdater` message bridge to trusted Daymark pages.
 The Svelte route selects one of three actions from host capabilities: native update check, legacy bootstrap download, or web reload.
 
 The native application version comes from `CFBundleVersion` and `CFBundleShortVersionString`.

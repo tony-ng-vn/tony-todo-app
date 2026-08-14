@@ -6,13 +6,13 @@ import WebKit
 @Suite("Menu bar web policies")
 struct MenuBarPolicyTests {
   private let homeURL = URL(
-    string: "https://tony-todo-app.vercel.app/menubar"
+    string: "https://daymark.inhavens.com/menubar"
   )!
 
   @Test("Keeps same-origin pages inside the popover")
   func allowsSameOriginNavigation() throws {
     let url = try #require(
-      URL(string: "https://tony-todo-app.vercel.app/sign-in")
+      URL(string: "https://daymark.inhavens.com/sign-in")
     )
 
     #expect(
@@ -45,17 +45,17 @@ struct MenuBarPolicyTests {
     let noteURL = try #require(
       URL(
         string:
-          "https://tony-todo-app.vercel.app/menubar?note=task-123"
+          "https://daymark.inhavens.com/menubar?note=task-123"
       )
     )
     let otherOrigin = try #require(
       URL(string: "https://example.com/menubar?note=task-123")
     )
     let missingTask = try #require(
-      URL(string: "https://tony-todo-app.vercel.app/menubar?note=")
+      URL(string: "https://daymark.inhavens.com/menubar?note=")
     )
     let wrongPath = try #require(
-      URL(string: "https://tony-todo-app.vercel.app/?note=task-123")
+      URL(string: "https://daymark.inhavens.com/?note=task-123")
     )
 
     #expect(MenuBarNavigationPolicy.isFloatingNoteURL(noteURL, homeURL: homeURL))
@@ -84,7 +84,7 @@ struct MenuBarPolicyTests {
   @Test("Accepts only the quick note return command from the menu bar page")
   func validatesMenuBarReturnCommands() throws {
     let noteURL = try #require(
-      URL(string: "https://tony-todo-app.vercel.app/menubar?note=task-123")
+      URL(string: "https://daymark.inhavens.com/menubar?note=task-123")
     )
 
     #expect(
@@ -162,7 +162,7 @@ struct MenuBarPolicyTests {
   @Test("Requires the expected menu bar shell before reporting ready")
   func requiresExpectedShell() throws {
     let finalURL = try #require(
-      URL(string: "https://tony-todo-app.vercel.app/menubar")
+      URL(string: "https://daymark.inhavens.com/menubar")
     )
 
     #expect(

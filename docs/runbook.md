@@ -1,6 +1,6 @@
 # Deploy and release runbook
 
-Scope: deploying merged work to the live InsForge backend and publishing the native Done Log macOS application.
+Scope: deploying merged work to the live InsForge backend and publishing the native Daymark macOS application.
 The frontend deploys itself through Vercel on merge.
 
 ## Backend deploy
@@ -89,11 +89,11 @@ Never commit any private key, certificate, or password.
 5. Create and push the matching version tag from the merged release commit, such as `v0.12.0`.
 6. Watch the `Native release` workflow until signing, application notarization, disk-image notarization, and publication all succeed.
 7. Confirm the GitHub release contains `Done-Log-<version>.zip`, `Done-Log.dmg`, and `appcast.xml`.
-8. Open the stable `releases/latest/download/appcast.xml` URL and confirm it points to the tagged archive before testing an update from the previous notarized Done Log release.
+8. Open the stable `releases/latest/download/appcast.xml` URL and confirm it points to the tagged archive before testing an update from the previous notarized Daymark release.
 
 ### Legacy bootstrap
 
 Versions without Sparkle cannot replace themselves.
 Their hosted menu bar page shows `Install desktop update` and opens the stable `Done-Log.dmg` download.
-Drag the new Done Log into Applications once, replacing the legacy bundle if Finder asks.
+Drag the new Daymark into Applications once, replacing the legacy bundle if Finder asks.
 Every later release uses `Check for Updates` and completes the signed in-app update through Sparkle.

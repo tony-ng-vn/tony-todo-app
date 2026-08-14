@@ -3,7 +3,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
-APP_BUNDLE="$REPO_ROOT/.build/app-bundle/Done Log.app"
+APP_BUNDLE="$REPO_ROOT/.build/app-bundle/Daymark.app"
 EXECUTABLE="$APP_BUNDLE/Contents/MacOS/done-log-menubar"
 
 INSTANCE_ID="$(
@@ -12,7 +12,7 @@ INSTANCE_ID="$(
 export DONE_LOG_INSTANCE="${DONE_LOG_INSTANCE:-dev}"
 export DONE_LOG_INSTANCE_ID="${DONE_LOG_INSTANCE_ID:-$INSTANCE_ID}"
 export DONE_LOG_BUNDLE_IDENTIFIER="${DONE_LOG_BUNDLE_IDENTIFIER:-com.tonynguyen.donelog.dev}"
-export DONE_LOG_BUNDLE_DISPLAY_NAME="${DONE_LOG_BUNDLE_DISPLAY_NAME:-Done Log Local}"
+export DONE_LOG_BUNDLE_DISPLAY_NAME="${DONE_LOG_BUNDLE_DISPLAY_NAME:-Daymark Local}"
 
 bash "$SCRIPT_DIR/build-menubar-app.sh" >/dev/null
 

@@ -29,7 +29,7 @@ final class FullAppWindowController: NSWindowController, NSWindowDelegate {
       backing: .buffered,
       defer: false
     )
-    window.title = "Done Log"
+    window.title = "Daymark"
     window.contentMinSize = MenuBarConfiguration.fullAppMinimumSize
     window.contentViewController = contentController
     window.isReleasedWhenClosed = false

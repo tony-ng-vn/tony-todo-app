@@ -90,7 +90,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
   private func configureContextMenu() {
     let openItem = NSMenuItem(
-      title: "Open Done Log",
+      title: "Open Daymark",
       action: #selector(showFullApp),
       keyEquivalent: ""
     )
@@ -147,7 +147,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
 
     button.image = MenuBarConfiguration.makeStatusIcon()
     button.imagePosition = .imageOnly
-    button.toolTip = "Done Log"
+    button.toolTip = "Daymark"
   }
 
   private func togglePopover() {

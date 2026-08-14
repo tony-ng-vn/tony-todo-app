@@ -142,7 +142,7 @@ jobs:
         run: |
           set -euo pipefail
           umask 077
-          app='.build/app-bundle/Done Log.app'
+          app='.build/app-bundle/Daymark.app'
           notary_zip="$RUNNER_TEMP/Done-Log-notary.zip"
           notary_key="$RUNNER_TEMP/AuthKey_${APPLE_NOTARY_KEY_ID}.p8"
           printf '%s' "$APPLE_NOTARY_KEY" > "$notary_key"
@@ -166,7 +166,7 @@ jobs:
           umask 077
           release_dir="$RUNNER_TEMP/native-release"
           sparkle_dir="$RUNNER_TEMP/sparkle"
-          app='.build/app-bundle/Done Log.app'
+          app='.build/app-bundle/Daymark.app'
           archive="$release_dir/Done-Log-${DONE_LOG_RELEASE_VERSION}.zip"
           disk_image="$RUNNER_TEMP/Done-Log.dmg"
           mkdir -p "$release_dir" "$sparkle_dir"
@@ -174,10 +174,10 @@ jobs:
 
           dmg_root="$RUNNER_TEMP/dmg-root"
           mkdir -p "$dmg_root"
-          ditto "$app" "$dmg_root/Done Log.app"
+          ditto "$app" "$dmg_root/Daymark.app"
           ln -s /Applications "$dmg_root/Applications"
           hdiutil create \
-            -volname 'Done Log' \
+            -volname 'Daymark' \
             -srcfolder "$dmg_root" \
             -format UDZO \
             -ov \
@@ -270,6 +270,6 @@ jobs:
             "$DONE_LOG_BOOTSTRAP_DMG" \
             "$DONE_LOG_RELEASE_DIR/appcast.xml" \
             --repo "$GITHUB_REPOSITORY" \
-            --title "Done Log ${DONE_LOG_RELEASE_VERSION}" \
+            --title "Daymark ${DONE_LOG_RELEASE_VERSION}" \
             --generate-notes \
             --verify-tag

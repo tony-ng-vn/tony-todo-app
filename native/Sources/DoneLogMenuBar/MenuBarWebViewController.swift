@@ -447,6 +447,6 @@ enum MenuBarLoadError: LocalizedError {
   case expectedShellMissing
 
   var errorDescription: String? {
-    "loaded page is not the Done Log menu bar route"
+    "loaded page is not the Daymark menu bar route"
   }
 }

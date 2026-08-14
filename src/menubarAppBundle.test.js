@@ -77,7 +77,7 @@ describe('menu bar app bundle', () => {
     expect(runner).not.toContain('menubar:install');
     expect(installer).toContain('unset DONE_LOG_INSTANCE');
     expect(builder).toContain('DONE_LOG_BUNDLE_IDENTIFIER');
-    expect(installer).toContain('refusing to install a development Done Log');
+    expect(installer).toContain('refusing to install a development Daymark');
     expect(installer).toContain('com.tonynguyen.donelog.menubar');
     expect(installer).toContain('com.tonynguyen.donelog');
     expect(installer).toContain(
@@ -254,17 +254,19 @@ describe('menu bar app bundle', () => {
     const installer = readFileSync(path.join(repoRoot, 'scripts/install-menubar-app.sh'), 'utf8');
 
     expect(builder).toContain('BUILD_ROOT="$REPO_ROOT/.build/app-bundle"');
-    expect(installer).toContain('SOURCE_APP="$REPO_ROOT/.build/app-bundle/Done Log.app"');
+    expect(installer).toContain('SOURCE_APP="$REPO_ROOT/.build/app-bundle/Daymark.app"');
     expect(builder).not.toContain('BUILD_ROOT="$REPO_ROOT/dist"');
-    expect(installer).not.toContain('SOURCE_APP="$REPO_ROOT/dist/Done Log.app"');
+    expect(installer).not.toContain('SOURCE_APP="$REPO_ROOT/dist/Daymark.app"');
   });
 
   it('installs one app and leaves startup to the user', () => {
     const installer = readFileSync(path.join(repoRoot, 'scripts/install-menubar-app.sh'), 'utf8');
 
-    expect(installer).toContain('"$INSTALLED_BINARY" --unregister-login-item');
-    expect(installer).not.toContain('"$INSTALLED_BINARY" --register-login-item');
+    expect(installer).toContain('--unregister-login-item');
+    expect(installer).not.toContain('--register-login-item');
     expect(installer).not.toContain('/usr/bin/open -n');
+    expect(installer).toContain('INSTALLED_APP="/Applications/Daymark.app"');
+    expect(installer).toContain('LEGACY_APP="/Applications/Done Log.app"');
     expect(installer).toContain('Open it from Applications when you are ready');
     expect(installer).toContain('com.tonynguyen.donelog.macos');
   });
@@ -277,7 +279,7 @@ describe('menu bar app bundle', () => {
     expect(spawnSync(comparer, ['0.8.0', '0.8.0']).status).toBe(1);
     expect(spawnSync(comparer, ['0.7.2', '0.8.0']).status).toBe(1);
     expect(installer).toContain('app-version-is-newer.sh');
-    expect(installer).toContain('refusing to replace newer Done Log');
+    expect(installer).toContain('refusing to replace newer Daymark');
   });
 
   it('marks native web views before the menu bar page loads', () => {

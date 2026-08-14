@@ -10,9 +10,9 @@ enum ApplicationMenuFactory {
 
     let applicationItem = NSMenuItem()
     mainMenu.addItem(applicationItem)
-    let applicationMenu = NSMenu(title: "Done Log")
+    let applicationMenu = NSMenu(title: "Daymark")
     applicationMenu.addItem(
-      withTitle: "About Done Log",
+      withTitle: "About Daymark",
       action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
       keyEquivalent: ""
     )
@@ -26,7 +26,7 @@ enum ApplicationMenuFactory {
     }
     applicationMenu.addItem(.separator())
     applicationMenu.addItem(
-      withTitle: "Hide Done Log",
+      withTitle: "Hide Daymark",
       action: #selector(NSApplication.hide(_:)),
       keyEquivalent: "h"
     )
@@ -43,7 +43,7 @@ enum ApplicationMenuFactory {
     )
     applicationMenu.addItem(.separator())
     applicationMenu.addItem(
-      withTitle: "Quit Done Log",
+      withTitle: "Quit Daymark",
       action: #selector(NSApplication.terminate(_:)),
       keyEquivalent: "q"
     )

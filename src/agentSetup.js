@@ -35,7 +35,7 @@ export function buildAgentSetupPrompt({ token, url = AGENT_TODOS_URL } = {}) {
   }
 
   return [
-    'Use this to read and update my Done Log.',
+    'Use this to read and update my Daymark.',
     '',
     `POST ${url}`,
     `Authorization: Bearer ${token}`,

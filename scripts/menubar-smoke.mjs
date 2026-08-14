@@ -650,7 +650,7 @@ try {
   });
 
   const failures = [];
-  if (initial.title !== 'Done Log') failures.push(`unexpected heading: ${JSON.stringify(initial)}`);
+  if (initial.title !== 'Daymark') failures.push(`unexpected heading: ${JSON.stringify(initial)}`);
   if (initial.sync !== 'Local only') failures.push(`unexpected sync state: ${JSON.stringify(initial)}`);
   if (initial.openCount !== '6 open') failures.push(`unexpected open count: ${JSON.stringify(initial)}`);
   if (!initial.sectionsInOrder || !initial.runningVisible || !initial.pausedVisible || !initial.openVisible) {
@@ -701,7 +701,7 @@ try {
     !manualUpdate.keptLocalMode ||
     !manualUpdate.hasCacheBuster
   ) {
-    failures.push(`manual update control did not reload Done Log safely: ${JSON.stringify({ initial, manualUpdate })}`);
+    failures.push(`manual update control did not reload Daymark safely: ${JSON.stringify({ initial, manualUpdate })}`);
   }
   if (initial.scrollWidth > initial.clientWidth || initial.scrollbarWidth !== 'none') {
     failures.push(`compact shell overflows or shows a scrollbar: ${JSON.stringify(initial)}`);

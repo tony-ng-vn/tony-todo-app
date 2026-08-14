@@ -189,7 +189,7 @@ enum DoneLogMenuBarApp {
           )
         }
         FileHandle.standardOutput.write(
-          Data("Done Log is already running\n".utf8)
+          Data("Daymark is already running\n".utf8)
         )
       }
 
@@ -239,7 +239,7 @@ enum DoneLogMenuBarApp {
     let manager = LoginItemManager()
     guard manager.isAvailable else {
       FileHandle.standardError.write(
-        Data("LOGIN_ITEM_FAILED run this command from Done Log.app\n".utf8)
+        Data("LOGIN_ITEM_FAILED run this command from Daymark.app\n".utf8)
       )
       return 1
     }

@@ -3,7 +3,7 @@ import Foundation
 
 enum MenuBarConfiguration {
   static let defaultURL = URL(
-    string: "https://tony-todo-app.vercel.app/menubar"
+    string: "https://daymark.inhavens.com/menubar"
   )!
   static let popoverSize = NSSize(width: 420, height: 640)
   static let fullAppSize = NSSize(width: 1280, height: 820)
@@ -99,7 +99,7 @@ enum MenuBarConfiguration {
     guard
       let image = NSImage(
         systemSymbolName: "checkmark.circle",
-        accessibilityDescription: "Done Log"
+        accessibilityDescription: "Daymark"
       )
     else {
       return nil
@@ -123,7 +123,7 @@ enum MenuBarConfiguration {
     if let button = statusItem.button {
       button.image = makeStatusIcon()
       button.imagePosition = .imageOnly
-      button.toolTip = "Done Log"
+      button.toolTip = "Daymark"
     }
     statusItem.isVisible = true
     return statusItem

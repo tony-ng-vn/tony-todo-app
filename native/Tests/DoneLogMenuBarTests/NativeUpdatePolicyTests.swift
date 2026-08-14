@@ -26,10 +26,10 @@ struct NativeUpdatePolicyTests {
   @Test("Accepts update checks only from the trusted main frame")
   func requiresTrustedMainFrame() throws {
     let homeURL = try #require(
-      URL(string: "https://tony-todo-app.vercel.app/menubar")
+      URL(string: "https://daymark.inhavens.com/menubar")
     )
     let trustedURL = try #require(
-      URL(string: "https://tony-todo-app.vercel.app/menubar?local=1")
+      URL(string: "https://daymark.inhavens.com/menubar?local=1")
     )
     let untrustedURL = try #require(
       URL(string: "https://example.com/embedded")
