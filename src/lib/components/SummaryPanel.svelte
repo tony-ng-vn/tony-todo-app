@@ -6,7 +6,6 @@
   import { iconChevronLeft, iconChevronRight, iconPage } from './icons.js';
 
   export let summary = [];
-  export let completedToday = 0;
   export let selectedDay;
   export let draggedSummaryId = null;
   export let dropTargetId = null;
@@ -24,6 +23,8 @@
   let editingTimeId = null;
   let timeDraft = '';
   let timeError = '';
+
+  $: recapItemCount = summary.reduce((count, section) => count + section.items.length, 0);
 
   async function startTimeEdit(item) {
     editingTimeId = item.id;
@@ -78,8 +79,8 @@
   <div class="summary-top">
     <div class="summary-heading">
       <h2 id="summary-heading">Today recap</h2>
-      <output class="recap-completion-count" aria-label={`${completedToday} completed today`}>
-        {completedToday} done
+      <output class="recap-completion-count" aria-label={`${recapItemCount} completed on this day`}>
+        {recapItemCount} done
       </output>
     </div>
     <div class="summary-date-navigation" aria-label="Recap day navigation">
