@@ -28,6 +28,14 @@
   async function beginEditing() {
     await focus();
   }
+
+  function handleLinkClick(event) {
+    if (event.metaKey || event.ctrlKey) {
+      return;
+    }
+    event.preventDefault();
+    void beginEditing();
+  }
 </script>
 
 <div class={`rich-note-editor ${variant}`} class:showing-preview={showingPreview}>
@@ -60,7 +68,7 @@
       <div class="rich-note-content">
         {#each tokens as token}
           {#if token.type === 'link'}
-            <a data-note-link href={token.href} target="_blank" rel="noreferrer noopener">
+            <a data-note-link href={token.href} target="_blank" rel="noreferrer noopener" on:click={handleLinkClick}>
               <svg viewBox="0 0 16 16" aria-hidden="true">
                 <circle cx="8" cy="8" r="6.25"></circle>
                 <path d="M1.75 8h12.5M8 1.75c1.65 1.7 2.5 3.78 2.5 6.25S9.65 12.55 8 14.25C6.35 12.55 5.5 10.47 5.5 8S6.35 3.45 8 1.75Z"></path>
