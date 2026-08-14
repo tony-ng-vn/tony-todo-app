@@ -3,7 +3,7 @@ import Testing
 
 @testable import DoneLogMenuBar
 
-@Suite("Native app launch policy")
+@Suite("Native app launch policy", .serialized)
 struct NativeAppLaunchPolicyTests {
   @Test("Opens the full window for a normal LaunchServices launch")
   func opensFullWindowForNormalLaunch() {
@@ -46,7 +46,7 @@ struct NativeAppLaunchPolicyTests {
 
   @Test("Keeps the full window closed during floating-note activation")
   @MainActor
-  func keepsFullWindowClosedForFloatingNoteActivation() {
+  func keepsFullWindowClosedForFloatingNoteActivation() async throws {
     var activationAction: NativeAppLaunchPolicy.Action?
 
     NativeAppLaunchPolicy.withReopenIntent(.floatingNoteActivation) {
@@ -54,6 +54,11 @@ struct NativeAppLaunchPolicyTests {
     }
 
     #expect(activationAction == .keepCurrentWindows)
+    #expect(NativeAppLaunchPolicy.reopenAction == .keepCurrentWindows)
+
+    try await Task.sleep(
+      nanoseconds: NativeAppLaunchPolicy.reopenIntentRestoreNanoseconds + 50_000_000
+    )
     #expect(NativeAppLaunchPolicy.reopenAction == .openFullApp)
   }
 

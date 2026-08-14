@@ -144,6 +144,7 @@ describe('menu bar app bundle', () => {
     expect(menuBarController).toContain('onShowMenuBar:');
     expect(note).toContain('requestNativeMenuBar(window)');
     expect(note).toContain('Mini todos');
+    expect(note).toContain('class="floating-note-header"');
   });
 
   it('keeps floating-note activation from opening the full app', () => {
@@ -161,9 +162,21 @@ describe('menu bar app bundle', () => {
     );
 
     expect(policy).toContain('case floatingNoteActivation');
+    expect(policy).toContain('reopenIntentRestoreNanoseconds');
     expect(app).toContain('NativeAppLaunchPolicy.reopenAction');
     expect(noteController).toContain(
       'NativeAppLaunchPolicy.withReopenIntent(.floatingNoteActivation)',
+    );
+    expect(noteController).toContain('makeKeyAndOrderFront');
+    const showBody = noteController.slice(
+      noteController.indexOf('func show()'),
+      noteController.indexOf('func windowDidResize'),
+    );
+    expect(showBody.indexOf('withReopenIntent')).toBeLessThan(
+      showBody.indexOf('makeKeyAndOrderFront'),
+    );
+    expect(showBody.indexOf('withReopenIntent')).toBeLessThan(
+      showBody.indexOf('NSApp.activate'),
     );
   });
 
