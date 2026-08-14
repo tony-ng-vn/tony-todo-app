@@ -6,6 +6,7 @@
   import FloatingTaskNote from '../../lib/components/FloatingTaskNote.svelte';
   import MenubarTaskRow from '../../lib/components/MenubarTaskRow.svelte';
   import ThemeToggle from '../../lib/components/ThemeToggle.svelte';
+  import { resolveMenubarShell } from '../../menubarShell.js';
   import {
     applyThemeMode,
     loadThemeMode,
@@ -96,6 +97,7 @@
   const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
   let state = createInitialState();
+  let stateLoaded = false;
   let syncMessage = 'Connecting';
   let useRemote = false;
   let authChecked = false;
@@ -147,6 +149,14 @@
   });
   $: floatingNoteTodo = floatingNoteId ? findTodo(floatingNoteId) : null;
   $: standaloneNoteTodo = standaloneNoteId ? findTodo(standaloneNoteId) : null;
+  $: shell = resolveMenubarShell({
+    stateLoaded,
+    authChecked,
+    useRemote,
+    authUser,
+    standaloneNoteId,
+    hasStandaloneNoteTodo: Boolean(standaloneNoteTodo),
+  });
 
   onMount(() => {
     const searchParams = new URLSearchParams(window.location.search);
@@ -166,6 +176,7 @@
     useRemote = isInsForgeConfigured && !searchParams.has('local');
     syncMessage = useRemote ? 'Connecting' : 'Local only';
     state = loadLocalState();
+    stateLoaded = true;
     queuePendingNoteSaves();
     themeMode = loadThemeMode();
     applyThemeMode(themeMode);
@@ -835,9 +846,9 @@
 
 </script>
 
-{#if !authChecked}
+{#if shell === 'loading'}
   <main class="menubar-loading" aria-label="Loading Daymark">Connecting...</main>
-{:else if useRemote && !authUser}
+{:else if shell === 'auth'}
   <AuthGate
     mode={authMode}
     bind:email={authEmail}
@@ -847,13 +858,13 @@
     onSubmit={handleAuthSubmit}
     onToggleMode={handleAuthToggleMode}
   />
-{:else if standaloneNoteId && standaloneNoteTodo}
+{:else if shell === 'note'}
   <FloatingTaskNote
     todo={standaloneNoteTodo}
     noteSaveStatus={noteSaveStatuses[standaloneNoteTodo.id] ?? 'saved'}
     onNoteInput={handleNoteInput}
   />
-{:else if standaloneNoteId}
+{:else if shell === 'note-missing'}
   <main class="menubar-loading" aria-label="Task note unavailable">This task is no longer available.</main>
 {:else}
   <main class="menubar-shell" aria-label="Daymark menu bar companion">
