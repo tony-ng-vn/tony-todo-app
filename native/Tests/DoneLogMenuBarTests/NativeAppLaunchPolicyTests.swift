@@ -3,7 +3,7 @@ import Testing
 
 @testable import DoneLogMenuBar
 
-@Suite("Native app launch policy")
+@Suite("Native app launch policy", .serialized)
 struct NativeAppLaunchPolicyTests {
   @Test("Opens the full window for a normal LaunchServices launch")
   func opensFullWindowForNormalLaunch() {

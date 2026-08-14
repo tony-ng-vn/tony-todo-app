@@ -51,17 +51,17 @@ final class FloatingNoteWindowController: NSWindowController, NSWindowDelegate {
   }
 
   func show() {
-    if let window {
-      NativeWindowPolicy.applyChrome(to: window)
-      contentController.syncNativeChrome(from: window)
-    }
-    showWindow(nil)
-    if !hasBeenShown {
-      window?.center()
-      hasBeenShown = true
-    }
-    window?.makeKeyAndOrderFront(nil)
     NativeAppLaunchPolicy.withReopenIntent(.floatingNoteActivation) {
+      if let window {
+        NativeWindowPolicy.applyChrome(to: window)
+        contentController.syncNativeChrome(from: window)
+      }
+      showWindow(nil)
+      if !hasBeenShown {
+        window?.center()
+        hasBeenShown = true
+      }
+      window?.makeKeyAndOrderFront(nil)
       NSApp.activate(ignoringOtherApps: true)
     }
   }
