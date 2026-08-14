@@ -9,7 +9,7 @@ struct MenuBarConfigurationTests {
   func usesDeployedRouteByDefault() {
     #expect(
       MenuBarConfiguration.resolveURL(environment: [:]).absoluteString
-        == "https://tony-todo-app.vercel.app/menubar"
+        == "https://daymark.inhavens.com/menubar"
     )
   }
 
@@ -28,7 +28,7 @@ struct MenuBarConfigurationTests {
   @Test("Revalidates the menu bar page on launch")
   func revalidatesMenuBarPageOnLaunch() throws {
     let url = try #require(
-      URL(string: "https://tony-todo-app.vercel.app/menubar")
+      URL(string: "https://daymark.inhavens.com/menubar")
     )
     let request = MenuBarConfiguration.makeHomeRequest(for: url)
 
@@ -60,7 +60,7 @@ struct MenuBarConfigurationTests {
     #expect(
       MenuBarConfiguration.resolveURL(
         environment: ["DONE_LOG_MENUBAR_URL": override]
-      ).absoluteString == "https://tony-todo-app.vercel.app/menubar"
+      ).absoluteString == "https://daymark.inhavens.com/menubar"
     )
   }
 
@@ -76,9 +76,9 @@ struct MenuBarConfigurationTests {
   @Test(
     "Refreshes an existing document when the full app is presented",
     arguments: [
-      (URL(string: "https://tony-todo-app.vercel.app/")!, false, false, true),
-      (URL(string: "https://tony-todo-app.vercel.app/")!, false, true, false),
-      (URL(string: "https://tony-todo-app.vercel.app/")!, true, false, false),
+      (URL(string: "https://daymark.inhavens.com/")!, false, false, true),
+      (URL(string: "https://daymark.inhavens.com/")!, false, true, false),
+      (URL(string: "https://daymark.inhavens.com/")!, true, false, false),
       (nil, false, false, false),
     ]
   )

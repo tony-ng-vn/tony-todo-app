@@ -2,7 +2,7 @@
 
 A quiet task tracker that keeps what is next beside proof of what got done.
 
-[Open Done Log](https://tony-todo-app.vercel.app)
+[Open Done Log](https://daymark.inhavens.com)
 
 ![Done Log full app](docs/images/done-log-app.jpg)
 

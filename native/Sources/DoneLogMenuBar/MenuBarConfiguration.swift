@@ -3,7 +3,7 @@ import Foundation
 
 enum MenuBarConfiguration {
   static let defaultURL = URL(
-    string: "https://tony-todo-app.vercel.app/menubar"
+    string: "https://daymark.inhavens.com/menubar"
   )!
   static let popoverSize = NSSize(width: 420, height: 640)
   static let fullAppSize = NSSize(width: 1280, height: 820)

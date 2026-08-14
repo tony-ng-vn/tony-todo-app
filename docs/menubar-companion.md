@@ -53,7 +53,7 @@ npm run menubar
 
 The first run compiles the small Swift host.
 The command remains open while the menu bar app is running, and Control+C quits it.
-The default URL is `https://tony-todo-app.vercel.app/menubar`.
+The default URL is `https://daymark.inhavens.com/menubar`.
 The native WebKit profile has its own authentication session, so sign in once inside the popover to use the same account-backed task set as the full app.
 
 Set `DONE_LOG_MENUBAR_URL` to test another deployment:
