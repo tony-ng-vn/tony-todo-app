@@ -488,10 +488,10 @@
     min-width: 0;
     margin: calc(var(--space-5) * -1) calc(var(--space-5) * -1) calc(var(--space-5) * -1) 0;
     overflow: hidden;
-    border-left: 1px solid rgba(58, 54, 47, 0.12);
-    background: #f7f3ea;
-    color: #302f2b;
-    box-shadow: -18px 0 52px rgba(65, 57, 46, 0.08);
+    border-left: 1px solid var(--border);
+    background: var(--canvas-soft);
+    color: var(--strong);
+    box-shadow: -18px 0 52px var(--shadow);
     animation: calendar-day-panel-enter 220ms ease both;
   }
 
@@ -502,13 +502,13 @@
     justify-content: space-between;
     gap: 16px;
     padding: 24px 22px 19px;
-    border-bottom: 1px solid rgba(58, 54, 47, 0.12);
-    background: #fffdf8;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface-strong);
   }
 
   .calendar-day-kicker {
     margin: 0;
-    color: #99958b;
+    color: var(--subtle);
     font-size: 9px;
     font-weight: 700;
     letter-spacing: 0.13em;
@@ -517,7 +517,7 @@
 
   .calendar-day-panel-header h2 {
     margin: 5px 0 3px;
-    color: #302f2b;
+    color: var(--strong);
     font-size: 20px;
     font-weight: 590;
     letter-spacing: -0.035em;
@@ -525,7 +525,7 @@
 
   .calendar-day-panel-summary {
     margin: 0;
-    color: #99958b;
+    color: var(--subtle);
     font-size: 10px;
   }
 
@@ -535,15 +535,15 @@
     height: 31px;
     flex: 0 0 auto;
     place-items: center;
-    border: 1px solid rgba(58, 54, 47, 0.12);
+    border: 1px solid var(--border);
     border-radius: 9px;
     background: transparent;
-    color: #69665f;
+    color: var(--default);
   }
 
   .calendar-day-panel-close:hover {
-    background: rgba(120, 145, 124, 0.1);
-    color: #302f2b;
+    background: var(--block-hover);
+    color: var(--strong);
   }
 
   .calendar-day-number:focus-visible,
@@ -562,17 +562,17 @@
 
   .calendar-day-joined-summary {
     margin: 0 0 13px;
-    color: #69665f;
+    color: var(--default);
     font-size: 10px;
     text-align: center;
   }
 
   .calendar-day-joined-cluster {
     overflow: hidden;
-    border: 1px solid rgba(86, 77, 63, 0.1);
+    border: 1px solid var(--block-border);
     border-radius: 24px;
-    background: #fffdf8;
-    box-shadow: 0 10px 28px rgba(86, 77, 63, 0.07);
+    background: var(--surface-strong);
+    box-shadow: var(--shadow-soft);
   }
 
   .calendar-day-task {
@@ -584,16 +584,16 @@
     border: 0;
     border-radius: 0;
     background: transparent;
-    color: #302f2b;
+    color: var(--strong);
     text-align: left;
   }
 
   .calendar-day-task + .calendar-day-task {
-    border-top: 1px solid rgba(58, 54, 47, 0.12);
+    border-top: 1px solid var(--border);
   }
 
   .calendar-day-task:hover {
-    background: rgba(120, 145, 124, 0.055);
+    background: var(--block-hover);
   }
 
   .calendar-day-task-index {
@@ -605,22 +605,22 @@
     height: 23px;
     place-items: center;
     border-radius: 999px;
-    background: #eaf1e9;
-    color: #78917c;
+    background: color-mix(in srgb, #78917c 18%, var(--surface-strong));
+    color: color-mix(in srgb, #78917c 70%, var(--strong));
     font-size: 9px;
     font-weight: 700;
   }
 
   .calendar-day-task.is-clay .calendar-day-task-index {
-    background: #f4e9e2;
-    color: #b78369;
+    background: color-mix(in srgb, #b78369 18%, var(--surface-strong));
+    color: color-mix(in srgb, #b78369 72%, var(--strong));
   }
 
   .calendar-day-task-time {
     display: flex;
     align-items: center;
     gap: 7px;
-    color: #78917c;
+    color: color-mix(in srgb, #78917c 70%, var(--strong));
     font-size: 9px;
     font-weight: 700;
   }
@@ -634,7 +634,7 @@
   }
 
   .calendar-day-task.is-clay .calendar-day-task-time {
-    color: #b78369;
+    color: color-mix(in srgb, #b78369 72%, var(--strong));
   }
 
   .calendar-day-task-title {
@@ -646,7 +646,7 @@
 
   .calendar-day-task-duration {
     display: block;
-    color: #99958b;
+    color: var(--subtle);
     font-size: 9px;
   }
 
@@ -665,8 +665,8 @@
     height: 42px;
     place-items: center;
     border-radius: 999px;
-    background: #eaf1e9;
-    color: #78917c;
+    background: color-mix(in srgb, #78917c 18%, var(--surface-strong));
+    color: color-mix(in srgb, #78917c 70%, var(--strong));
     font-size: 14px;
   }
 
@@ -679,7 +679,7 @@
   .calendar-day-empty p {
     max-width: 28ch;
     margin: 0;
-    color: #99958b;
+    color: var(--subtle);
     font-size: 10px;
   }
 

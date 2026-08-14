@@ -2,13 +2,18 @@ import { chromium } from 'playwright';
 
 const targetUrl = new URL(process.env.UI_SMOKE_URL ?? 'http://127.0.0.1:5174/');
 targetUrl.searchParams.set('local', '1');
+const theme = process.env.UI_SMOKE_THEME ?? 'light';
+if (!['light', 'dark'].includes(theme)) {
+  throw new Error(`UI_SMOKE_THEME must be light or dark, received ${theme}`);
+}
 
 const browser = await chromium.launch({ headless: true });
 
 try {
   const context = await browser.newContext({
+    deviceScaleFactor: 2,
     locale: 'en-US',
-    viewport: { width: 1366, height: 900 },
+    viewport: { width: 1421, height: 1066 },
     timezoneId: 'America/Los_Angeles',
   });
   const page = await context.newPage();
@@ -23,9 +28,9 @@ try {
   });
   page.on('pageerror', (error) => browserErrors.push(error.message));
 
-  await page.addInitScript(() => {
+  await page.addInitScript((selectedTheme) => {
     localStorage.setItem('done-log-client-id', 'calendar-day-panel-smoke');
-    localStorage.setItem('done-log-theme', 'light');
+    localStorage.setItem('done-log-theme', selectedTheme);
     localStorage.setItem('done-log-view', 'calendar');
     localStorage.setItem(
       'done-log-state',
@@ -67,17 +72,18 @@ try {
         ],
       }),
     );
-  });
+  }, theme);
 
   await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
   await page.waitForSelector('.calendar-panel');
 
   const dayButton = (dateKey) => page.locator(`[data-calendar-date="${dateKey}"] .calendar-day-number`);
+  const expectedInkBackground = theme === 'dark' ? 'rgb(244, 241, 232)' : 'rgb(41, 41, 41)';
   const waitForInkDot = (dateKey) =>
-    page.waitForFunction((key) => {
+    page.waitForFunction(({ key, background }) => {
       const number = document.querySelector(`[data-calendar-date="${key}"] .calendar-day-number`);
-      return number && getComputedStyle(number).backgroundColor === 'rgb(41, 41, 41)';
-    }, dateKey);
+      return number && getComputedStyle(number).backgroundColor === background;
+    }, { key: dateKey, background: expectedInkBackground });
 
   await dayButton('2026-08-05').dblclick();
   await waitForInkDot('2026-08-05');
@@ -101,6 +107,18 @@ try {
       selected: selectedCell?.classList.contains('is-selected'),
       selectedPressed: selectedNumber?.getAttribute('aria-pressed'),
       selectedBackground: selectedNumber ? getComputedStyle(selectedNumber).backgroundColor : null,
+      panelBackground: getComputedStyle(document.querySelector('.calendar-day-panel')).backgroundColor,
+      headerBackground: getComputedStyle(
+        document.querySelector('.calendar-day-panel-header'),
+      ).backgroundColor,
+      clusterBackground: getComputedStyle(
+        document.querySelector('.calendar-day-joined-cluster'),
+      ).backgroundColor,
+      headingColor: getComputedStyle(
+        document.querySelector('#calendar-day-panel-heading'),
+      ).color,
+      taskColor: getComputedStyle(document.querySelector('.calendar-day-task')).color,
+      mutedColor: getComputedStyle(document.querySelector('.calendar-day-task-duration')).color,
       panelTitle: document.querySelector('#calendar-day-panel-heading')?.textContent.trim(),
       panelSummary: document.querySelector('.calendar-day-panel-summary')?.textContent.trim(),
       taskTitles,
@@ -116,7 +134,7 @@ try {
   if (
     !todayState.selected ||
     todayState.selectedPressed !== 'true' ||
-    todayState.selectedBackground === 'rgba(0, 0, 0, 0)' ||
+    todayState.selectedBackground !== expectedInkBackground ||
     todayState.panelTitle !== 'Wednesday, August 5' ||
     todayState.panelSummary !== '2 tasks - 2h 12m focused' ||
     JSON.stringify(todayState.taskTitles) !==
@@ -128,7 +146,33 @@ try {
     throw new Error(`today panel did not match the selected design: ${JSON.stringify(todayState)}`);
   }
 
-  await page.screenshot({ path: '/tmp/calendar-day-panel-joined.png', fullPage: true });
+  const expectedThemeState =
+    theme === 'dark'
+      ? {
+          panelBackground: 'rgb(25, 24, 22)',
+          headerBackground: 'rgba(42, 40, 36, 0.9)',
+          clusterBackground: 'rgba(42, 40, 36, 0.9)',
+          headingColor: 'rgb(244, 241, 232)',
+          taskColor: 'rgb(244, 241, 232)',
+          mutedColor: 'rgb(140, 138, 132)',
+        }
+      : {
+          panelBackground: 'rgb(245, 245, 242)',
+          headerBackground: 'rgba(255, 255, 255, 0.92)',
+          clusterBackground: 'rgba(255, 255, 255, 0.92)',
+          headingColor: 'rgb(41, 41, 41)',
+          taskColor: 'rgb(41, 41, 41)',
+          mutedColor: 'rgb(127, 127, 127)',
+        };
+  for (const [property, expected] of Object.entries(expectedThemeState)) {
+    if (todayState[property] !== expected) {
+      throw new Error(
+        `${theme} daily timeline ${property} was ${todayState[property]}, expected ${expected}`,
+      );
+    }
+  }
+
+  await page.screenshot({ path: `/tmp/calendar-day-panel-${theme}-joined.png`, fullPage: true });
 
   await page.getByRole('button', { name: 'Close daily timeline' }).click();
   await page.waitForSelector('.calendar-day-panel', { state: 'hidden' });
@@ -170,7 +214,7 @@ try {
     JSON.stringify(otherDateState.taskTitles) !== JSON.stringify(['Prepare tomorrow handoff']) ||
     otherDateState.previousPressed !== 'false' ||
     otherDateState.selectedPressed !== 'true' ||
-    otherDateState.selectedBackground !== 'rgb(41, 41, 41)'
+    otherDateState.selectedBackground !== expectedInkBackground
   ) {
     throw new Error(`another date did not replace the selected day cleanly: ${JSON.stringify(otherDateState)}`);
   }
@@ -196,7 +240,7 @@ try {
     !emptyState.emptyCopy?.includes('Double-click another date') ||
     emptyState.taskCount !== 0 ||
     emptyState.selectedPressed !== 'true' ||
-    emptyState.selectedBackground !== 'rgb(41, 41, 41)'
+    emptyState.selectedBackground !== expectedInkBackground
   ) {
     throw new Error(`empty-day state was not shown: ${JSON.stringify(emptyState)}`);
   }
@@ -205,8 +249,8 @@ try {
     throw new Error(`calendar interaction logged browser errors: ${browserErrors.join(' | ')}`);
   }
 
-  await page.screenshot({ path: '/tmp/calendar-day-panel-empty.png', fullPage: true });
-  console.log(JSON.stringify({ todayState, otherDateState, emptyState }, null, 2));
+  await page.screenshot({ path: `/tmp/calendar-day-panel-${theme}-empty.png`, fullPage: true });
+  console.log(JSON.stringify({ theme, todayState, otherDateState, emptyState }, null, 2));
   await page.close();
 } finally {
   await browser.close();
