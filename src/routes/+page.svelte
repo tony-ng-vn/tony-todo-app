@@ -1518,6 +1518,7 @@
 
     <SummaryPanel
       {summary}
+      {completedToday}
       bind:selectedDay
       {draggedSummaryId}
       {dropTargetId}

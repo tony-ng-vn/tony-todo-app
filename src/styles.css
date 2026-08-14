@@ -1130,19 +1130,19 @@ h2 {
   text-align: center;
 }
 
+.summary-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.recap-completion-count {
+  display: none;
+}
+
 .rail-line {
   width: 1px;
   min-height: 120px;
   background: linear-gradient(to bottom, transparent, var(--subtle), transparent);
-}
-
-.rail-caption {
-  writing-mode: vertical-rl;
-  justify-self: center;
-  color: var(--subtle);
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
 }
 
 .new-task-form {
@@ -2622,11 +2622,6 @@ h2 {
     background: linear-gradient(to right, transparent, var(--subtle), transparent);
   }
 
-  html:not(.is-native-host) .rail-caption {
-    writing-mode: horizontal-tb;
-    justify-self: end;
-  }
-
   html:not(.is-native-host) .view-toggle {
     width: 100%;
   }
@@ -2998,7 +2993,21 @@ html.is-native-host .todo-item {
 }
 
 html.is-native-host .flow-rail {
-  border: 0;
+  display: none;
+}
+
+html.is-native-host .recap-completion-count {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 24px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 9px;
+  background: var(--surface-strong);
+  color: var(--default);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
 }
 
 html.is-native-host .summary-panel,
@@ -3042,20 +3051,36 @@ html.is-native-host .floating-note-shell {
 }
 
 html.is-native-host .workspace:not(.is-board-view) {
-  grid-template-columns: minmax(0, 1fr) clamp(68px, 7vw, 104px) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 html.is-native-host .workspace.has-detail:not(.is-board-view) {
   grid-template-columns:
     minmax(300px, 1fr)
-    clamp(64px, 6vw, 96px)
     minmax(300px, 0.95fr)
     minmax(320px, 0.9fr);
 }
 
+html.is-native-host .todo-item,
+html.is-native-host .summary-section li {
+  box-shadow: none;
+}
+
+@container task-panel (max-width: 540px) {
+  html.is-native-host .brand-row {
+    flex-wrap: wrap;
+    gap: 6px 12px;
+  }
+
+  html.is-native-host .brand-row .header-actions {
+    flex-basis: 100%;
+    flex-wrap: wrap;
+  }
+}
+
 @media (max-width: 1199px) {
   html.is-native-host .workspace.has-detail:not(.is-board-view) {
-    grid-template-columns: minmax(0, 1fr) 64px minmax(360px, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 44%);
   }
 
   html.is-native-host .workspace.has-detail:not(.is-board-view) .summary-panel {
@@ -3078,8 +3103,10 @@ html.is-native-host .workspace.has-detail:not(.is-board-view) {
     margin: 24px 0 20px;
   }
 
-  html.is-native-host .flow-rail {
-    padding-inline: 6px;
-  }
+}
 
+@media (max-height: 700px) {
+  html.is-native-host .new-task-form {
+    margin-block: 16px;
+  }
 }

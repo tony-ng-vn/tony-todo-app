@@ -6,6 +6,7 @@
   import { iconChevronLeft, iconChevronRight, iconPage } from './icons.js';
 
   export let summary = [];
+  export let completedToday = 0;
   export let selectedDay;
   export let draggedSummaryId = null;
   export let dropTargetId = null;
@@ -75,8 +76,11 @@
 
 <aside class="summary-panel" aria-labelledby="summary-heading">
   <div class="summary-top">
-    <div>
+    <div class="summary-heading">
       <h2 id="summary-heading">Today recap</h2>
+      <output class="recap-completion-count" aria-label={`${completedToday} completed today`}>
+        {completedToday} done
+      </output>
     </div>
     <div class="summary-date-navigation" aria-label="Recap day navigation">
       <button
