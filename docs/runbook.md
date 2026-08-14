@@ -77,7 +77,7 @@ Configure these encrypted environment secrets before creating the first native r
 - `APPLE_NOTARY_ISSUER_ID`: Issuer identifier for the notarization API key.
 - `SPARKLE_PRIVATE_KEY`: Exported Sparkle EdDSA private key.
 
-The Sparkle private key is already generated for `com.tonynguyen.donelog` and must remain in the macOS Keychain and GitHub Actions secrets only.
+The Sparkle private key for the canonical `com.tonynguyen.donelog.menubar` app must remain in the macOS Keychain and GitHub Actions secrets only.
 Never commit any private key, certificate, or password.
 
 ### Release sequence
