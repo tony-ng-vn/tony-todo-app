@@ -226,6 +226,7 @@ function assertMobileTaskDetail(result) {
 async function inspectNativeWorkspaceLayout(viewport) {
   const page = await browser.newPage({ viewport });
   await page.addInitScript(() => {
+    window.__doneLogNativeChrome = true;
     const now = new Date();
     const dayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const at = (hour, minute) =>
@@ -333,7 +334,20 @@ async function captureNativeLayout(page) {
 
     return {
       workspace: measure('.workspace'),
+      workspaceInsets: (() => {
+        const style = getComputedStyle(document.querySelector('.workspace'));
+        return {
+          top: Number.parseFloat(style.paddingTop),
+          right: Number.parseFloat(style.paddingRight),
+          bottom: Number.parseFloat(style.paddingBottom),
+          left: Number.parseFloat(style.paddingLeft),
+        };
+      })(),
       taskPanel: measure('.task-panel'),
+      taskTitle: measure('#task-heading'),
+      taskPanelNote: measure('.task-panel > .panel-note'),
+      workspaceTabs: measure('.task-panel > .view-toggle'),
+      newTaskForm: measure('.new-task-form'),
       quickAddTitle: measure('#todo-title'),
       taskContent: measure('[data-todo-id="ui-smoke-native-paused"] .task-content'),
       taskActions: measure('[data-todo-id="ui-smoke-native-paused"] .task-actions'),
@@ -347,8 +361,15 @@ async function captureNativeLayout(page) {
         ':scope > button',
       ),
       summaryPanel: measure('.summary-panel'),
+      summaryTitle: measure('#summary-heading'),
+      firstSummaryCard: measure('.summary-section li'),
+      summaryProgress: measure('.recap-completion-count'),
       taskDetail: measure('.task-detail'),
       taskDetailContent: measure('.task-detail .detail-title-display'),
+      flowRailDisplay: getComputedStyle(document.querySelector('.flow-rail')).display,
+      redundantLabels: Array.from(document.querySelectorAll('.rail-caption, .task-detail .eyebrow'))
+        .map((element) => element.textContent.trim())
+        .filter(Boolean),
     };
   });
 }
@@ -369,6 +390,40 @@ function assertNativeWorkspaceLayout(result) {
     failures.push(
       `native quick-add title is too narrow at ${result.defaultLayout.quickAddTitle.width}px`,
     );
+  }
+  if (result.defaultLayout.flowRailDisplay !== 'none') {
+    failures.push('native focus rail still consumes a layout column');
+  }
+  for (const [edge, inset] of Object.entries(result.defaultLayout.workspaceInsets)) {
+    if (inset < 10) {
+      failures.push(`native workspace ${edge} inset is only ${inset}px`);
+    }
+  }
+  if (Math.abs(result.defaultLayout.taskTitle.left - result.defaultLayout.taskPanelNote.left) > 1) {
+    failures.push('native Today heading does not align with the task content grid');
+  }
+  if (Math.abs(result.defaultLayout.taskTitle.top - result.defaultLayout.summaryTitle.top) > 1) {
+    failures.push('native panel headings do not share a horizontal baseline');
+  }
+  if (
+    Math.abs(result.defaultLayout.workspaceTabs.left - result.defaultLayout.newTaskForm.left) > 1 ||
+    Math.abs(result.defaultLayout.workspaceTabs.right - result.defaultLayout.newTaskForm.right) > 1
+  ) {
+    failures.push('native task blocks do not share horizontal edges');
+  }
+  if (Math.abs(result.defaultLayout.firstSummaryCard.left - result.defaultLayout.summaryTitle.left) > 1) {
+    failures.push('native recap cards do not align with the summary content grid');
+  }
+  if (result.defaultLayout.summaryProgress.width < 44) {
+    failures.push('native recap header is missing the completed-today status');
+  }
+  for (const [state, layout] of Object.entries({
+    default: result.defaultLayout,
+    detail: result.detailLayout,
+  })) {
+    if (layout.redundantLabels.length) {
+      failures.push(`native ${state} still shows redundant labels: ${layout.redundantLabels.join(', ')}`);
+    }
   }
   if (result.detailLayout.taskContent.width < 180) {
     failures.push(

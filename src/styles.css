@@ -1130,19 +1130,19 @@ h2 {
   text-align: center;
 }
 
+.summary-heading {
+  display: grid;
+  gap: 4px;
+}
+
+.recap-completion-count {
+  display: none;
+}
+
 .rail-line {
   width: 1px;
   min-height: 120px;
   background: linear-gradient(to bottom, transparent, var(--subtle), transparent);
-}
-
-.rail-caption {
-  writing-mode: vertical-rl;
-  justify-self: center;
-  color: var(--subtle);
-  font-size: 12px;
-  font-weight: 500;
-  text-transform: uppercase;
 }
 
 .new-task-form {
@@ -2622,11 +2622,6 @@ h2 {
     background: linear-gradient(to right, transparent, var(--subtle), transparent);
   }
 
-  html:not(.is-native-host) .rail-caption {
-    writing-mode: horizontal-tb;
-    justify-self: end;
-  }
-
   html:not(.is-native-host) .view-toggle {
     width: 100%;
   }
@@ -2906,7 +2901,7 @@ html.is-native-host .workspace.is-board-view.has-detail {
   width: 100%;
   height: 100dvh;
   margin: 0;
-  padding: 0;
+  padding: 12px;
   border-radius: 0;
   background: transparent;
   box-shadow: none;
@@ -2932,12 +2927,33 @@ html.is-native-host .settings-panel {
 
 html.is-native-host .task-panel {
   border-width: 0 1px 0 0;
+  border-radius: 14px 0 0 14px;
   padding-inline: clamp(20px, 3vw, 42px);
   padding-top: 0;
 }
 
 html.is-native-host .summary-panel {
+  border-radius: 0 14px 14px 0;
   padding-inline: clamp(20px, 2.5vw, 34px);
+}
+
+html.is-native-host .workspace.has-detail .summary-panel {
+  border-radius: 0;
+}
+
+html.is-native-host .workspace.has-detail .task-detail {
+  border-radius: 0 14px 14px 0;
+}
+
+html.is-native-host .board-panel,
+html.is-native-host .projects-panel,
+html.is-native-host .calendar-panel,
+html.is-native-host .inbox-panel,
+html.is-native-host .waiting-panel,
+html.is-native-host .history-panel,
+html.is-native-host .meetings-panel,
+html.is-native-host .settings-panel {
+  border-radius: 14px;
 }
 
 html.is-native-host .summary-panel,
@@ -2955,23 +2971,26 @@ html.is-native-host .settings-panel {
 
 html.is-native-host .brand-row,
 html.is-native-host .board-header,
-html.is-native-host .panel-heading {
+html.is-native-host .panel-heading,
+html.is-native-host .summary-top,
+html.is-native-host .detail-header {
   box-sizing: border-box;
-  min-height: max(44px, var(--native-titlebar-inset));
+  min-height: calc(var(--native-titlebar-inset) + 52px);
   align-items: center;
   flex-shrink: 0;
-  padding-top: 6px;
-  padding-bottom: 6px;
-  padding-inline-start: var(--native-traffic-lights-inset);
+  padding-top: calc(var(--native-titlebar-inset) + 8px);
+  padding-bottom: 8px;
+  padding-inline-start: 0;
   -webkit-app-region: drag;
 }
 
 html.is-native-host .task-panel .brand-row {
-  margin-inline-start: calc(-1 * clamp(20px, 3vw, 42px));
+  margin-inline-start: 0;
+  padding-inline-start: 0;
 }
 
 html.is-native-host .board-panel .board-header {
-  margin-inline-start: -18px;
+  margin-inline-start: 0;
 }
 
 html.is-native-host .projects-panel .panel-heading,
@@ -2981,7 +3000,7 @@ html.is-native-host .waiting-panel .panel-heading,
 html.is-native-host .history-panel .panel-heading,
 html.is-native-host .meetings-panel .panel-heading,
 html.is-native-host .settings-panel .panel-heading {
-  margin-inline-start: calc(-1 * var(--space-5));
+  margin-inline-start: 0;
 }
 
 html.is-native-host .view-toggle {
@@ -2997,21 +3016,32 @@ html.is-native-host .todo-item {
   height: auto;
 }
 
+html.is-native-host .summary-section {
+  border-left: 0;
+  padding-inline: 0;
+}
+
 html.is-native-host .flow-rail {
-  border: 0;
+  display: none;
+}
+
+html.is-native-host .recap-completion-count {
+  display: inline-flex;
+  width: fit-content;
+  min-height: 24px;
+  align-items: center;
+  border-radius: 999px;
+  padding: 0 9px;
+  background: var(--surface-strong);
+  color: var(--default);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
 }
 
 html.is-native-host .summary-panel,
 html.is-native-host .workspace.has-detail .task-detail {
   border-width: 0 0 0 1px;
-  border-radius: 0;
-}
-
-html.is-native-host .summary-top,
-html.is-native-host .detail-header {
-  min-height: max(44px, var(--native-titlebar-inset));
-  align-items: center;
-  -webkit-app-region: drag;
 }
 
 html.is-native-host .header-actions,
@@ -3042,20 +3072,36 @@ html.is-native-host .floating-note-shell {
 }
 
 html.is-native-host .workspace:not(.is-board-view) {
-  grid-template-columns: minmax(0, 1fr) clamp(68px, 7vw, 104px) minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
 }
 
 html.is-native-host .workspace.has-detail:not(.is-board-view) {
   grid-template-columns:
     minmax(300px, 1fr)
-    clamp(64px, 6vw, 96px)
     minmax(300px, 0.95fr)
     minmax(320px, 0.9fr);
 }
 
+html.is-native-host .todo-item,
+html.is-native-host .summary-section li {
+  box-shadow: none;
+}
+
+@container task-panel (max-width: 540px) {
+  html.is-native-host .brand-row {
+    flex-wrap: wrap;
+    gap: 6px 12px;
+  }
+
+  html.is-native-host .brand-row .header-actions {
+    flex-basis: 100%;
+    flex-wrap: wrap;
+  }
+}
+
 @media (max-width: 1199px) {
   html.is-native-host .workspace.has-detail:not(.is-board-view) {
-    grid-template-columns: minmax(0, 1fr) 64px minmax(360px, 1fr);
+    grid-template-columns: minmax(0, 1fr) minmax(360px, 44%);
   }
 
   html.is-native-host .workspace.has-detail:not(.is-board-view) .summary-panel {
@@ -3078,8 +3124,10 @@ html.is-native-host .workspace.has-detail:not(.is-board-view) {
     margin: 24px 0 20px;
   }
 
-  html.is-native-host .flow-rail {
-    padding-inline: 6px;
-  }
+}
 
+@media (max-height: 700px) {
+  html.is-native-host .new-task-form {
+    margin-block: 16px;
+  }
 }

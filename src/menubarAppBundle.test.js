@@ -167,7 +167,7 @@ describe('menu bar app bundle', () => {
     );
   });
 
-  it('uses one stable visible status item for the installed app', () => {
+  it('uses one visible status item without restoring a poisoned position', () => {
     const controller = readFileSync(
       path.join(repoRoot, 'native/Sources/DoneLogMenuBar/MenuBarController.swift'),
       'utf8',
@@ -182,8 +182,9 @@ describe('menu bar app bundle', () => {
       'utf8',
     );
 
-    expect(config).toContain('autosaveName');
-    expect(config).toContain('DoneLogStatusItem');
+    expect(config).toContain('statusItemAutosaveName');
+    expect(config).toContain('primary-status-item-v4');
+    expect(config).not.toContain('DoneLogStatusItem');
     expect(config).not.toContain('NSStatusItem Preferred Position');
     expect(config).not.toContain('NSStatusItem VisibleCC');
     expect(config).toContain('statusItem.isVisible = true');
@@ -277,5 +278,34 @@ describe('menu bar app bundle', () => {
     expect(styles).toContain('flex-wrap: wrap;');
     expect(styles).toContain('html.is-native-host .floating-note-shell');
     expect(styles).toContain('padding-top: calc(18px + var(--native-titlebar-inset));');
+  });
+
+  it('keeps native workspace status compact and removes redundant labels', () => {
+    const styles = readFileSync(path.join(repoRoot, 'src/styles.css'), 'utf8');
+    const summary = readFileSync(
+      path.join(repoRoot, 'src/lib/components/SummaryPanel.svelte'),
+      'utf8',
+    );
+    const detail = readFileSync(
+      path.join(repoRoot, 'src/lib/components/TaskDetail.svelte'),
+      'utf8',
+    );
+    const rail = readFileSync(
+      path.join(repoRoot, 'src/lib/components/FlowRail.svelte'),
+      'utf8',
+    );
+
+    expect(styles).toMatch(/html\.is-native-host \.flow-rail\s*{[^}]*display:\s*none;/s);
+    expect(styles).toMatch(/html\.is-native-host \.workspace,[\s\S]*?padding:\s*12px;/);
+    expect(styles).toContain('border-radius: 14px 0 0 14px;');
+    expect(styles).toMatch(
+      /html\.is-native-host \.task-panel \.brand-row\s*{[^}]*padding-inline-start:\s*0;/s,
+    );
+    expect(styles).toMatch(
+      /html\.is-native-host \.summary-section\s*{[^}]*padding-inline:\s*0;/s,
+    );
+    expect(summary).toContain('class="recap-completion-count"');
+    expect(detail).not.toContain('Task page');
+    expect(rail).not.toContain('rail-caption');
   });
 });

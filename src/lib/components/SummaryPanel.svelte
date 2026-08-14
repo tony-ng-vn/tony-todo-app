@@ -24,6 +24,11 @@
   let timeDraft = '';
   let timeError = '';
 
+  $: recapItemCount = summary.reduce(
+    (count, section) => count + section.items.filter((item) => item.outcome !== 'failed').length,
+    0,
+  );
+
   async function startTimeEdit(item) {
     editingTimeId = item.id;
     timeDraft = timeInputValue(item.completedAt);
@@ -75,8 +80,11 @@
 
 <aside class="summary-panel" aria-labelledby="summary-heading">
   <div class="summary-top">
-    <div>
+    <div class="summary-heading">
       <h2 id="summary-heading">Today recap</h2>
+      <output class="recap-completion-count" aria-label={`${recapItemCount} completed on this day`}>
+        {recapItemCount} done
+      </output>
     </div>
     <div class="summary-date-navigation" aria-label="Recap day navigation">
       <button

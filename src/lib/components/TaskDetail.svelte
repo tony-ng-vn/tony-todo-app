@@ -261,7 +261,6 @@
 <aside class="task-detail" id="task-detail" aria-labelledby="detail-heading">
   <div class="detail-header">
     <div>
-      <p class="eyebrow">Task page</p>
       <h2 id="detail-heading">Details</h2>
     </div>
     <div class="detail-window-actions">

@@ -64,9 +64,37 @@ struct MenuBarConfigurationTests {
     )
   }
 
-  @Test("Uses one stable status item identity")
-  func usesOneStableStatusItemIdentity() {
-    #expect(MenuBarConfiguration.statusItemAutosaveName == "DoneLogStatusItem")
+  @Test("Uses the status item identity exposed in System Settings")
+  func usesSystemSettingsStatusItemIdentity() {
+    #expect(
+      MenuBarConfiguration.statusItemAutosaveName(
+        bundleIdentifier: "com.tonynguyen.donelog"
+      ) == "com.tonynguyen.donelog.primary-status-item-v4"
+    )
+  }
+
+  @Test(
+    "Refreshes an existing document when the full app is presented",
+    arguments: [
+      (URL(string: "https://tony-todo-app.vercel.app/")!, false, false, true),
+      (URL(string: "https://tony-todo-app.vercel.app/")!, false, true, false),
+      (URL(string: "https://tony-todo-app.vercel.app/")!, true, false, false),
+      (nil, false, false, false),
+    ]
+  )
+  func refreshesExistingDocumentForPresentation(
+    currentURL: URL?,
+    isLoading: Bool,
+    windowWasVisible: Bool,
+    expected: Bool
+  ) {
+    #expect(
+      MenuBarConfiguration.shouldRefreshWebContentForPresentation(
+        currentURL: currentURL,
+        isLoading: isLoading,
+        windowWasVisible: windowWasVisible
+      ) == expected
+    )
   }
 
   @Test("Builds a visible native template icon")
