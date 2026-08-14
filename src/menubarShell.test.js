@@ -26,6 +26,11 @@ describe('resolveMenubarShell', () => {
   });
 
   it('never gates local mode on auth', () => {
+    // authChecked true + no user is the one row where remote mode would show
+    // the auth gate; local mode must still render the app.
+    expect(
+      resolveMenubarShell({ ...base, useRemote: false, authChecked: true, authUser: null }),
+    ).toBe('app');
     expect(
       resolveMenubarShell({ ...base, useRemote: false, authChecked: false, authUser: null }),
     ).toBe('app');
