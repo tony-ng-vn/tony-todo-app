@@ -84,7 +84,6 @@
 <section class="board-panel" aria-labelledby="board-heading">
   <header class="board-header">
     <div class="board-brand">
-      <p class="eyebrow">Done Log</p>
       <h1 id="board-heading">Board</h1>
     </div>
 

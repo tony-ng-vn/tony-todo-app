@@ -14,13 +14,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
   private var floatingNoteWindows: [String: FloatingNoteWindowController] = [:]
 
   init(url: URL, updateChecker: any AppUpdateChecking) {
-    MenuBarConfiguration.revealStatusItemInControlCenter()
-    statusItem = NSStatusBar.system.statusItem(
-      withLength: NSStatusItem.variableLength
-    )
-    statusItem.autosaveName = NSStatusItem.AutosaveName(
-      MenuBarConfiguration.statusItemAutosaveName
-    )
+    statusItem = MenuBarConfiguration.makeStatusItem()
     popover = NSPopover()
     contextMenu = NSMenu()
     fullAppURL = MenuBarConfiguration.fullAppURL(for: url)
@@ -121,20 +115,6 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     statusItem.menu = contextMenu
   }
 
-  func recreateStatusItem() {
-    NSStatusBar.system.removeStatusItem(statusItem)
-    MenuBarConfiguration.revealStatusItemInControlCenter()
-    statusItem = NSStatusBar.system.statusItem(
-      withLength: NSStatusItem.variableLength
-    )
-    statusItem.autosaveName = NSStatusItem.AutosaveName(
-      MenuBarConfiguration.statusItemAutosaveName
-    )
-    applyStatusItemAppearance()
-    statusItem.menu = contextMenu
-    statusItem.isVisible = true
-  }
-
   func revealStatusItem() {
     statusItem.isVisible = true
     if statusItem.button?.image == nil {
@@ -166,7 +146,7 @@ final class MenuBarController: NSObject, NSMenuDelegate {
     }
 
     button.image = MenuBarConfiguration.makeStatusIcon()
-    button.imagePosition = .imageLeft
+    button.imagePosition = .imageOnly
     button.toolTip = "Done Log"
   }
 

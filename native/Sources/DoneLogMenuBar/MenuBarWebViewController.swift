@@ -12,7 +12,7 @@ private final class WindowChromeMessageRelay: NSObject, WKScriptMessageHandler {
     _ userContentController: WKUserContentController,
     didReceive message: WKScriptMessage
   ) {
-    Task { @MainActor in
+    MainActor.assumeIsolated {
       self.controller?.handleWindowChromeMessage(message)
     }
   }
@@ -251,6 +251,11 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     }
 
     switch NativeWindowPolicy.chromeCommand(from: message.body) {
+    case .drag:
+      guard let event = NSApp.currentEvent, event.type == .leftMouseDown else {
+        return
+      }
+      window.performDrag(with: event)
     case .zoom:
       window.performZoom(nil)
     case nil:
@@ -394,11 +399,32 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     window.__doneLogMenuBarMessage = '\(NativeMenuBarReturnPolicy.messageName)';
     window.__doneLogNativeUpdater = \(updaterFlag);
     window.__doneLogNativeUpdaterMessage = '\(NativeUpdatePolicy.messageName)';
-    if (\(chromeFlag)) {
-      document.documentElement.classList.add('is-native-host');
-      document.documentElement.style.setProperty('--native-titlebar-inset', '28px');
-      document.documentElement.style.setProperty('--native-traffic-lights-inset', '78px');
-    }
+     if (\(chromeFlag)) {
+       document.documentElement.classList.add('is-native-host');
+       document.documentElement.style.setProperty('--native-titlebar-inset', '28px');
+       document.documentElement.style.setProperty('--native-traffic-lights-inset', '78px');
+       if (!window.__doneLogNativeDragInstalled) {
+         window.__doneLogNativeDragInstalled = true;
+         const dragSelector = '.brand-row, .board-header, .panel-heading, .summary-top, .detail-header';
+         const noDragSelector = 'button, a, input, textarea, select, label, option, [role="button"], [role="tab"], [contenteditable="true"], .header-actions, .board-header-actions, .theme-toggle, .calendar-picker, .view-toggle, .summary-date-navigation, .detail-window-actions';
+         document.addEventListener('mousedown', (event) => {
+           const target = event.target;
+           if (
+             event.button !== 0 ||
+             typeof target?.closest !== 'function' ||
+             target.closest(noDragSelector) ||
+             !target.closest(dragSelector)
+           ) {
+             return;
+           }
+
+           event.preventDefault();
+           window.webkit?.messageHandlers?.doneLogWindow?.postMessage({
+             command: 'drag',
+           });
+         });
+       }
+     }
     """
   }
 }

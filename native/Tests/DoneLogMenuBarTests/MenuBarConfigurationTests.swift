@@ -64,33 +64,9 @@ struct MenuBarConfigurationTests {
     )
   }
 
-  @Test("Turns the Control Center extra on before creating it")
-  func revealsStatusItemInControlCenter() {
-    let defaults = UserDefaults(suiteName: "done-log.status-item.visible-test")!
-
-    MenuBarConfiguration.revealStatusItemInControlCenter(defaults: defaults)
-
-    #expect(
-      defaults.bool(
-        forKey: MenuBarConfiguration.statusItemVisibleDefaultsKey(
-          prefix: "NSStatusItem Visible"
-        )
-      )
-    )
-    #expect(
-      defaults.bool(
-        forKey: MenuBarConfiguration.statusItemVisibleDefaultsKey(
-          prefix: "NSStatusItem VisibleCC"
-        )
-      )
-    )
-    #expect(
-      defaults.integer(
-        forKey: MenuBarConfiguration.statusItemVisibleDefaultsKey(
-          prefix: "NSStatusItem Preferred Position"
-        )
-      ) == 450
-    )
+  @Test("Uses one stable status item identity")
+  func usesOneStableStatusItemIdentity() {
+    #expect(MenuBarConfiguration.statusItemAutosaveName == "DoneLogStatusItem")
   }
 
   @Test("Builds a visible native template icon")

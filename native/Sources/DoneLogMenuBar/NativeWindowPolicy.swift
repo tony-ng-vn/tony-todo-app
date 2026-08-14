@@ -17,6 +17,7 @@ enum NativeWindowPolicy {
   static let canvasColor = NSColor(srgbRed: 20.0 / 255.0, green: 20.0 / 255.0, blue: 18.0 / 255.0, alpha: 1)
 
   enum ChromeCommand: Equatable {
+    case drag
     case zoom
   }
 
@@ -29,6 +30,7 @@ enum NativeWindowPolicy {
     window.appearance = NSAppearance(named: .darkAqua)
     window.isOpaque = true
     window.backgroundColor = canvasColor
+    window.hidesOnDeactivate = false
     window.isMovableByWindowBackground = true
   }
 
@@ -124,6 +126,8 @@ enum NativeWindowPolicy {
     }
 
     switch command {
+    case "drag":
+      return .drag
     case "zoom":
       return .zoom
     default:

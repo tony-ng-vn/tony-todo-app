@@ -182,12 +182,12 @@ describe('menu bar app bundle', () => {
       'utf8',
     );
 
-    expect(controller).toContain('autosaveName');
+    expect(config).toContain('autosaveName');
     expect(config).toContain('DoneLogStatusItem');
-    expect(controller).not.toContain('com.tonynguyen.donelog.primary-status-item');
-    expect(controller).toContain('revealStatusItemInControlCenter');
-    expect(controller).toContain('statusItem.isVisible = true');
-    expect(controller).toContain('withLength: NSStatusItem.variableLength');
+    expect(config).not.toContain('NSStatusItem Preferred Position');
+    expect(config).not.toContain('NSStatusItem VisibleCC');
+    expect(config).toContain('statusItem.isVisible = true');
+    expect(config).toContain('withLength: NSStatusItem.squareLength');
     expect(controller).toContain('statusItemWindow.isVisible');
     expect(controller).toContain('statusItemFrameIsInMenuBar');
     expect(controller).toContain('func revealStatusItem()');
@@ -195,7 +195,8 @@ describe('menu bar app bundle', () => {
     expect(controller).not.toContain('statusItem.menu = nil');
     expect(app).toContain('hostStatusItem');
     expect(app).toContain('shouldKeepWaitingForStatusItem');
-    expect(app).toContain('shouldRecreateStatusItem');
+    expect(app).not.toContain('shouldRecreateStatusItem');
+    expect(controller).not.toContain('recreateStatusItem');
     expect(app).toContain('allowUnhosted: true');
     expect(app).toContain('shouldOpenFullAppAfterTimeout');
   });
@@ -209,13 +210,23 @@ describe('menu bar app bundle', () => {
       path.join(repoRoot, 'native/Sources/DoneLogMenuBar/DoneLogMenuBarApp.swift'),
       'utf8',
     );
+    const webViewController = readFileSync(
+      path.join(
+        repoRoot,
+        'native/Sources/DoneLogMenuBar/MenuBarWebViewController.swift',
+      ),
+      'utf8',
+    );
 
     expect(controller).toContain('MenuBarConfiguration.fullAppSize');
     expect(controller).toContain('application.setActivationPolicy(.accessory)');
-    expect(controller).not.toContain('application.setActivationPolicy(.regular)');
+    expect(controller).toContain('application.setActivationPolicy(.regular)');
+    expect(controller).toContain('onActivationPolicyChanged?()');
     expect(controller).toContain('.moveToActiveSpace');
     expect(controller).toContain('windowWillUseStandardFrame');
     expect(controller).toContain('screen?.visibleFrame');
+    expect(webViewController).toContain("document.addEventListener('mousedown'");
+    expect(webViewController).toContain('window.performDrag(with: event)');
     expect(app).toContain('NativeAppLaunchPolicy.action(for: launchIntent)');
   });
 

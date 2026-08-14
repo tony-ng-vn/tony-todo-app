@@ -97,6 +97,22 @@ struct NativeWindowPolicyTests {
     #expect(!(window.contentView is NSVisualEffectView))
   }
 
+  @Test("Keeps the full app visible when it deactivates")
+  @MainActor
+  func keepsFullAppVisibleWhenDeactivated() {
+    let window = NSWindow(
+      contentRect: NSRect(x: 0, y: 0, width: 1_000, height: 700),
+      styleMask: NativeWindowPolicy.primaryStyleMask,
+      backing: .buffered,
+      defer: false
+    )
+    window.hidesOnDeactivate = true
+
+    NativeWindowPolicy.applyChrome(to: window)
+
+    #expect(!window.hidesOnDeactivate)
+  }
+
   @Test("Uses the screen visible frame for the native zoom action")
   @MainActor
   func zoomsToTheUsableScreen() throws {
@@ -104,11 +120,11 @@ struct NativeWindowPolicyTests {
       url: try #require(URL(string: "https://example.com/"))
     )
     let window = try #require(controller.window)
-    let visibleFrame = try #require(window.screen?.visibleFrame)
     window.setFrame(
       NSRect(x: 200, y: 160, width: 1_000, height: 700),
       display: false
     )
+    let visibleFrame = try #require(window.screen?.visibleFrame)
 
     window.performZoom(nil)
 
@@ -200,6 +216,7 @@ struct NativeWindowPolicyTests {
       )
     )
     #expect(NativeWindowPolicy.trafficLightsLeadingInset(zoomMaxX: 62) == 78)
+    #expect(NativeWindowPolicy.chromeCommand(from: ["command": "drag"]) == .drag)
     #expect(NativeWindowPolicy.chromeCommand(from: ["command": "zoom"]) == .zoom)
     #expect(NativeWindowPolicy.chromeCommand(from: ["command": "nope"]) == nil)
   }

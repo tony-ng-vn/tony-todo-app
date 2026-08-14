@@ -40,7 +40,6 @@ enum NativeAppLaunchPolicy {
 
   static let statusItemHostTimeout: TimeInterval = 1
   static let statusItemRetryTimeout: TimeInterval = 8
-  static let statusItemRecreateLimit = 3
 
   static func action(for intent: Intent) -> Action {
     switch intent {
@@ -55,17 +54,22 @@ enum NativeAppLaunchPolicy {
   static func shouldOpenFullAppNow(
     action: Action,
     statusItemIsReady: Bool,
-    allowUnhosted: Bool = false
+    allowUnhosted: Bool = false,
+    hasOpenedFullApp: Bool = false
   ) -> Bool {
-    action == .openFullApp && (statusItemIsReady || allowUnhosted)
+    !hasOpenedFullApp
+      && action == .openFullApp
+      && (statusItemIsReady || allowUnhosted)
   }
 
   static func shouldOpenFullAppAfterTimeout(
     action: Action,
     statusItemIsReady: Bool,
-    elapsed: TimeInterval
+    elapsed: TimeInterval,
+    hasOpenedFullApp: Bool = false
   ) -> Bool {
-    action == .openFullApp
+    !hasOpenedFullApp
+      && action == .openFullApp
       && !statusItemIsReady
       && elapsed >= statusItemHostTimeout
   }
@@ -75,17 +79,6 @@ enum NativeAppLaunchPolicy {
     elapsed: TimeInterval
   ) -> Bool {
     !statusItemIsReady && elapsed < statusItemRetryTimeout
-  }
-
-  static func shouldRecreateStatusItem(
-    statusItemIsReady: Bool,
-    recreateCount: Int,
-    elapsed: TimeInterval
-  ) -> Bool {
-    !statusItemIsReady
-      && recreateCount < statusItemRecreateLimit
-      && elapsed >= 0.4 * Double(recreateCount + 1)
-      && elapsed < statusItemRetryTimeout
   }
 
   @MainActor
