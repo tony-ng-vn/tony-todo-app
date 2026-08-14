@@ -226,6 +226,7 @@ function assertMobileTaskDetail(result) {
 async function inspectNativeWorkspaceLayout(viewport) {
   const page = await browser.newPage({ viewport });
   await page.addInitScript(() => {
+    window.__doneLogNativeChrome = true;
     const now = new Date();
     const dayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
     const at = (hour, minute) =>
@@ -347,8 +348,13 @@ async function captureNativeLayout(page) {
         ':scope > button',
       ),
       summaryPanel: measure('.summary-panel'),
+      summaryProgress: measure('.summary-progress'),
       taskDetail: measure('.task-detail'),
       taskDetailContent: measure('.task-detail .detail-title-display'),
+      flowRailDisplay: getComputedStyle(document.querySelector('.flow-rail')).display,
+      redundantLabels: Array.from(document.querySelectorAll('.rail-caption, .task-detail .eyebrow'))
+        .map((element) => element.textContent.trim())
+        .filter(Boolean),
     };
   });
 }
@@ -369,6 +375,20 @@ function assertNativeWorkspaceLayout(result) {
     failures.push(
       `native quick-add title is too narrow at ${result.defaultLayout.quickAddTitle.width}px`,
     );
+  }
+  if (result.defaultLayout.flowRailDisplay !== 'none') {
+    failures.push('native focus rail still consumes a layout column');
+  }
+  if (result.defaultLayout.summaryProgress.width < 44) {
+    failures.push('native recap header is missing the completed-today status');
+  }
+  for (const [state, layout] of Object.entries({
+    default: result.defaultLayout,
+    detail: result.detailLayout,
+  })) {
+    if (layout.redundantLabels.length) {
+      failures.push(`native ${state} still shows redundant labels: ${layout.redundantLabels.join(', ')}`);
+    }
   }
   if (result.detailLayout.taskContent.width < 180) {
     failures.push(
