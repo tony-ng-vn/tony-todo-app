@@ -1,10 +1,10 @@
-# Done Log
+# Daymark
 
 A quiet task tracker that keeps what is next beside proof of what got done.
 
-[Open Done Log](https://daymark.inhavens.com)
+[Open Daymark](https://daymark.inhavens.com)
 
-![Done Log full app](docs/images/done-log-app.jpg)
+![Daymark full app](docs/images/done-log-app.jpg)
 
 ## What it does
 
@@ -16,7 +16,7 @@ A quiet task tracker that keeps what is next beside proof of what got done.
 - Opens the complete workflow in a standard native macOS window with move, resize, minimize, zoom, full-screen, menus, and keyboard shortcuts.
 
 <p align="center">
-  <img src="docs/images/done-log-menubar.jpg" alt="Done Log menu bar companion" width="420">
+  <img src="docs/images/done-log-menubar.jpg" alt="Daymark menu bar companion" width="420">
 </p>
 
 ## Run locally

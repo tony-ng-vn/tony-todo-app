@@ -67,7 +67,7 @@ Several agents work this repo concurrently; these rules keep them from colliding
 
 ## Native menu bar
 
-- Local `npm run menubar` / `menubar:dev` from a worktree must use the `dev` instance lock and `com.tonynguyen.donelog.dev`. Never share the production lock or `doneLogQuit` notification, or a test run will steal or quit `/Applications/Done Log.app`.
+- Local `npm run menubar` / `menubar:dev` from a worktree must use the `dev` instance lock and `com.tonynguyen.donelog.dev`. Never share the production lock or `doneLogQuit` notification, or a test run will steal or quit `/Applications/Daymark.app`.
 - Use `npm run menubar:install` only when you intend to replace the installed production app.
 
 ## CI verification
