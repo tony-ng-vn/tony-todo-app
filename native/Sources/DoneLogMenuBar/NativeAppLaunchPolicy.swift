@@ -28,6 +28,11 @@ enum NativeAppLaunchPolicy {
   private static var currentReopenIntent = Reopen.user
   @MainActor
   private static var reopenIntentGeneration = 0
+  @MainActor
+  private static var scheduledReopenIntentRestore: (
+    generation: Int,
+    previousIntent: Reopen
+  )?
 
   static func initialIntent(
     launchDate: Date?,
@@ -99,14 +104,41 @@ enum NativeAppLaunchPolicy {
     currentReopenIntent = intent
     reopenIntentGeneration += 1
     let generation = reopenIntentGeneration
+    scheduledReopenIntentRestore = (generation, previousIntent)
     let result = try action()
-    Task { @MainActor in
-      try? await Task.sleep(nanoseconds: reopenIntentRestoreNanoseconds)
-      guard generation == reopenIntentGeneration else {
-        return
+    let restoreDelay =
+      Double(reopenIntentRestoreNanoseconds) / 1_000_000_000
+    DispatchQueue.main.asyncAfter(deadline: .now() + restoreDelay) {
+      Task { @MainActor in
+        restoreReopenIntent(
+          generation: generation,
+          previousIntent: previousIntent
+        )
       }
-      currentReopenIntent = previousIntent
     }
     return result
+  }
+
+  @MainActor
+  static func flushScheduledReopenIntentRestore() {
+    guard let scheduled = scheduledReopenIntentRestore else {
+      return
+    }
+    restoreReopenIntent(
+      generation: scheduled.generation,
+      previousIntent: scheduled.previousIntent
+    )
+  }
+
+  @MainActor
+  private static func restoreReopenIntent(
+    generation: Int,
+    previousIntent: Reopen
+  ) {
+    guard generation == reopenIntentGeneration else {
+      return
+    }
+    scheduledReopenIntentRestore = nil
+    currentReopenIntent = previousIntent
   }
 }
