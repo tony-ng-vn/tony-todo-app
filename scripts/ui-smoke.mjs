@@ -344,6 +344,10 @@ async function captureNativeLayout(page) {
         };
       })(),
       taskPanel: measure('.task-panel'),
+      taskTitle: measure('#task-heading'),
+      taskPanelNote: measure('.task-panel > .panel-note'),
+      workspaceTabs: measure('.task-panel > .view-toggle'),
+      newTaskForm: measure('.new-task-form'),
       quickAddTitle: measure('#todo-title'),
       taskContent: measure('[data-todo-id="ui-smoke-native-paused"] .task-content'),
       taskActions: measure('[data-todo-id="ui-smoke-native-paused"] .task-actions'),
@@ -357,6 +361,8 @@ async function captureNativeLayout(page) {
         ':scope > button',
       ),
       summaryPanel: measure('.summary-panel'),
+      summaryTitle: measure('#summary-heading'),
+      firstSummaryCard: measure('.summary-section li'),
       summaryProgress: measure('.recap-completion-count'),
       taskDetail: measure('.task-detail'),
       taskDetailContent: measure('.task-detail .detail-title-display'),
@@ -392,6 +398,21 @@ function assertNativeWorkspaceLayout(result) {
     if (inset < 10) {
       failures.push(`native workspace ${edge} inset is only ${inset}px`);
     }
+  }
+  if (Math.abs(result.defaultLayout.taskTitle.left - result.defaultLayout.taskPanelNote.left) > 1) {
+    failures.push('native Today heading does not align with the task content grid');
+  }
+  if (Math.abs(result.defaultLayout.taskTitle.top - result.defaultLayout.summaryTitle.top) > 1) {
+    failures.push('native panel headings do not share a horizontal baseline');
+  }
+  if (
+    Math.abs(result.defaultLayout.workspaceTabs.left - result.defaultLayout.newTaskForm.left) > 1 ||
+    Math.abs(result.defaultLayout.workspaceTabs.right - result.defaultLayout.newTaskForm.right) > 1
+  ) {
+    failures.push('native task blocks do not share horizontal edges');
+  }
+  if (Math.abs(result.defaultLayout.firstSummaryCard.left - result.defaultLayout.summaryTitle.left) > 1) {
+    failures.push('native recap cards do not align with the summary content grid');
   }
   if (result.defaultLayout.summaryProgress.width < 44) {
     failures.push('native recap header is missing the completed-today status');

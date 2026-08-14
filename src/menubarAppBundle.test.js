@@ -298,6 +298,12 @@ describe('menu bar app bundle', () => {
     expect(styles).toMatch(/html\.is-native-host \.flow-rail\s*{[^}]*display:\s*none;/s);
     expect(styles).toMatch(/html\.is-native-host \.workspace,[\s\S]*?padding:\s*12px;/);
     expect(styles).toContain('border-radius: 14px 0 0 14px;');
+    expect(styles).toMatch(
+      /html\.is-native-host \.task-panel \.brand-row\s*{[^}]*padding-inline-start:\s*0;/s,
+    );
+    expect(styles).toMatch(
+      /html\.is-native-host \.summary-section\s*{[^}]*padding-inline:\s*0;/s,
+    );
     expect(summary).toContain('class="recap-completion-count"');
     expect(detail).not.toContain('Task page');
     expect(rail).not.toContain('rail-caption');
