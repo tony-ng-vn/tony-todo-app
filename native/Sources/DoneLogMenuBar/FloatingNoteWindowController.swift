@@ -42,7 +42,13 @@ final class FloatingNoteWindowController: NSWindowController, NSWindowDelegate {
     super.init(window: window)
     NativeWindowPolicy.applyChrome(to: window)
     window.delegate = self
-    contentController.onShowMenuBar = onShowMenuBar
+    let showMenuBar = onShowMenuBar
+    contentController.onShowMenuBar = { [weak self] in
+      NativeMenuBarReturnPolicy.performReturn(
+        showMenuBar: { showMenuBar?() },
+        dismissNote: { self?.close() }
+      )
+    }
   }
 
   @available(*, unavailable)

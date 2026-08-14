@@ -31,4 +31,9 @@ enum NativeMenuBarReturnPolicy {
 
     return command == "show"
   }
+
+  static func performReturn(showMenuBar: () -> Void, dismissNote: () -> Void) {
+    showMenuBar()
+    dismissNote()
+  }
 }
