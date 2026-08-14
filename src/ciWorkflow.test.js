@@ -11,6 +11,9 @@ const functionsWorkflow = parse(
 const dependencyWorkflow = parse(
   readFileSync(new URL('../.github/workflows/dependency-health.yml', import.meta.url), 'utf8'),
 );
+const nativeReleaseWorkflow = parse(
+  readFileSync(new URL('../.github/workflows/native-release.yml', import.meta.url), 'utf8'),
+);
 const dependabot = parse(
   readFileSync(new URL('../.github/dependabot.yml', import.meta.url), 'utf8'),
 );
@@ -56,6 +59,17 @@ describe('CI workflow', () => {
     expect(nativeStepsByName['Run canonical native verification'].run).toBe(
       'npm run verify:native',
     );
+  });
+
+  it('uses the verified checkout action in the native release workflow', () => {
+    const ciCheckout = workflow.jobs.verify.steps.find(
+      (step) => step.name === 'Check out repository',
+    );
+    const releaseCheckout = nativeReleaseWorkflow.jobs.release.steps.find(
+      (step) => step.name === 'Check out repository',
+    );
+
+    expect(releaseCheckout.uses).toBe(ciCheckout.uses);
   });
 
   it('keeps local verification aligned with CI', () => {
