@@ -1,10 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   TASK_PHOTO_BUCKET,
   TASK_PHOTO_MAX_BYTES,
   cleanupTodoPhotos,
   isRemoteTaskPhotoKey,
   removeTaskPhotoObject,
+  resolveTaskPhotoSrc,
   taskPhotoObjectKey,
   uploadTaskPhoto,
   validateTaskPhoto,
@@ -144,5 +145,71 @@ describe('uploadTaskPhoto', () => {
     ]);
 
     expect(removed).toEqual(['user-1/task-9/photo.jpg', 'user-1/session-1/photo.png']);
+  });
+});
+
+function signingClient() {
+  let calls = 0;
+  return {
+    get calls() {
+      return calls;
+    },
+    storage: {
+      from() {
+        return {
+          async createSignedUrl() {
+            calls += 1;
+            return { data: { signedUrl: `signed-${calls}` }, error: null };
+          },
+          async remove() {
+            return { error: null };
+          },
+        };
+      },
+    },
+  };
+}
+
+describe('resolveTaskPhotoSrc caching', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('mints one signed url for repeated resolves of the same photo', async () => {
+    const client = signingClient();
+    const todo = { photoUrl: 'https://example.test/p', photoKey: 'user-1/cache-a/photo.jpg' };
+
+    const first = await resolveTaskPhotoSrc(client, todo);
+    const second = await resolveTaskPhotoSrc(client, todo);
+
+    expect(first).toBe('signed-1');
+    expect(second).toBe('signed-1');
+    expect(client.calls).toBe(1);
+  });
+
+  it('mints a fresh url once the cached one nears expiry', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-08-14T12:00:00Z'));
+    const client = signingClient();
+    const todo = { photoUrl: 'https://example.test/p', photoKey: 'user-1/cache-b/photo.jpg' };
+
+    await resolveTaskPhotoSrc(client, todo);
+    vi.setSystemTime(new Date('2026-08-14T12:56:00Z'));
+    const refreshed = await resolveTaskPhotoSrc(client, todo);
+
+    expect(refreshed).toBe('signed-2');
+    expect(client.calls).toBe(2);
+  });
+
+  it('drops the cached url when the photo object is removed', async () => {
+    const client = signingClient();
+    const todo = { photoUrl: 'https://example.test/p', photoKey: 'user-1/cache-c/photo.jpg' };
+
+    await resolveTaskPhotoSrc(client, todo);
+    await removeTaskPhotoObject(client, todo.photoKey);
+    const after = await resolveTaskPhotoSrc(client, todo);
+
+    expect(after).toBe('signed-2');
+    expect(client.calls).toBe(2);
   });
 });
