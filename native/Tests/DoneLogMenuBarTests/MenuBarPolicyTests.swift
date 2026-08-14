@@ -116,6 +116,18 @@ struct MenuBarPolicyTests {
     )
   }
 
+  @Test("Closes the quick note after showing mini todos")
+  func closesQuickNoteAfterShowingMenuBar() {
+    var events: [String] = []
+
+    NativeMenuBarReturnPolicy.performReturn(
+      showMenuBar: { events.append("show") },
+      dismissNote: { events.append("dismiss") }
+    )
+
+    #expect(events == ["show", "dismiss"])
+  }
+
   @Test("Lets the quick note header drag the native window")
   @MainActor
   func includesQuickNoteHeaderInNativeDragSelector() {
