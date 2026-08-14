@@ -53,6 +53,25 @@ describe('tokenizeLinks', () => {
     ]);
   });
 
+  it('does not swallow a wrapping parenthesis after a bare link', () => {
+    const url = 'https://mail.google.com/mail/u/3/#search/journal+ali/FMfcgzQfBQBKmFnHHFdFgqmzcXJJLBSL';
+
+    expect(tokenizeLinks(`read this (${url})`)).toEqual([
+      { type: 'text', value: 'read this (' },
+      { type: 'link', href: url, label: url },
+      { type: 'text', value: ')' },
+    ]);
+  });
+
+  it('keeps balanced parentheses that belong to the path', () => {
+    const url = 'https://en.wikipedia.org/wiki/Tone_(literature)';
+
+    expect(tokenizeLinks(`see ${url}`)).toEqual([
+      { type: 'text', value: 'see ' },
+      { type: 'link', href: url, label: url },
+    ]);
+  });
+
   it('keeps unsafe Markdown destinations as plain text', () => {
     expect(tokenizeLinks('[open me](javascript:alert(1))')).toEqual([
       { type: 'text', value: '[open me](javascript:alert(1))' },

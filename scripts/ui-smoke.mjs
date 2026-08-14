@@ -151,6 +151,14 @@ async function inspectMobileTaskDetail(viewport) {
       href: await notePreview.locator('[data-note-link]').getAttribute('href'),
       raw: await page.locator('#detail-note').inputValue(),
     };
+    const linkPopup = page.waitForEvent('popup', { timeout: 1000 }).then((popup) => popup.url()).catch(() => '');
+    await notePreview.locator('[data-note-link]').click();
+    noteLinkPresentation.linkPopupUrl = await linkPopup;
+    noteLinkPresentation.linkClickEdit = await page.evaluate(
+      () => document.activeElement?.id === 'detail-note',
+    );
+    await page.locator('.detail-title-display').tap();
+    await notePreview.waitFor();
     await notePreview.locator('[data-note-link-edit]').press('Enter');
     noteLinkPresentation.keyboardEdit = await page.evaluate(
       () => document.activeElement?.id === 'detail-note',
@@ -211,6 +219,8 @@ function assertMobileTaskDetail(result) {
     result.noteLinkPresentation?.href !== expectedNoteUrl ||
     result.noteLinkPresentation?.raw !==
       `- watching: [${expectedNoteUrl}](${expectedNoteUrl})` ||
+    result.noteLinkPresentation?.linkPopupUrl ||
+    !result.noteLinkPresentation?.linkClickEdit ||
     !result.noteLinkPresentation?.keyboardEdit
   ) {
     failures.push(
