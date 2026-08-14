@@ -79,6 +79,7 @@
   import { loadLocalState, reconcileRemoteState, saveLocalState, TODO_STORAGE_KEY } from '../todoPersistence.js';
   import {
     LOCAL_TASK_PHOTO_KEY,
+    cleanupTodoPhotos,
     readFileAsDataUrl,
     removeTaskPhotoObject,
     uploadTaskPhoto,
@@ -982,7 +983,7 @@
     saveLocalState(state);
     await syncRemoteChange('Deleting task', async () => {
       if (useRemote && authUser) {
-        await Promise.all(deletedTodos.map((todo) => removeTaskPhotoObject(insforge, todo.photoKey)));
+        await cleanupTodoPhotos(insforge, deletedTodos);
       }
       await persistDeletedTodos(deletedIds);
     });

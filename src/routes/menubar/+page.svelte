@@ -78,6 +78,7 @@
   } from '../../todoRemote.js';
   import {
     LOCAL_TASK_PHOTO_KEY,
+    cleanupTodoPhotos,
     readFileAsDataUrl,
     removeTaskPhotoObject,
     uploadTaskPhoto,
@@ -708,7 +709,7 @@
     saveLocalState(state);
     await syncRemoteChange('Deleting task', async () => {
       if (useRemote && authUser) {
-        await Promise.all(deletedTodos.map((todo) => removeTaskPhotoObject(insforge, todo.photoKey)));
+        await cleanupTodoPhotos(insforge, deletedTodos);
       }
       await Promise.all(deletedIds.map((deletedId) => persistDeletedTodo(deletedId)));
     });

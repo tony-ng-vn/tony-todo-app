@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   TASK_PHOTO_BUCKET,
   TASK_PHOTO_MAX_BYTES,
+  cleanupTodoPhotos,
   isRemoteTaskPhotoKey,
   removeTaskPhotoObject,
   taskPhotoObjectKey,
@@ -118,5 +119,30 @@ describe('uploadTaskPhoto', () => {
   it('skips storage delete for a local-only photo key', async () => {
     const { error } = await removeTaskPhotoObject({ storage: { from() {} } }, 'local');
     expect(error).toBeNull();
+  });
+
+  it('removes every remote photo when a task and its sessions are deleted', async () => {
+    const removed = [];
+    const client = {
+      storage: {
+        from() {
+          return {
+            async remove(key) {
+              removed.push(key);
+              return { error: null };
+            },
+          };
+        },
+      },
+    };
+
+    await cleanupTodoPhotos(client, [
+      { photoKey: 'user-1/task-9/photo.jpg' },
+      { photoKey: 'local' },
+      { photoKey: null },
+      { photoKey: 'user-1/session-1/photo.png' },
+    ]);
+
+    expect(removed).toEqual(['user-1/task-9/photo.jpg', 'user-1/session-1/photo.png']);
   });
 });

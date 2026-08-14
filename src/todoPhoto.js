@@ -75,6 +75,10 @@ export async function removeTaskPhotoObject(client, photoKey) {
   return { error };
 }
 
+export async function cleanupTodoPhotos(client, todos) {
+  await Promise.all((todos ?? []).map((todo) => removeTaskPhotoObject(client, todo?.photoKey)));
+}
+
 export async function resolveTaskPhotoSrc(client, todo) {
   if (!todo?.photoUrl && !isRemoteTaskPhotoKey(todo?.photoKey)) {
     return null;
