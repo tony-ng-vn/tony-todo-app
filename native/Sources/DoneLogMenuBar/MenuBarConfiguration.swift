@@ -12,7 +12,11 @@ enum MenuBarConfiguration {
   static let floatingNoteMinimumSize = NSSize(width: 320, height: 400)
 
   static func statusItemAutosaveName(bundleIdentifier: String?) -> String? {
-    nil
+    guard let bundleIdentifier, !bundleIdentifier.isEmpty else {
+      return nil
+    }
+
+    return "\(bundleIdentifier).primary-status-item-v4"
   }
 
   static func shouldRefreshWebContentForPresentation(
