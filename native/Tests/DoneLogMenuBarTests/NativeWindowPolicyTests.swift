@@ -120,11 +120,11 @@ struct NativeWindowPolicyTests {
       url: try #require(URL(string: "https://example.com/"))
     )
     let window = try #require(controller.window)
-    let visibleFrame = try #require(window.screen?.visibleFrame)
     window.setFrame(
       NSRect(x: 200, y: 160, width: 1_000, height: 700),
       display: false
     )
+    let visibleFrame = try #require(window.screen?.visibleFrame)
 
     window.performZoom(nil)
 
