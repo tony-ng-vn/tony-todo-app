@@ -36,7 +36,7 @@ The Developer ID certificate, notarization credentials, and Sparkle private key 
 Versions that predate the native updater cannot replace themselves.
 Their remotely loaded menu bar page detects the missing native capability and sends the user to `Done-Log.dmg` from the latest GitHub release.
 
-The bootstrap installer replaces the legacy `com.tonynguyen.donelog.macos` bundle with the canonical `com.tonynguyen.donelog` bundle once.
+The bootstrap installer replaces the legacy `com.tonynguyen.donelog.macos` or `com.tonynguyen.donelog` bundle with the canonical `com.tonynguyen.donelog.menubar` bundle once.
 After that installation, every native update keeps the canonical bundle identifier and uses Sparkle.
 
 ## Failure behavior
