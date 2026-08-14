@@ -175,6 +175,19 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
     }
   }
 
+  func refreshForPresentation() {
+    guard isViewLoaded,
+      MenuBarConfiguration.shouldRefreshWebContentForPresentation(
+        currentURL: webView.url,
+        isLoading: webView.isLoading
+      )
+    else {
+      return
+    }
+
+    webView.load(MenuBarConfiguration.makeHomeRequest(for: homeURL))
+  }
+
   func webView(
     _ webView: WKWebView,
     createWebViewWith configuration: WKWebViewConfiguration,

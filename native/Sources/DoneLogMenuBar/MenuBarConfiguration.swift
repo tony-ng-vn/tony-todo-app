@@ -10,7 +10,17 @@ enum MenuBarConfiguration {
   static let fullAppMinimumSize = NSSize(width: 900, height: 600)
   static let floatingNoteSize = NSSize(width: 360, height: 440)
   static let floatingNoteMinimumSize = NSSize(width: 320, height: 400)
-  static let statusItemAutosaveName = "DoneLogStatusItem"
+
+  static func statusItemAutosaveName(bundleIdentifier: String?) -> String? {
+    nil
+  }
+
+  static func shouldRefreshWebContentForPresentation(
+    currentURL: URL?,
+    isLoading: Bool
+  ) -> Bool {
+    currentURL != nil && !isLoading
+  }
 
   static func resolveURL(
     environment: [String: String] = ProcessInfo.processInfo.environment
@@ -100,7 +110,11 @@ enum MenuBarConfiguration {
     let statusItem = NSStatusBar.system.statusItem(
       withLength: NSStatusItem.squareLength
     )
-    statusItem.autosaveName = statusItemAutosaveName
+    if let autosaveName = statusItemAutosaveName(
+      bundleIdentifier: Bundle.main.bundleIdentifier
+    ) {
+      statusItem.autosaveName = autosaveName
+    }
     if let button = statusItem.button {
       button.image = makeStatusIcon()
       button.imagePosition = .imageOnly

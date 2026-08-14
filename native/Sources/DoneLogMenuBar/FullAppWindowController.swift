@@ -58,6 +58,7 @@ final class FullAppWindowController: NSWindowController, NSWindowDelegate {
   func show() {
     application.setActivationPolicy(.regular)
     onActivationPolicyChanged?()
+    contentController.refreshForPresentation()
     if let window {
       NativeWindowPolicy.applyChrome(to: window)
       contentController.syncNativeChrome(from: window)
