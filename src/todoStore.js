@@ -953,13 +953,17 @@ function getTodoAssignedDayKey(todo) {
   return Number.isNaN(createdDate.getTime()) ? null : formatDayKey(createdDate);
 }
 
+// Constructing an Intl.DateTimeFormat dominates the per-second recompute that
+// runs while a timer ticks (one instance per date section per pass), so share
+// a single module-level formatter.
+const dateGroupLabelFormat = new Intl.DateTimeFormat('en-US', {
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+
 function formatDateGroupLabel(dayKey) {
-  const date = new Date(`${dayKey}T00:00:00`);
-  return new Intl.DateTimeFormat('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(date);
+  return dateGroupLabelFormat.format(new Date(`${dayKey}T00:00:00`));
 }
 
 function totalTimeSegmentSeconds(segments) {

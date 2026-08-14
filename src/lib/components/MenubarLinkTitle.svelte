@@ -1,3 +1,9 @@
+<script module>
+  // Module-scoped so every link row shares one cache; the old per-instance
+  // Map meant a fresh fetch for every row on every popover open.
+  const titleCache = new Map();
+</script>
+
 <script>
   import { onMount } from 'svelte';
   import { isYouTubeUrl } from '../../linkify.js';
@@ -5,7 +11,6 @@
   export let url;
   export let fallbackTitle;
 
-  const titleCache = new Map();
   let displayTitle = fallbackTitle;
 
   $: isYouTube = isYouTubeUrl(url);

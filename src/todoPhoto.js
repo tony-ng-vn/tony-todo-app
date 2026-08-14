@@ -55,8 +55,10 @@ export async function uploadTaskPhoto(client, { userId, todo, file }) {
     return { data: null, error };
   }
 
+  signedUrlCache.delete(data.key);
   const previousKey = todo.photoKey;
   if (isRemoteTaskPhotoKey(previousKey) && previousKey !== data.key) {
+    signedUrlCache.delete(previousKey);
     await client.storage.from(TASK_PHOTO_BUCKET).remove(previousKey);
   }
 
@@ -71,6 +73,7 @@ export async function removeTaskPhotoObject(client, photoKey) {
     return { error: null };
   }
 
+  signedUrlCache.delete(photoKey);
   const { error } = await client.storage.from(TASK_PHOTO_BUCKET).remove(photoKey);
   return { error };
 }
@@ -78,6 +81,14 @@ export async function removeTaskPhotoObject(client, photoKey) {
 export async function cleanupTodoPhotos(client, todos) {
   await Promise.all((todos ?? []).map((todo) => removeTaskPhotoObject(client, todo?.photoKey)));
 }
+
+// Signed URLs live for an hour, but the reactive photo field re-resolves on
+// every store invalidation (once per second while a timer runs). Cache per
+// object key and refresh shortly before expiry; upload and removal above
+// invalidate their key so a replaced or deleted photo never serves stale.
+const SIGNED_URL_TTL_SECONDS = 3600;
+const SIGNED_URL_REFRESH_MARGIN_MS = 5 * 60 * 1000;
+const signedUrlCache = new Map();
 
 export async function resolveTaskPhotoSrc(client, todo) {
   if (!todo?.photoUrl && !isRemoteTaskPhotoKey(todo?.photoKey)) {
@@ -88,13 +99,22 @@ export async function resolveTaskPhotoSrc(client, todo) {
     return todo.photoUrl ?? null;
   }
 
+  const cached = signedUrlCache.get(todo.photoKey);
+  if (cached && cached.expiresAt - SIGNED_URL_REFRESH_MARGIN_MS > Date.now()) {
+    return cached.url;
+  }
+
   const { data, error } = await client.storage
     .from(TASK_PHOTO_BUCKET)
-    .createSignedUrl(todo.photoKey, 3600);
+    .createSignedUrl(todo.photoKey, SIGNED_URL_TTL_SECONDS);
 
   if (error || !data?.signedUrl) {
     return todo.photoUrl ?? null;
   }
 
+  signedUrlCache.set(todo.photoKey, {
+    url: data.signedUrl,
+    expiresAt: Date.now() + SIGNED_URL_TTL_SECONDS * 1000,
+  });
   return data.signedUrl;
 }
