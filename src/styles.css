@@ -2971,23 +2971,26 @@ html.is-native-host .settings-panel {
 
 html.is-native-host .brand-row,
 html.is-native-host .board-header,
-html.is-native-host .panel-heading {
+html.is-native-host .panel-heading,
+html.is-native-host .summary-top,
+html.is-native-host .detail-header {
   box-sizing: border-box;
-  min-height: max(44px, var(--native-titlebar-inset));
+  min-height: calc(var(--native-titlebar-inset) + 52px);
   align-items: center;
   flex-shrink: 0;
-  padding-top: 6px;
-  padding-bottom: 6px;
-  padding-inline-start: var(--native-traffic-lights-inset);
+  padding-top: calc(var(--native-titlebar-inset) + 8px);
+  padding-bottom: 8px;
+  padding-inline-start: 0;
   -webkit-app-region: drag;
 }
 
 html.is-native-host .task-panel .brand-row {
-  margin-inline-start: calc(-1 * clamp(20px, 3vw, 42px));
+  margin-inline-start: 0;
+  padding-inline-start: 0;
 }
 
 html.is-native-host .board-panel .board-header {
-  margin-inline-start: -18px;
+  margin-inline-start: 0;
 }
 
 html.is-native-host .projects-panel .panel-heading,
@@ -2997,7 +3000,7 @@ html.is-native-host .waiting-panel .panel-heading,
 html.is-native-host .history-panel .panel-heading,
 html.is-native-host .meetings-panel .panel-heading,
 html.is-native-host .settings-panel .panel-heading {
-  margin-inline-start: calc(-1 * var(--space-5));
+  margin-inline-start: 0;
 }
 
 html.is-native-host .view-toggle {
@@ -3011,6 +3014,11 @@ html.is-native-host .todo-item {
   align-items: start;
   overflow: visible;
   height: auto;
+}
+
+html.is-native-host .summary-section {
+  border-left: 0;
+  padding-inline: 0;
 }
 
 html.is-native-host .flow-rail {
@@ -3034,13 +3042,6 @@ html.is-native-host .recap-completion-count {
 html.is-native-host .summary-panel,
 html.is-native-host .workspace.has-detail .task-detail {
   border-width: 0 0 0 1px;
-}
-
-html.is-native-host .summary-top,
-html.is-native-host .detail-header {
-  min-height: max(44px, var(--native-titlebar-inset));
-  align-items: center;
-  -webkit-app-region: drag;
 }
 
 html.is-native-host .header-actions,
