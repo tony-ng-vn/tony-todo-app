@@ -24,18 +24,18 @@ struct ApplicationMenuTests {
       updateChecker: updateChecker
     )
     let applicationMenu = try #require(
-      mainMenu.items.first { $0.submenu?.title == "Done Log" }?.submenu
+      mainMenu.items.first { $0.submenu?.title == "Daymark" }?.submenu
     )
     let fileMenu = try #require(mainMenu.items.first { $0.title == "File" }?.submenu)
     let editMenu = try #require(mainMenu.items.first { $0.title == "Edit" }?.submenu)
     let viewMenu = try #require(mainMenu.items.first { $0.title == "View" }?.submenu)
 
-    #expect(applicationMenu.item(withTitle: "About Done Log") != nil)
+    #expect(applicationMenu.item(withTitle: "About Daymark") != nil)
     let updateItem = try #require(applicationMenu.item(withTitle: "Check for Updates..."))
     #expect(updateItem.target === updateChecker)
     #expect(updateItem.action == #selector(AppUpdateChecking.checkForUpdates(_:)))
-    #expect(applicationMenu.item(withTitle: "Hide Done Log")?.keyEquivalent == "h")
-    #expect(applicationMenu.item(withTitle: "Quit Done Log")?.keyEquivalent == "q")
+    #expect(applicationMenu.item(withTitle: "Hide Daymark")?.keyEquivalent == "h")
+    #expect(applicationMenu.item(withTitle: "Quit Daymark")?.keyEquivalent == "q")
     let closeItem = try #require(fileMenu.item(withTitle: "Close Window"))
     #expect(closeItem.keyEquivalent == "w")
     #expect(closeItem.target === windowCommands)

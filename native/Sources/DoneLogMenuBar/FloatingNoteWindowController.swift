@@ -28,7 +28,7 @@ final class FloatingNoteWindowController: NSWindowController, NSWindowDelegate {
       backing: .buffered,
       defer: false
     )
-    window.title = "Done Log Note"
+    window.title = "Daymark Note"
     window.contentMinSize = MenuBarConfiguration.floatingNoteMinimumSize
     window.contentViewController = contentController
     contentController.onCloseWindow = { [weak window] in

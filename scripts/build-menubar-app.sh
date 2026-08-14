@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
 BUILD_ROOT="$REPO_ROOT/.build/app-bundle"
-APP_BUNDLE="$BUILD_ROOT/Done Log.app"
+APP_BUNDLE="$BUILD_ROOT/Daymark.app"
 
 swift build \
   --package-path "$REPO_ROOT/native" \
@@ -32,7 +32,7 @@ fi
 mkdir -p "$BUILD_ROOT"
 CANONICAL_BUILD_ROOT="$(cd "$BUILD_ROOT" && pwd -P)"
 if [[ "$(dirname "$APP_BUNDLE")" != "$CANONICAL_BUILD_ROOT" ]] \
-  || [[ "$(basename "$APP_BUNDLE")" != "Done Log.app" ]]; then
+  || [[ "$(basename "$APP_BUNDLE")" != "Daymark.app" ]]; then
   echo "refusing to replace unexpected app path: $APP_BUNDLE" >&2
   exit 1
 fi
@@ -50,7 +50,7 @@ mkdir -p "$APP_BUNDLE/Contents/Frameworks"
 /usr/bin/ditto \
   "$SPARKLE_SOURCE" \
   "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework"
-# Done Log is not sandboxed, so Sparkle does not use its optional XPC services.
+# Daymark is not sandboxed, so Sparkle does not use its optional XPC services.
 rm -rf "$APP_BUNDLE/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices"
 /usr/bin/install_name_tool \
   -add_rpath '@executable_path/../Frameworks' \

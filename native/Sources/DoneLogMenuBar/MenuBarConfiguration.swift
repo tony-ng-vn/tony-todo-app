@@ -99,7 +99,7 @@ enum MenuBarConfiguration {
     guard
       let image = NSImage(
         systemSymbolName: "checkmark.circle",
-        accessibilityDescription: "Done Log"
+        accessibilityDescription: "Daymark"
       )
     else {
       return nil
@@ -123,7 +123,7 @@ enum MenuBarConfiguration {
     if let button = statusItem.button {
       button.image = makeStatusIcon()
       button.imagePosition = .imageOnly
-      button.toolTip = "Done Log"
+      button.toolTip = "Daymark"
     }
     statusItem.isVisible = true
     return statusItem
