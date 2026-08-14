@@ -9,6 +9,7 @@ import {
   getActiveTodos,
   matchesDueFilter,
   setTodoDueDate,
+  setTodoPhoto,
   setTodoSomeday,
   shiftDayKey,
   getBoardColumns,
@@ -1598,6 +1599,23 @@ describe('task due dates', () => {
 
     state = setTodoDueDate(state, id, null);
     expect(state.todos[0].dueDate).toBeNull();
+  });
+
+  it('sets and clears a task photo on an existing todo', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Ship', new Date('2026-06-08T08:00:00'));
+    const id = state.todos[0].id;
+
+    state = setTodoPhoto(state, id, {
+      photoUrl: 'https://files.example/photo.jpg',
+      photoKey: 'user-1/task/photo.jpg',
+    });
+    expect(state.todos[0].photoUrl).toBe('https://files.example/photo.jpg');
+    expect(state.todos[0].photoKey).toBe('user-1/task/photo.jpg');
+
+    state = setTodoPhoto(state, id, { photoUrl: null, photoKey: null });
+    expect(state.todos[0].photoUrl).toBeNull();
+    expect(state.todos[0].photoKey).toBeNull();
   });
 
   it('formats a due date as a short month/day label', () => {
