@@ -27,6 +27,7 @@
     partitionTaskFlowTodos,
     restoreTodoFromSomeday,
     setTodoDueDate,
+    setTodoPhoto,
     setTodoProgressive,
     setTodoSomeday,
     startTodoTimer,
@@ -69,11 +70,19 @@
     logRemoteProgressSession,
     updateRemoteTodoDueDate,
     updateRemoteTodoNote,
+    updateRemoteTodoPhoto,
     updateRemoteTodoProgress,
     updateRemoteTodoTimer,
     updateRemoteTodoTitle,
     updateRemoteTodoWorkflow,
   } from '../../todoRemote.js';
+  import {
+    LOCAL_TASK_PHOTO_KEY,
+    readFileAsDataUrl,
+    removeTaskPhotoObject,
+    uploadTaskPhoto,
+    validateTaskPhoto,
+  } from '../../todoPhoto.js';
 
   const TIMER_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds', 'timeSegments'];
   const TIMING_FIELDS = [
@@ -104,6 +113,8 @@
   let bootstrapAvailable = false;
   let themeMode = 'light';
   let expandedTaskId = null;
+  let photoBusy = false;
+  let photoError = '';
   let noteSaveStatuses = {};
   let liveTimer = null;
   let refreshInFlight = false;
@@ -584,6 +595,75 @@
     await syncRemoteChange('Saving due date', () => persistTodoDueDate(after));
   }
 
+  async function handleTaskPhotoSelect(todoId, file) {
+    const before = findTodo(todoId);
+    if (!before) {
+      return { ok: false, error: 'That task is no longer available.' };
+    }
+
+    const check = validateTaskPhoto(file);
+    if (!check.ok) {
+      photoError = check.error;
+      return { ok: false, error: check.error };
+    }
+
+    photoBusy = true;
+    photoError = '';
+
+    try {
+      if (useRemote && authUser) {
+        const { data, error } = await uploadTaskPhoto(insforge, {
+          userId: authUser.id,
+          todo: before,
+          file,
+        });
+        if (error) {
+          throw error;
+        }
+        state = setTodoPhoto(state, todoId, data);
+        saveLocalState(state);
+        await syncRemoteChange('Saving photo', () => persistTodoPhoto(findTodo(todoId)));
+      } else {
+        const photoUrl = await readFileAsDataUrl(file);
+        state = setTodoPhoto(state, todoId, { photoUrl, photoKey: LOCAL_TASK_PHOTO_KEY });
+        saveLocalState(state);
+        renderSyncStatus();
+      }
+      return { ok: true };
+    } catch (error) {
+      photoError = error.message || 'The photo could not be saved.';
+      return { ok: false, error: photoError };
+    } finally {
+      photoBusy = false;
+    }
+  }
+
+  async function handleTaskPhotoRemove(todoId) {
+    const before = findTodo(todoId);
+    if (!before) {
+      return;
+    }
+
+    photoBusy = true;
+    photoError = '';
+
+    try {
+      if (useRemote && authUser) {
+        const { error } = await removeTaskPhotoObject(insforge, before.photoKey);
+        if (error) {
+          throw error;
+        }
+      }
+      state = setTodoPhoto(state, todoId, { photoUrl: null, photoKey: null });
+      saveLocalState(state);
+      await syncRemoteChange('Removing photo', () => persistTodoPhoto(findTodo(todoId)));
+    } catch (error) {
+      photoError = error.message || 'The photo could not be removed.';
+    } finally {
+      photoBusy = false;
+    }
+  }
+
   async function handleSomedayChange(todoId, moveToSomeday) {
     const before = findTodo(todoId);
     state = moveToSomeday
@@ -620,16 +700,18 @@
   }
 
   async function handleDelete(todoId) {
-    const deletedIds = state.todos
-      .filter((todo) => todo.id === todoId || todo.parentTaskId === todoId)
-      .map((todo) => todo.id);
+    const deletedTodos = state.todos.filter((todo) => todo.id === todoId || todo.parentTaskId === todoId);
+    const deletedIds = deletedTodos.map((todo) => todo.id);
 
     state = deleteTodo(state, todoId);
     expandedTaskId = null;
     saveLocalState(state);
-    await syncRemoteChange('Deleting task', () =>
-      Promise.all(deletedIds.map((deletedId) => persistDeletedTodo(deletedId))),
-    );
+    await syncRemoteChange('Deleting task', async () => {
+      if (useRemote && authUser) {
+        await Promise.all(deletedTodos.map((todo) => removeTaskPhotoObject(insforge, todo.photoKey)));
+      }
+      await Promise.all(deletedIds.map((deletedId) => persistDeletedTodo(deletedId)));
+    });
   }
 
   function toggleDetails(todoId) {
@@ -722,6 +804,11 @@
   async function persistTodoDueDate(todo) {
     if (!useRemote || !authUser || !todo) return;
     await updateRemoteTodoDueDate(insforge, authUser.id, todo);
+  }
+
+  async function persistTodoPhoto(todo) {
+    if (!useRemote || !authUser || !todo) return;
+    await updateRemoteTodoPhoto(insforge, authUser.id, todo);
   }
 
   async function persistDeletedTodo(todoId) {
@@ -974,6 +1061,10 @@
     onSomedayChange={handleSomedayChange}
     onTimingChange={handleTimingChange}
     onDelete={handleDelete}
+    onPhotoSelect={handleTaskPhotoSelect}
+    onPhotoRemove={handleTaskPhotoRemove}
+    {photoBusy}
+    {photoError}
   />
 {/snippet}
 

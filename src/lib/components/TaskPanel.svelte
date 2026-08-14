@@ -254,6 +254,9 @@
       {#if todo.dueDate}
         <span class="task-due-badge" data-due-for={todo.id}>Due {formatDueDate(todo.dueDate)}</span>
       {/if}
+      {#if todo.photoUrl}
+        <img class="task-photo-thumb" src={todo.photoUrl} alt="" />
+      {/if}
       {#if todo.isProgressive}
         <span class="task-progress-label">
           {todo.progressLabel || 'Add session note in task page'}

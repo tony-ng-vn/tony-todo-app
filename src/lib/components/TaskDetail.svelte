@@ -2,6 +2,7 @@
   import { tick } from 'svelte';
   import CalendarPicker from './CalendarPicker.svelte';
   import RichNoteTextarea from './RichNoteTextarea.svelte';
+  import TaskPhotoField from './TaskPhotoField.svelte';
   import { linkifyText } from '../../linkify.js';
   import { expandTodoCommand, parseNoteTodos, toggleNoteTodo } from '../../noteTodos.js';
   import { getTextareaCaretRestore, getTextareaKeyEdit } from '../../textareaEditing.js';
@@ -23,6 +24,10 @@
   export let onDueDateChange;
   export let onSomedayChange;
   export let onDeleteTask;
+  export let onPhotoSelect;
+  export let onPhotoRemove;
+  export let photoBusy = false;
+  export let photoError = '';
   export let formatDuration;
   export let completedTime;
   export let detailMeta;
@@ -421,6 +426,13 @@
         onChange={handleDueDateInput}
       />
     </label>
+    <TaskPhotoField
+      todo={selectedTask}
+      busy={photoBusy}
+      error={photoError}
+      onSelect={onPhotoSelect}
+      onRemove={onPhotoRemove}
+    />
     <div class="detail-timing-controls time-segment-history" aria-label="Time blocks">
       {#if selectedTask.completedAt}
         <label class="detail-done-date-control">

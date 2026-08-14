@@ -2413,6 +2413,88 @@ h2 {
   background: var(--field-surface);
 }
 
+.task-photo-field {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.task-photo-label {
+  color: var(--subtle);
+  font-size: 12px;
+  font-weight: 500;
+  text-transform: uppercase;
+}
+
+.task-photo-preview {
+  display: grid;
+  gap: 10px;
+}
+
+.task-photo-preview img,
+.task-photo-thumb {
+  display: block;
+  border: 1px solid var(--border);
+  background: var(--block-surface);
+  object-fit: cover;
+}
+
+.task-photo-preview img {
+  width: 100%;
+  max-height: 220px;
+  border-radius: 14px;
+}
+
+.task-photo-thumb {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.task-photo-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.task-photo-button {
+  min-height: 38px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-strong);
+  color: var(--strong);
+  font: inherit;
+  font-weight: 500;
+}
+
+.task-photo-button:hover {
+  background: var(--block-hover);
+}
+
+.task-photo-button:disabled {
+  opacity: 0.6;
+}
+
+.task-photo-button.is-remove {
+  color: var(--subtle);
+}
+
+.task-photo-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+.task-photo-error {
+  margin: 0;
+  color: var(--danger, #b42318);
+  font-size: 12px;
+}
+
 .session-history {
   display: grid;
   gap: 10px;

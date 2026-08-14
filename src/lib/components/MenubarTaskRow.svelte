@@ -15,6 +15,7 @@
   import { iconCheck, iconDetails, iconPage, iconPause, iconPlay, iconX } from './icons.js';
   import MenubarLinkTitle from './MenubarLinkTitle.svelte';
   import RichNoteTextarea from './RichNoteTextarea.svelte';
+  import TaskPhotoField from './TaskPhotoField.svelte';
 
   export let todo;
   export let expanded = false;
@@ -31,6 +32,10 @@
   export let onSomedayChange;
   export let onTimingChange;
   export let onDelete;
+  export let onPhotoSelect;
+  export let onPhotoRemove;
+  export let photoBusy = false;
+  export let photoError = '';
 
   let draftTodoId = null;
   let noteDraft = '';
@@ -430,6 +435,13 @@
           onChange={(nextDate) => onDueDateChange(todo.id, nextDate)}
         />
       </label>
+      <TaskPhotoField
+        {todo}
+        busy={photoBusy}
+        error={photoError}
+        onSelect={onPhotoSelect}
+        onRemove={onPhotoRemove}
+      />
 
       {#if !isCompleted}
         <div class="menubar-someday-state">
