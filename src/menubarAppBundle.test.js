@@ -80,6 +80,9 @@ describe('menu bar app bundle', () => {
     expect(installer).toContain('refusing to install a development Done Log');
     expect(installer).toContain('com.tonynguyen.donelog.menubar');
     expect(installer).toContain('com.tonynguyen.donelog');
+    expect(installer).toContain(
+      'if [[ "$SOURCE_IDENTIFIER" != "com.tonynguyen.donelog.menubar" ]]; then',
+    );
     expect(installer).toContain('Sparkle.framework');
   });
 
