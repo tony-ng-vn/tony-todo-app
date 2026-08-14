@@ -24,7 +24,10 @@
   let timeDraft = '';
   let timeError = '';
 
-  $: recapItemCount = summary.reduce((count, section) => count + section.items.length, 0);
+  $: recapItemCount = summary.reduce(
+    (count, section) => count + section.items.filter((item) => item.outcome !== 'failed').length,
+    0,
+  );
 
   async function startTimeEdit(item) {
     editingTimeId = item.id;
