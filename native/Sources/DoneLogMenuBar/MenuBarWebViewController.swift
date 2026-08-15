@@ -299,7 +299,7 @@ final class MenuBarWebViewController: NSViewController, WKNavigationDelegate, WK
         messageName: message.name,
         body: message.body,
         isMainFrame: message.frameInfo.isMainFrame,
-        sourceURL: message.frameInfo.request.url,
+        sourceURL: message.webView?.url ?? message.frameInfo.request.url,
         homeURL: homeURL
       )
     else {

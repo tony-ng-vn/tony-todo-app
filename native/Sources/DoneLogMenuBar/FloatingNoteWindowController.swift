@@ -46,7 +46,12 @@ final class FloatingNoteWindowController: NSWindowController, NSWindowDelegate {
     contentController.onShowMenuBar = { [weak self] in
       NativeMenuBarReturnPolicy.performReturn(
         showMenuBar: { showMenuBar?() },
-        dismissNote: { self?.close() }
+        dismissNote: {
+          DispatchQueue.main.async {
+            self?.window?.orderOut(nil)
+            self?.close()
+          }
+        }
       )
     }
   }

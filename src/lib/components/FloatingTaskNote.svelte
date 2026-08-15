@@ -1,7 +1,7 @@
 <script>
   import { onMount, tick } from 'svelte';
   import { expandTodoCommand, parseNoteTodos, toggleNoteTodo } from '../../noteTodos.js';
-  import { canShowNativeMenuBar, requestNativeMenuBar } from '../../nativeMenuBar.js';
+  import { canShowNativeMenuBar, returnToNativeMenuBar } from '../../nativeMenuBar.js';
   import { getTextareaCaretRestore, getTextareaKeyEdit } from '../../textareaEditing.js';
   import { stripNoteStampsForEditor } from '../../todoStore.js';
   import RichNoteTextarea from './RichNoteTextarea.svelte';
@@ -108,7 +108,7 @@
   }
 
   function returnToMenuBar() {
-    requestNativeMenuBar(window);
+    returnToNativeMenuBar(window, onClose);
   }
 </script>
 

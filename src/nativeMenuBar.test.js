@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   canShowNativeMenuBar,
   requestNativeMenuBar,
+  returnToNativeMenuBar,
 } from './nativeMenuBar.js';
 
 describe('native menu bar bridge', () => {
@@ -15,18 +16,27 @@ describe('native menu bar bridge', () => {
     expect(canShowNativeMenuBar({})).toBe(false);
   });
 
-  it('requests the mini todo popover and leaves native code to close the note', () => {
+  it('requests the mini todo popover and then closes the current quick note', () => {
     const postMessage = vi.fn();
-    const close = vi.fn();
+    const closeNote = vi.fn();
     const targetWindow = {
-      close,
       __doneLogCanShowMenuBar: true,
       webkit: { messageHandlers: { doneLogMenuBar: { postMessage } } },
     };
 
-    expect(requestNativeMenuBar(targetWindow)).toBe(true);
+    expect(returnToNativeMenuBar(targetWindow, closeNote)).toBe(true);
     expect(postMessage).toHaveBeenCalledWith({ command: 'show' });
-    expect(close).not.toHaveBeenCalled();
+    expect(closeNote).toHaveBeenCalledTimes(1);
+    expect(postMessage.mock.invocationCallOrder[0]).toBeLessThan(
+      closeNote.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('does not close the note when native mini todos are unavailable', () => {
+    const closeNote = vi.fn();
+
+    expect(returnToNativeMenuBar({}, closeNote)).toBe(false);
+    expect(closeNote).not.toHaveBeenCalled();
   });
 
   it('does nothing outside the supported native quick note', () => {
