@@ -163,6 +163,19 @@ async function inspectMobileTaskDetail(viewport) {
     noteLinkPresentation.keyboardEdit = await page.evaluate(
       () => document.activeElement?.id === 'detail-note',
     );
+    // Long notes scroll inside the preview; a tap below the first screenful must still open the editor.
+    const longLines = Array.from({ length: 40 }, (_, index) => `- line ${index + 1}`);
+    await page.locator('#detail-note').fill([...longLines, `- watching: ${noteUrl}`, '- last line'].join('\n'));
+    await page.locator('.detail-title-display').tap();
+    await notePreview.waitFor();
+    await notePreview.evaluate((element) => {
+      element.scrollTop = element.scrollHeight;
+    });
+    const previewBox = await notePreview.boundingBox();
+    await page.mouse.click(previewBox.x + 24, previewBox.y + previewBox.height - 12);
+    noteLinkPresentation.scrolledClickEdit = await page.evaluate(
+      () => document.activeElement?.id === 'detail-note',
+    );
     await page.locator('#detail-note').fill('iPhone note');
     noteValue = await page.locator('#detail-note').inputValue();
   } catch (error) {
@@ -221,7 +234,8 @@ function assertMobileTaskDetail(result) {
       `- watching: [${expectedNoteUrl}](${expectedNoteUrl})` ||
     result.noteLinkPresentation?.linkPopupUrl ||
     !result.noteLinkPresentation?.linkClickEdit ||
-    !result.noteLinkPresentation?.keyboardEdit
+    !result.noteLinkPresentation?.keyboardEdit ||
+    !result.noteLinkPresentation?.scrolledClickEdit
   ) {
     failures.push(
       `task note link was not rendered cleanly or could not return to editing: ${JSON.stringify(result.noteLinkPresentation)}`,
