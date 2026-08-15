@@ -13,6 +13,7 @@
   export let onKeydown;
 
   let textarea;
+  let preview;
   let editing = false;
 
   $: tokens = tokenizeLinks(value);
@@ -26,7 +27,10 @@
   }
 
   async function beginEditing() {
+    // Keep the reader's place: the textarea should open scrolled where the preview was.
+    const scrollTop = preview?.scrollTop ?? 0;
     await focus();
+    if (textarea) textarea.scrollTop = scrollTop;
   }
 
   function handleLinkClick(event) {
@@ -55,27 +59,33 @@
 
   {#if showingPreview}
     <div
+      bind:this={preview}
       class="rich-note-preview"
       data-note-link-preview
     >
-      <button
-        class="rich-note-edit"
-        data-note-link-edit
-        type="button"
-        aria-label={ariaLabel ? `Edit ${ariaLabel}` : 'Edit task note'}
-        on:click={beginEditing}
-      ></button>
-      <div class="rich-note-content">
-        {#each tokens as token}
-          {#if token.type === 'link'}
-            <a data-note-link href={token.href} target="_blank" rel="noreferrer noopener" on:click={handleLinkClick}>
-              <svg viewBox="0 0 16 16" aria-hidden="true">
-                <circle cx="8" cy="8" r="6.25"></circle>
-                <path d="M1.75 8h12.5M8 1.75c1.65 1.7 2.5 3.78 2.5 6.25S9.65 12.55 8 14.25C6.35 12.55 5.5 10.47 5.5 8S6.35 3.45 8 1.75Z"></path>
-              </svg><span>{token.label}</span>
-            </a>
-          {:else}{token.value}{/if}
-        {/each}
+      <!-- The wrapper grows with the content, so the edit button covers the whole scroll height, not just the first screenful. -->
+      <div class="rich-note-scroll">
+        <!-- Focusing this tall button on mousedown scrolls the panel and moves the target from under the pointer, killing the click. -->
+        <button
+          class="rich-note-edit"
+          data-note-link-edit
+          type="button"
+          aria-label={ariaLabel ? `Edit ${ariaLabel}` : 'Edit task note'}
+          on:mousedown|preventDefault
+          on:click={beginEditing}
+        ></button>
+        <div class="rich-note-content">
+          {#each tokens as token}
+            {#if token.type === 'link'}
+              <a data-note-link href={token.href} target="_blank" rel="noreferrer noopener" on:click={handleLinkClick}>
+                <svg viewBox="0 0 16 16" aria-hidden="true">
+                  <circle cx="8" cy="8" r="6.25"></circle>
+                  <path d="M1.75 8h12.5M8 1.75c1.65 1.7 2.5 3.78 2.5 6.25S9.65 12.55 8 14.25C6.35 12.55 5.5 10.47 5.5 8S6.35 3.45 8 1.75Z"></path>
+                </svg><span>{token.label}</span>
+              </a>
+            {:else}{token.value}{/if}
+          {/each}
+        </div>
       </div>
     </div>
   {/if}

@@ -20,6 +20,7 @@
 
 .rich-note-editor textarea {
   display: block;
+  padding: var(--rich-note-padding);
   -webkit-appearance: none;
   appearance: none;
 }
@@ -42,10 +43,18 @@
 }
 
 .rich-note-editor .rich-note-preview {
-  position: relative;
+  display: flex;
+  flex-direction: column;
   overflow: auto;
   overflow-wrap: anywhere;
   cursor: text;
+}
+
+/* Carries the padding and grows with the content so the edit button covers every scrolled line. */
+.rich-note-editor .rich-note-scroll {
+  position: relative;
+  flex: 1 0 auto;
+  padding: var(--rich-note-padding);
 }
 
 .rich-note-editor textarea:focus-visible {
@@ -108,12 +117,15 @@
   vertical-align: -0.12em;
 }
 
+.rich-note-editor.detail {
+  --rich-note-padding: 14px 16px;
+}
+
 .rich-note-editor.detail textarea,
 .rich-note-editor.detail .rich-note-preview {
   min-height: 96px;
   max-height: min(36vh, 280px);
   border-radius: 11px;
-  padding: 14px 16px;
   font-size: 14px;
   line-height: 1.45;
 }
@@ -124,11 +136,14 @@
   resize: vertical;
 }
 
+.rich-note-editor.menubar {
+  --rich-note-padding: 9px 10px;
+}
+
 .rich-note-editor.menubar textarea,
 .rich-note-editor.menubar .rich-note-preview {
   min-height: 72px;
   border-radius: 10px;
-  padding: 9px 10px;
   font-size: 13px;
   line-height: 1.4;
 }
@@ -138,6 +153,7 @@
 }
 
 .rich-note-editor.floating {
+  --rich-note-padding: 13px;
   height: 100%;
   min-height: 180px;
 }
@@ -147,7 +163,6 @@
   height: 100%;
   min-height: 180px;
   border-radius: 14px;
-  padding: 13px;
   font-size: 14px;
   line-height: 1.5;
 }
