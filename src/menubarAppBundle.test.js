@@ -148,8 +148,10 @@ describe('menu bar app bundle', () => {
     expect(controller).toContain('contentController.onCloseWindow');
     expect(menuBarController).toContain('onShowMenuBar:');
     expect(controller).toContain('NativeMenuBarReturnPolicy.performReturn');
+    expect(controller).toContain('DispatchQueue.main.async');
+    expect(controller).toContain('orderOut');
     expect(controller).toContain('self?.close()');
-    expect(note).toContain('requestNativeMenuBar(window)');
+    expect(note).toContain('returnToNativeMenuBar(window, onClose)');
     expect(note).toContain('Mini todos');
     expect(note).toContain('class="floating-note-header"');
   });
