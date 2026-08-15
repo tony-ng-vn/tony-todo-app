@@ -17,3 +17,11 @@ export function requestNativeMenuBar(targetWindow) {
   getNativeMenuBarHandler(targetWindow).postMessage({ command: 'show' });
   return true;
 }
+
+export function returnToNativeMenuBar(targetWindow, closeNote) {
+  const requested = requestNativeMenuBar(targetWindow);
+  if (requested) {
+    closeNote();
+  }
+  return requested;
+}
