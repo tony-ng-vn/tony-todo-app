@@ -2580,7 +2580,9 @@ h2 {
 }
 
 @container summary-panel (max-width: 460px) {
-  .summary-top {
+  /* Native host centers this row; once it stacks, centering strands the heading mid-panel. */
+  .summary-top,
+  html.is-native-host .summary-panel .summary-top {
     flex-direction: column;
     align-items: stretch;
   }
