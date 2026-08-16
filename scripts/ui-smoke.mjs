@@ -385,6 +385,7 @@ async function captureNativeLayout(page) {
         ':scope > button',
       ),
       summaryPanel: measure('.summary-panel'),
+      summaryTop: measure('.summary-top'),
       summaryTitle: measure('#summary-heading'),
       firstSummaryCard: measure('.summary-section li'),
       summaryProgress: measure('.recap-completion-count'),
@@ -440,6 +441,20 @@ function assertNativeWorkspaceLayout(result) {
   }
   if (result.defaultLayout.summaryProgress.width < 44) {
     failures.push('native recap header is missing the completed-today status');
+  }
+  // A narrow recap panel stacks its header; it must stay left-aligned instead of centering.
+  for (const [state, layout] of Object.entries({
+    default: result.defaultLayout,
+    detail: result.detailLayout,
+  })) {
+    if (layout.summaryPanel.width > 0 && layout.summaryTitle.left - layout.summaryTop.left > 4) {
+      failures.push(
+        `native ${state} recap heading is not left-aligned in its header: ${JSON.stringify({
+          headingLeft: layout.summaryTitle.left,
+          headerLeft: layout.summaryTop.left,
+        })}`,
+      );
+    }
   }
   for (const [state, layout] of Object.entries({
     default: result.defaultLayout,
