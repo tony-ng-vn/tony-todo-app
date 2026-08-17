@@ -146,6 +146,19 @@ async function persistTodoCommand(client, ownerUserId, persist) {
     return;
   }
 
+  for (const session of persist.sessions ?? []) {
+    const { error: insertError } = await client.database.from('todos').insert([
+      {
+        ...toRemoteRecord(session, ownerUserId),
+        due_date: session.dueDate,
+        loop_status: 'accepted',
+      },
+    ]);
+    if (insertError) {
+      throw insertError;
+    }
+  }
+
   const { error } = await client.database
     .from('todos')
     .update({
@@ -170,7 +183,6 @@ function statusFor(code) {
     case 'not_found':
       return 404;
     case 'ambiguous_title':
-    case 'progressive_unsupported':
       return 409;
     default:
       return 500;
