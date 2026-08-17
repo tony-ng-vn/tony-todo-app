@@ -464,7 +464,7 @@ export function moveTodoToBoardColumn(state, todoId, columnId, at = new Date()) 
   }
 
   if (columnId === 'done') {
-    return completeTodo(archivePriorDaySessions(state, at), todoId, at);
+    return completeTodo(state, todoId, at);
   }
 
   return state;
@@ -804,7 +804,7 @@ export function updateTodoProgress(state, todoId, progressLabel) {
 }
 
 export function logProgressSession(state, todoId, completedAt = new Date()) {
-  return completeTodo(archivePriorDaySessions(state, completedAt), todoId, completedAt);
+  return completeTodo(state, todoId, completedAt);
 }
 
 export function getProgressSessions(state, parentTaskId) {

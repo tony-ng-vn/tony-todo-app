@@ -1214,8 +1214,12 @@ describe('todo day summary', () => {
                   startedAt: new Date('2026-06-08T09:00:00-07:00').toISOString(),
                   endedAt: new Date('2026-06-08T09:20:00-07:00').toISOString(),
                 },
+                {
+                  startedAt: new Date('2026-06-08T09:20:00-07:00').toISOString(),
+                  endedAt: new Date('2026-06-08T10:00:00-07:00').toISOString(),
+                },
               ],
-              trackedSeconds: 20 * 60,
+              trackedSeconds: 60 * 60,
               firstStartedAt: new Date('2026-06-08T09:00:00-07:00').toISOString(),
             }
           : todo,
@@ -1223,11 +1227,11 @@ describe('todo day summary', () => {
     };
     state = archivePriorDaySessions(state, new Date('2026-06-10T15:00:00-07:00'));
 
-    expect(getProgressSessions(state, todoId)).toHaveLength(1);
+    const sessions = getProgressSessions(state, todoId);
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].id).toBe(getProgressSessions(afterFirstArchive, todoId)[0].id);
+    expect(sessions[0].trackedSeconds).toBe(60 * 60);
     expect(state.todos.find((todo) => todo.id === todoId).timeSegments).toEqual([]);
-    expect(getProgressSessions(state, todoId)[0].id).toBe(
-      getProgressSessions(afterFirstArchive, todoId)[0].id,
-    );
   });
 
   it('does not archive same-day timer work', () => {
@@ -1260,7 +1264,7 @@ describe('todo day summary', () => {
     expect(parent.completedAt).toBeNull();
   });
 
-  it('completes remaining work after prior days have been archived', () => {
+  it('archives prior-day work when completing without a pre-archive call', () => {
     let state = createInitialState();
     state = addTodo(state, 'Write investor update', new Date('2026-06-08T08:00:00-07:00'));
     const todoId = state.todos[0].id;
@@ -1268,7 +1272,7 @@ describe('todo day summary', () => {
     state = pauseTodoTimer(state, todoId, new Date('2026-06-08T20:20:00-07:00'));
     state = startTodoTimer(state, todoId, new Date('2026-06-10T10:00:00-07:00'));
     const doneAt = new Date('2026-06-10T10:30:00-07:00');
-    state = completeTodo(archivePriorDaySessions(state, doneAt), todoId, doneAt);
+    state = completeTodo(state, todoId, doneAt);
 
     const parent = state.todos.find((todo) => todo.id === todoId);
     const sessions = getProgressSessions(state, todoId);

@@ -303,6 +303,47 @@ describe('runTodoCommand complete', () => {
     expect(result.ok).toBe(true);
     expect(result.persist.todo.completedAt).toBe(UTC_EVENING.toISOString());
     expect(result.persist.sessions).toEqual([]);
+    expect(result.persist.sessionUpdates).toEqual([]);
+  });
+
+  it('persists merged leftover recap time on complete', () => {
+    const mondayStart = '2026-06-08T16:00:00.000Z';
+    const mondayMid = '2026-06-08T16:20:00.000Z';
+    const mondayEnd = '2026-06-08T17:00:00.000Z';
+    const state = createInitialState([
+      openTodo({
+        id: 'parent',
+        title: 'Read',
+        createdAt: mondayStart,
+        firstStartedAt: mondayStart,
+        trackedSeconds: 40 * 60,
+        timeSegments: [{ startedAt: mondayStart, endedAt: mondayEnd }],
+      }),
+      openTodo({
+        id: 'session-1',
+        title: 'Read',
+        createdAt: mondayStart,
+        completedAt: mondayMid,
+        parentTaskId: 'parent',
+        isProgressSession: true,
+        firstStartedAt: mondayStart,
+        trackedSeconds: 20 * 60,
+        timeSegments: [{ startedAt: mondayStart, endedAt: mondayMid }],
+      }),
+    ]);
+    const result = runTodoCommand(
+      state,
+      { kind: 'complete', target: { by: 'id', id: 'parent' } },
+      new Date('2026-06-10T17:30:00.000Z'),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.persist.sessions).toEqual([]);
+    expect(result.persist.sessionUpdates).toHaveLength(1);
+    expect(result.persist.sessionUpdates[0].id).toBe('session-1');
+    expect(result.persist.sessionUpdates[0].trackedSeconds).toBe(60 * 60);
+    expect(result.persist.todo.timeSegments).toEqual([]);
+    expect(result.persist.todo.completedAt).toBe('2026-06-10T17:30:00.000Z');
   });
 
   it('completes an open task by title', () => {
