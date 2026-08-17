@@ -83,7 +83,6 @@
     validateTaskPhoto,
   } from '../../todoPhoto.js';
 
-  const TIMER_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds', 'timeSegments'];
   const TIMING_FIELDS = [
     'firstStartedAt',
     'activeStartedAt',
@@ -395,12 +394,7 @@
       const beforeTodos = merged.todos;
       state = archivePriorDaySessions({ todos: merged.todos });
       saveLocalState(state);
-      const createdTodos = getCreatedTodos(beforeTodos, state.todos);
-      const changedTodos = getChangedTodos(beforeTodos, state.todos, TIMER_FIELDS);
-      if (createdTodos.length > 0 || changedTodos.length > 0) {
-        await persistCreatedTodos(createdTodos);
-        await Promise.all(changedTodos.map((todo) => persistTodoTimer(todo)));
-      }
+      await persistArchivedTodos(beforeTodos, state.todos);
       renderSyncStatus();
     } catch (error) {
       syncMessage = `Offline cache: ${error.message}`;
@@ -431,16 +425,11 @@
   async function handleTimerAction(action, todoId) {
     const beforeTodos = state.todos;
     state = action === 'pause' ? pauseTodoTimer(state, todoId) : startTodoTimer(state, todoId);
-    const changedTodos = getChangedTodos(beforeTodos, state.todos, TIMER_FIELDS);
-    const createdTodos = getCreatedTodos(beforeTodos, state.todos);
     saveLocalState(state);
     if (action === 'start') {
       await revealTodo(todoId);
     }
-    await syncRemoteChange('Saving time', async () => {
-      await persistCreatedTodos(createdTodos);
-      await Promise.all(changedTodos.map((todo) => persistTodoTimer(todo)));
-    });
+    await syncRemoteChange('Saving time', () => persistArchivedTodos(beforeTodos, state.todos));
   }
 
   async function revealTodo(todoId) {
@@ -455,17 +444,12 @@
   async function handleComplete(todoId) {
     const beforeTodos = state.todos;
     state = logProgressSession(state, todoId);
-    const afterTodo = findTodo(todoId);
-    const createdTodos = getCreatedTodos(beforeTodos, state.todos);
     saveLocalState(state);
 
     if (expandedTaskId === todoId) {
       expandedTaskId = null;
     }
-    await syncRemoteChange('Saving', async () => {
-      await persistCreatedTodos(createdTodos);
-      await persistCompletedTodo(afterTodo);
-    });
+    await syncRemoteChange('Saving', () => persistArchivedTodos(beforeTodos, state.todos));
   }
 
   async function handleTitleCommit(todoId, title) {
@@ -779,6 +763,14 @@
 
   async function persistCreatedTodos(todos) {
     await Promise.all(todos.map((todo) => persistNewTodo(todo)));
+  }
+
+  async function persistArchivedTodos(beforeTodos, afterTodos) {
+    await persistCreatedTodos(getCreatedTodos(beforeTodos, afterTodos));
+    const changedTodos = getChangedTodos(beforeTodos, afterTodos, TIMING_FIELDS);
+    await Promise.all(
+      changedTodos.map((todo) => (todo.completedAt ? persistCompletedTodo(todo) : persistTodoTimer(todo))),
+    );
   }
 
   async function persistTodoTitle(todo) {
