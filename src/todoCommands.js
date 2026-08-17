@@ -99,6 +99,37 @@ export function completeTodo(state, todoId, completedAt = new Date()) {
   };
 }
 
+export function archivePriorDaySessions(state, now = new Date()) {
+  const todayKey = formatSummaryDayKey(now);
+  if (!todayKey) {
+    return state;
+  }
+
+  const sessions = [];
+  const todos = state.todos.map((todo) => {
+    if (todo.completedAt || todo.isProgressSession || parseTodoKind(todo.kind) !== 'task') {
+      return todo;
+    }
+
+    const archived = archiveOpenTodoPriorDays(todo, now, todayKey, state.todos);
+    if (!archived) {
+      return todo;
+    }
+
+    sessions.push(...archived.sessions);
+    return archived.parent;
+  });
+
+  if (sessions.length === 0 && todos.every((todo, index) => todo === state.todos[index])) {
+    return state;
+  }
+
+  return {
+    ...state,
+    todos: [...todos, ...sessions],
+  };
+}
+
 export function getPendingTodos(state) {
   return state.todos
     .filter((todo) => parseTodoKind(todo.kind) === 'task' && !todo.completedAt && !todo.isProgressSession)
@@ -173,7 +204,7 @@ export function getDaySummary(state, dayKey) {
 
   return Array.from(sections, ([label, items]) => ({
     label,
-    items: items.toSorted(compareSummaryItemsByStart),
+    items: items.toSorted(compareSummaryItemsByEnd),
   }));
 }
 
@@ -621,13 +652,6 @@ function runCompleteCommand(state, target, now) {
   }
 
   const todo = resolved.todo;
-  if (todo.isProgressive) {
-    return {
-      ok: false,
-      error: { code: 'progressive_unsupported', message: 'Progressive tasks cannot be completed this way' },
-    };
-  }
-
   if (todo.completedAt) {
     return {
       ok: true,
@@ -636,13 +660,16 @@ function runCompleteCommand(state, target, now) {
     };
   }
 
-  const next = completeTodo(state, todo.id, now);
+  const next = completeTodo(archivePriorDaySessions(state, now), todo.id, now);
   const updated = next.todos.find((item) => item.id === todo.id);
+  const sessions = next.todos.filter(
+    (item) => item.isProgressSession && item.parentTaskId === todo.id && !state.todos.some((before) => before.id === item.id),
+  );
 
   return {
     ok: true,
     view: { kind: 'complete', task: toCompletedTaskView(updated) },
-    persist: { kind: 'update', todo: updated },
+    persist: { kind: 'update', todo: updated, sessions },
   };
 }
 
@@ -730,7 +757,7 @@ function toOpenTaskView(todo) {
     createdAt: todo.createdAt,
     source: todo.source ?? 'app',
     status: status === 'done' ? 'not_started' : status,
-    completable: !todo.isProgressive,
+    completable: true,
     note: todo.note ?? '',
     notes: toNoteViews(todo),
   };
@@ -879,14 +906,165 @@ function isPausedTodo(todo) {
   return Boolean(todo && !todo.completedAt && todo.firstStartedAt && !todo.activeStartedAt);
 }
 
-function compareSummaryItemsByStart(first, second) {
-  const firstStart = validTimestamp(first.startedAt);
-  const secondStart = validTimestamp(second.startedAt);
+function archiveOpenTodoPriorDays(todo, now, todayKey, existingTodos) {
+  const closedPieces = normalizeTimeSegments(todo.timeSegments).flatMap(splitSegmentBySummaryDays);
+  const livePieces = todo.activeStartedAt
+    ? splitSegmentBySummaryDays({
+        startedAt: todo.activeStartedAt,
+        endedAt: now.toISOString(),
+      })
+    : [];
+  const priorClosed = [...closedPieces, ...livePieces].filter((piece) => piece.dayKey < todayKey);
+  if (priorClosed.length === 0) {
+    return null;
+  }
 
-  if (firstStart === null && secondStart === null) return 0;
-  if (firstStart === null) return 1;
-  if (secondStart === null) return -1;
-  return firstStart - secondStart;
+  const sessionsByDay = new Map();
+  for (const piece of priorClosed) {
+    const current = sessionsByDay.get(piece.dayKey) ?? [];
+    current.push({ startedAt: piece.startedAt, endedAt: piece.endedAt });
+    sessionsByDay.set(piece.dayKey, current);
+  }
+
+  const sessions = [...sessionsByDay.entries()]
+    .toSorted(([firstDay], [secondDay]) => firstDay.localeCompare(secondDay))
+    .map(([dayKey, segments]) => createDayProgressSession(todo, dayKey, segments))
+    .filter((session) => !hasProgressSessionForDay(existingTodos, todo.id, session));
+
+  const remainingClosed = closedPieces
+    .filter((piece) => piece.dayKey >= todayKey)
+    .map((piece) => ({ startedAt: piece.startedAt, endedAt: piece.endedAt }));
+  const liveRemainderStart = liveRemainderStartedAt(todo, now, todayKey);
+  const trackedSeconds =
+    totalSegmentSeconds(remainingClosed) +
+    (liveRemainderStart ? getActiveSegmentSeconds(liveRemainderStart, now) : 0);
+  const firstStartedAt = remainingClosed[0]?.startedAt ?? liveRemainderStart?.toISOString() ?? null;
+
+  return {
+    parent: {
+      ...todo,
+      isProgressive: false,
+      firstStartedAt,
+      activeStartedAt: liveRemainderStart ? liveRemainderStart.toISOString() : null,
+      trackedSeconds,
+      timeSegments: remainingClosed,
+    },
+    sessions,
+  };
+}
+
+function liveRemainderStartedAt(todo, now, todayKey) {
+  if (!todo.activeStartedAt) {
+    return null;
+  }
+
+  const liveStart = new Date(todo.activeStartedAt);
+  if (Number.isNaN(liveStart.getTime()) || liveStart >= now) {
+    return null;
+  }
+
+  const liveDayKey = formatSummaryDayKey(liveStart);
+  if (liveDayKey === todayKey) {
+    return liveStart;
+  }
+
+  if (liveDayKey && liveDayKey < todayKey) {
+    const todayStart = dateAtSanFranciscoTime(todayKey, 0);
+    return todayStart < now ? todayStart : null;
+  }
+
+  return liveStart;
+}
+
+function splitSegmentBySummaryDays(segment) {
+  const start = new Date(segment.startedAt);
+  const end = new Date(segment.endedAt);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start >= end) {
+    return [];
+  }
+
+  const pieces = [];
+  let cursor = start;
+  while (cursor < end) {
+    const dayKey = formatSummaryDayKey(cursor);
+    const nextDayStart = dateAtSanFranciscoTime(nextSummaryDayKey(dayKey), 0);
+    const pieceEnd = nextDayStart < end ? nextDayStart : end;
+    if (getActiveSegmentSeconds(cursor, pieceEnd) > 0) {
+      pieces.push({
+        dayKey,
+        startedAt: cursor.toISOString(),
+        endedAt: pieceEnd.toISOString(),
+      });
+    }
+    cursor = pieceEnd;
+  }
+
+  return pieces;
+}
+
+function nextSummaryDayKey(dayKey) {
+  const [year, month, day] = dayKey.split('-').map(Number);
+  const next = new Date(Date.UTC(year, month - 1, day + 1));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-${String(next.getUTCDate()).padStart(2, '0')}`;
+}
+
+function createDayProgressSession(parent, dayKey, segments) {
+  const firstStart = new Date(segments[0].startedAt);
+  const lastEnd = new Date(segments.at(-1).endedAt);
+
+  return normalizeTodo({
+    id: createProgressSessionId(parent.id, lastEnd),
+    title: parent.title,
+    createdAt: firstStart.toISOString(),
+    completedAt: lastEnd.toISOString(),
+    note: '',
+    source: 'progress-session',
+    parentTaskId: parent.id,
+    isProgressSession: true,
+    isProgressive: false,
+    progressLabel: '',
+    firstStartedAt: firstStart.toISOString(),
+    activeStartedAt: null,
+    trackedSeconds: totalSegmentSeconds(segments),
+    timeSegments: segments,
+  });
+}
+
+function hasProgressSessionForDay(existingTodos, parentId, session) {
+  const sessionDay = formatSummaryDayKey(new Date(session.completedAt));
+  return existingTodos.some((item) => {
+    if (item.id === session.id) {
+      return true;
+    }
+
+    if (!item.isProgressSession || item.parentTaskId !== parentId || !item.completedAt) {
+      return false;
+    }
+
+    return formatSummaryDayKey(new Date(item.completedAt)) === sessionDay;
+  });
+}
+
+function createProgressSessionId(parentId, completedAt) {
+  return `${completedAt.getTime()}-${parentId.slice(0, 24)}-session`;
+}
+
+function totalSegmentSeconds(segments) {
+  return segments.reduce(
+    (total, segment) =>
+      total + getActiveSegmentSeconds(new Date(segment.startedAt), new Date(segment.endedAt)),
+    0,
+  );
+}
+
+function compareSummaryItemsByEnd(first, second) {
+  const firstEnd = validTimestamp(first.completedAt);
+  const secondEnd = validTimestamp(second.completedAt);
+
+  if (firstEnd === null && secondEnd === null) return 0;
+  if (firstEnd === null) return 1;
+  if (secondEnd === null) return -1;
+  return firstEnd - secondEnd;
 }
 
 function validTimestamp(value) {

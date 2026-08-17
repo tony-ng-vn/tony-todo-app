@@ -292,7 +292,7 @@ describe('runTodoCommand complete', () => {
     expect(result.view.task.completedAt).toBe('2026-06-10T23:20:00.000Z');
   });
 
-  it('does not complete a progressive task', () => {
+  it('completes a previously progressive-flagged task', () => {
     const state = createInitialState([openTodo({ isProgressive: true })]);
     const result = runTodoCommand(
       state,
@@ -300,8 +300,9 @@ describe('runTodoCommand complete', () => {
       UTC_EVENING,
     );
 
-    expect(result.ok).toBe(false);
-    expect(result.error.code).toBe('progressive_unsupported');
+    expect(result.ok).toBe(true);
+    expect(result.persist.todo.completedAt).toBe(UTC_EVENING.toISOString());
+    expect(result.persist.sessions).toEqual([]);
   });
 
   it('completes an open task by title', () => {
@@ -384,7 +385,7 @@ describe('runTodoCommand list and daySummary', () => {
       completable: true,
     });
     expect(result.view.tasks.find((task) => task.id === 'progressive')).toMatchObject({
-      completable: false,
+      completable: true,
     });
   });
 
