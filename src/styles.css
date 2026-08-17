@@ -1207,8 +1207,7 @@ h2 {
 .task-title-input,
 .summary-time-input,
 .detail-timing-controls input,
-.detail-title-input,
-.progress-input {
+.detail-title-input {
   min-width: 0;
   border: 1px solid var(--border);
   border-radius: 11px;
@@ -1510,7 +1509,7 @@ h2 {
 .summary-timing {
   display: grid;
   gap: 3px;
-  color: var(--default);
+  color: var(--subtle);
   font-size: 12px;
   font-variant-numeric: tabular-nums;
   font-weight: 500;
@@ -1901,8 +1900,8 @@ h2 {
   min-width: 0;
   overflow-wrap: anywhere;
   color: var(--strong);
-  font-size: 14px;
-  font-weight: 500;
+  font-size: 16px;
+  font-weight: 600;
 }
 
 .summary-section .open-task-button {
@@ -2105,49 +2104,10 @@ h2 {
   outline-offset: 2px;
 }
 
-.progress-toggle {
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr);
-  gap: 10px;
-  align-items: start;
-  padding: 12px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--empty-surface);
-  color: var(--strong);
-}
-
-.progress-toggle input {
-  width: 16px;
-  height: 16px;
-  margin: 2px 0 0;
-  accent-color: var(--strong);
-}
-
-.progress-toggle span {
-  display: grid;
-  gap: 2px;
-}
-
-.progress-toggle strong {
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.progress-toggle small,
 .session-history small {
   color: var(--subtle);
   font-size: 12px;
   font-weight: 500;
-}
-
-.progress-input {
-  width: 100%;
-  min-height: 42px;
-  resize: vertical;
-  padding: 10px 12px;
-  font-size: 14px;
-  line-height: 1.45;
 }
 
 .detail-note-shell {
@@ -2737,7 +2697,6 @@ h2 {
     padding-bottom: max(24px, env(safe-area-inset-bottom, 0px));
   }
 
-  .progress-input,
   .detail-title-input {
     font-size: 16px;
   }

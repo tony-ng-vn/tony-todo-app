@@ -15,6 +15,7 @@
   } from '../../theme.js';
   import {
     addTodo,
+    archivePriorDaySessions,
     createInitialState,
     deleteTodo,
     findDuplicateTodo,
@@ -29,12 +30,10 @@
     restoreTodoFromSomeday,
     setTodoDueDate,
     setTodoPhoto,
-    setTodoProgressive,
     setTodoSomeday,
     startTodoTimer,
     updateTodoTimeSegments,
     updateTodoNote,
-    updateTodoProgress,
     updateTodoTitle,
     stripNoteStampsForEditor,
   } from '../../todoStore.js';
@@ -68,11 +67,9 @@
     deleteRemoteTodo,
     insertRemoteTodo,
     loadRemoteTodos,
-    logRemoteProgressSession,
     updateRemoteTodoDueDate,
     updateRemoteTodoNote,
     updateRemoteTodoPhoto,
-    updateRemoteTodoProgress,
     updateRemoteTodoTimer,
     updateRemoteTodoTitle,
     updateRemoteTodoWorkflow,
@@ -175,7 +172,8 @@
     standaloneNoteId = requestedNoteId;
     useRemote = isInsForgeConfigured && !searchParams.has('local');
     syncMessage = useRemote ? 'Connecting' : 'Local only';
-    state = loadLocalState();
+    state = archivePriorDaySessions(loadLocalState());
+    saveLocalState(state);
     stateLoaded = true;
     queuePendingNoteSaves();
     themeMode = loadThemeMode();
@@ -251,7 +249,8 @@
       return;
     }
 
-    state = loadLocalState();
+    state = archivePriorDaySessions(loadLocalState());
+    saveLocalState(state);
     renderSyncStatus();
   }
 
@@ -393,8 +392,15 @@
         snapshotNoteEdits([...todoIds]),
       );
       clearNoteEdits(merged.staleEditIds ?? []);
-      state = { todos: merged.todos };
+      const beforeTodos = merged.todos;
+      state = archivePriorDaySessions({ todos: merged.todos });
       saveLocalState(state);
+      const createdTodos = getCreatedTodos(beforeTodos, state.todos);
+      const changedTodos = getChangedTodos(beforeTodos, state.todos, TIMER_FIELDS);
+      if (createdTodos.length > 0 || changedTodos.length > 0) {
+        await persistCreatedTodos(createdTodos);
+        await Promise.all(changedTodos.map((todo) => persistTodoTimer(todo)));
+      }
       renderSyncStatus();
     } catch (error) {
       syncMessage = `Offline cache: ${error.message}`;
@@ -426,13 +432,15 @@
     const beforeTodos = state.todos;
     state = action === 'pause' ? pauseTodoTimer(state, todoId) : startTodoTimer(state, todoId);
     const changedTodos = getChangedTodos(beforeTodos, state.todos, TIMER_FIELDS);
+    const createdTodos = getCreatedTodos(beforeTodos, state.todos);
     saveLocalState(state);
     if (action === 'start') {
       await revealTodo(todoId);
     }
-    await syncRemoteChange('Saving time', () =>
-      Promise.all(changedTodos.map((todo) => persistTodoTimer(todo))),
-    );
+    await syncRemoteChange('Saving time', async () => {
+      await persistCreatedTodos(createdTodos);
+      await Promise.all(changedTodos.map((todo) => persistTodoTimer(todo)));
+    });
   }
 
   async function revealTodo(todoId) {
@@ -446,21 +454,18 @@
 
   async function handleComplete(todoId) {
     const beforeTodos = state.todos;
-    const beforeTodo = findTodo(todoId);
     state = logProgressSession(state, todoId);
     const afterTodo = findTodo(todoId);
-    const createdTodo = state.todos.find((todo) => !beforeTodos.some((before) => before.id === todo.id));
+    const createdTodos = getCreatedTodos(beforeTodos, state.todos);
     saveLocalState(state);
-
-    if (beforeTodo?.isProgressive) {
-      await syncRemoteChange('Saving session', () => persistProgressSession(afterTodo, createdTodo));
-      return;
-    }
 
     if (expandedTaskId === todoId) {
       expandedTaskId = null;
     }
-    await syncRemoteChange('Saving', () => persistCompletedTodo(afterTodo));
+    await syncRemoteChange('Saving', async () => {
+      await persistCreatedTodos(createdTodos);
+      await persistCompletedTodo(afterTodo);
+    });
   }
 
   async function handleTitleCommit(todoId, title) {
@@ -568,27 +573,6 @@
 
   function setNoteSaveStatus(todoId, status) {
     noteSaveStatuses = { ...noteSaveStatuses, [todoId]: status };
-  }
-
-  async function handleProgressiveChange(todoId, isProgressive) {
-    state = setTodoProgressive(state, todoId, isProgressive);
-    const todo = findTodo(todoId);
-    saveLocalState(state);
-    await syncRemoteChange('Saving progress', () => persistTodoProgress(todo));
-  }
-
-  async function handleProgressCommit(todoId, progressLabel) {
-    const before = findTodo(todoId);
-    state = updateTodoProgress(state, todoId, progressLabel);
-    const after = findTodo(todoId);
-    saveLocalState(state);
-
-    if (!before || !after || before.progressLabel === after.progressLabel) {
-      renderSyncStatus();
-      return;
-    }
-
-    await syncRemoteChange('Saving progress', () => persistTodoProgress(after));
   }
 
   async function handleDueDateChange(todoId, value) {
@@ -793,9 +777,8 @@
     await updateRemoteTodoWorkflow(insforge, authUser.id, todo);
   }
 
-  async function persistProgressSession(parent, session) {
-    if (!useRemote || !authUser || !parent || !session) return;
-    await logRemoteProgressSession(insforge, parent, session);
+  async function persistCreatedTodos(todos) {
+    await Promise.all(todos.map((todo) => persistNewTodo(todo)));
   }
 
   async function persistTodoTitle(todo) {
@@ -806,11 +789,6 @@
   async function persistTodoNote(todo) {
     if (!useRemote || !authUser || !todo) return;
     await updateRemoteTodoNote(insforge, authUser.id, todo);
-  }
-
-  async function persistTodoProgress(todo) {
-    if (!useRemote || !authUser || !todo) return;
-    await updateRemoteTodoProgress(insforge, authUser.id, todo);
   }
 
   async function persistTodoDueDate(todo) {
@@ -834,6 +812,11 @@
 
   function findTodo(todoId) {
     return state.todos.find((todo) => todo.id === todoId);
+  }
+
+  function getCreatedTodos(beforeTodos, afterTodos) {
+    const beforeIds = new Set(beforeTodos.map((todo) => todo.id));
+    return afterTodos.filter((todo) => !beforeIds.has(todo.id));
   }
 
   function getChangedTodos(beforeTodos, afterTodos, fields) {
@@ -1067,8 +1050,6 @@
     onNoteInput={handleNoteInput}
     onOpenNote={openFloatingNote}
     noteSaveStatus={noteSaveStatuses[todo.id] ?? 'saved'}
-    onProgressiveChange={handleProgressiveChange}
-    onProgressCommit={handleProgressCommit}
     onDueDateChange={handleDueDateChange}
     onSomedayChange={handleSomedayChange}
     onTimingChange={handleTimingChange}

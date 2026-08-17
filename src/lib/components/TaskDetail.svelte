@@ -18,8 +18,6 @@
   export let onClose;
   export let onNoteInput;
   export let onDetailTitleCommit;
-  export let onProgressiveChange;
-  export let onProgressInput;
   export let onTimeSegmentsChange;
   export let onDueDateChange;
   export let onSomedayChange;
@@ -223,10 +221,6 @@
     return handleTextareaKeydown(event, onNoteInput);
   }
 
-  function handleProgressTextareaKeydown(event) {
-    return handleTextareaKeydown(event, (nextValue) => onProgressInput(selectedTask.id, nextValue));
-  }
-
   function handleTodoToggle(item) {
     onNoteInput(toggleNoteTodo(noteDraft, item.lineIndex));
   }
@@ -335,28 +329,6 @@
           {selectedTask.somedayAt ? 'Return to active' : 'Move to Stall'}
         </button>
       </div>
-    {/if}
-    <label class="progress-toggle">
-      <input
-        type="checkbox"
-        checked={selectedTask.isProgressive}
-        on:change={(event) => onProgressiveChange(selectedTask.id, event.currentTarget.checked)}
-      />
-      <span>
-        <strong>Progressive task</strong>
-        <small>Log today's session and keep this task open.</small>
-      </span>
-    </label>
-    {#if selectedTask.isProgressive}
-      <label class="detail-note-label" for="progress-label">Today progress</label>
-      <textarea
-        id="progress-label"
-        class="progress-input"
-        placeholder="pages 41-52, Chapter 4, lesson 2"
-        value={selectedTask.progressLabel ?? ''}
-        on:input={(event) => onProgressInput(selectedTask.id, event.currentTarget.value)}
-        on:keydown={handleProgressTextareaKeydown}
-      ></textarea>
     {/if}
     <div class="detail-notes">
       <div class="detail-note-row">
@@ -509,22 +481,18 @@
         <p class="detail-timing-error" role="alert" aria-live="polite">{timingError}</p>
       {/if}
     </div>
-    {#if selectedTask.isProgressive}
+    {#if selectedTaskSessions.length}
       <div class="session-history" aria-label="Progress sessions">
         <h3>Sessions</h3>
-        {#if selectedTaskSessions.length}
-          <ol>
-            {#each selectedTaskSessions as session (session.id)}
-              <li>
-                <time datetime={session.completedAt}>{completedTime(session.completedAt)}</time>
-                <span>{session.progressLabel || 'Session logged'}</span>
-                <small>{formatDuration(session.trackedSeconds)}</small>
-              </li>
-            {/each}
-          </ol>
-        {:else}
-          <p>No sessions logged yet.</p>
-        {/if}
+        <ol>
+          {#each selectedTaskSessions as session (session.id)}
+            <li>
+              <time datetime={session.completedAt}>{completedTime(session.completedAt)}</time>
+              <span>{session.progressLabel || 'Session'}</span>
+              <small>{formatDuration(session.trackedSeconds)}</small>
+            </li>
+          {/each}
+        </ol>
       </div>
     {/if}
 </aside>

@@ -240,11 +240,7 @@
         <span class="task-state-badge">Paused</span>
       {/if}
       <span class:is-live={isRunning} class="task-duration" data-timer-label={todo.id}>
-        {#if todo.isProgressive}
-          {isRunning ? 'Tracking session' : 'Session'} {formatDuration(elapsedSeconds)}
-        {:else}
-          {isRunning ? 'Tracking' : 'Duration'} {formatDuration(elapsedSeconds)}
-        {/if}
+        {isRunning ? 'Tracking' : 'Duration'} {formatDuration(elapsedSeconds)}
       </span>
       {#if todo.firstStartedAt}
         <span class="task-timing">
@@ -254,12 +250,9 @@
       {#if todo.dueDate}
         <span class="task-due-badge" data-due-for={todo.id}>Due {formatDueDate(todo.dueDate)}</span>
       {/if}
-      {#if todo.isProgressive}
+      {#if latestSession}
         <span class="task-progress-label">
-          {todo.progressLabel || 'Add session note in task page'}
-          {#if latestSession}
-            · last {formatDuration(latestSession.trackedSeconds)}
-          {/if}
+          Last session {formatDuration(latestSession.trackedSeconds)}
         </span>
       {/if}
     </div>
@@ -272,9 +265,9 @@
         {@html iconPage()}
         <span>Open</span>
       </button>
-      <button type="button" on:click={() => onComplete(todo.id)} aria-label={todo.isProgressive ? `Log ${todo.title} session` : `Mark ${todo.title} done`}>
+      <button type="button" on:click={() => onComplete(todo.id)} aria-label={`Mark ${todo.title} done`}>
         {@html iconCheck()}
-        <span>{todo.isProgressive ? 'Log session' : 'Done'}</span>
+        <span>Done</span>
       </button>
       <button type="button" class="fail-task-button" on:click={() => onFail(todo.id)} aria-label={`Mark ${todo.title} failed`}>
         {@html iconX()}
