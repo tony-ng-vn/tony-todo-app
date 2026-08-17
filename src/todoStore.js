@@ -23,7 +23,12 @@ import {
   normalizeTodo,
   normalizedTrackedSeconds,
 } from './todoCommands.js';
-import { stripNoteStampsForEditor } from './noteEntries.js';
+import {
+  isEmptyNoteUnitText,
+  openNoteTimeBlock,
+  parseNoteEntries,
+  stripNoteStampsForEditor,
+} from './noteEntries.js';
 
 export {
   addTodo,
@@ -230,6 +235,7 @@ export function startTodoTimer(state, todoId, startedAt = new Date()) {
         activeStartedAt: startedAtIso,
         trackedSeconds: normalizedTrackedSeconds(todo),
         timeSegments: normalizeTimeSegments(todo.timeSegments),
+        note: openNoteTimeBlock(todo.note ?? '', startedAt),
       };
     }),
   };
@@ -653,14 +659,22 @@ export function updateTodoNote(state, todoId, note, now = new Date()) {
     }
   }
 
+  const shouldAutoStart =
+    !todo.completedAt &&
+    !todo.activeStartedAt &&
+    parseNoteEntries(note).some((entry) => !isEmptyNoteUnitText(entry.text));
+  const nextState = shouldAutoStart ? startTodoTimer(state, todoId, now) : state;
+  const nextTodo = nextState.todos.find((item) => item.id === todoId) ?? todo;
+
   const tracked = noteBurstBaselines.get(todoId);
-  const withinBurst = Boolean(tracked) && nowMs - tracked.updatedAt < NOTE_BURST_GAP_MS;
-  const baseline = withinBurst ? tracked.note : (todo.note ?? '');
+  const elapsed = tracked ? nowMs - tracked.updatedAt : Number.POSITIVE_INFINITY;
+  const withinBurst = Boolean(tracked) && elapsed >= 0 && elapsed < NOTE_BURST_GAP_MS;
+  const baseline = withinBurst ? tracked.note : (nextTodo.note ?? '');
   noteBurstBaselines.set(todoId, { note: baseline, updatedAt: nowMs });
 
   return {
-    ...state,
-    todos: state.todos.map((item) =>
+    ...nextState,
+    todos: nextState.todos.map((item) =>
       item.id === todoId ? { ...item, note: applyTodoNote(baseline, note, now) } : item,
     ),
   };

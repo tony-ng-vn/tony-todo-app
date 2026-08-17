@@ -89,7 +89,7 @@ describe('applyTodoNote bullet matching', () => {
 
     expect(parseNoteEntries(next)).toEqual([
       { at: first.toISOString(), text: '- Call the vet' },
-      { at: now.toISOString(), text: '- Buy dog food' },
+      { at: first.toISOString(), text: '- Buy dog food' },
     ]);
   });
 
@@ -126,7 +126,7 @@ describe('applyTodoNote bullet matching', () => {
     const next = applyTodoNote(stored, '- Walk the dog\n- Buy milk', now);
 
     expect(parseNoteEntries(next)).toEqual([
-      { at: later.toISOString(), text: '- Walk the dog' },
+      { at: first.toISOString(), text: '- Walk the dog' },
       { at: first.toISOString(), text: '- Buy milk' },
     ]);
   });
@@ -154,7 +154,7 @@ describe('applyTodoNote bullet matching', () => {
 
     expect(parseNoteEntries(next)).toEqual([
       { at: first.toISOString(), text: '- hello' },
-      { at: now.toISOString(), text: '- world' },
+      { at: first.toISOString(), text: '- world' },
     ]);
   });
 
@@ -163,7 +163,7 @@ describe('applyTodoNote bullet matching', () => {
 
     const next = applyTodoNote(stored, '- b note', now);
 
-    expect(parseNoteEntries(next)).toEqual([{ at: now.toISOString(), text: '- b note' }]);
+    expect(parseNoteEntries(next)).toEqual([{ at: first.toISOString(), text: '- b note' }]);
   });
 
   it('mints a new time when the replacement bullet reads too differently', () => {
@@ -171,7 +171,7 @@ describe('applyTodoNote bullet matching', () => {
 
     const next = applyTodoNote(stored, '- Not getting lunch yet', now);
 
-    expect(parseNoteEntries(next)).toEqual([{ at: now.toISOString(), text: '- Not getting lunch yet' }]);
+    expect(parseNoteEntries(next)).toEqual([{ at: first.toISOString(), text: '- Not getting lunch yet' }]);
   });
 
   // Enter-on-dash creates a fresh "- " line under the caret; the surviving
@@ -186,7 +186,7 @@ describe('applyTodoNote bullet matching', () => {
       { at: first.toISOString(), text: '- a' },
       { at: null, text: '- ' },
     ]);
-    expect(next).toBe(`@ ${formatNoteAtLocal(first)}\n- a\n\n- `);
+    expect(next).toBe(`Start: ${formatNoteAtLocal(first)}\n- a\n- `);
     expect(stripNoteStampsForEditor(next)).toBe('- a\n- ');
   });
 
@@ -253,13 +253,11 @@ describe('applyTodoNote bullet matching', () => {
       { at: legacyAt, text: '- b' },
       { at: legacyAt, text: '- c' },
     ]);
-    expect(next).toBe(
-      `@ ${formatNoteAtLocal(legacyAt)}\n- a\n\n@ ${formatNoteAtLocal(legacyAt)}\n- b\n\n@ ${formatNoteAtLocal(legacyAt)}\n- c`,
-    );
+    expect(next).toBe(`Start: ${formatNoteAtLocal(legacyAt)}\n- a\n- b\n- c`);
   });
 
   it('keeps already-correct per-bullet notes byte-identical on parse and reapply', () => {
-    const stored = `@ ${formatNoteAtLocal(first)}\n- Buy milk\n\n@ ${formatNoteAtLocal(later)}\n- Walk the dog`;
+    const stored = `Start: ${formatNoteAtLocal(first)}\n- Buy milk\nStart: ${formatNoteAtLocal(later)}\n- Walk the dog`;
 
     expect(applyTodoNote(stored, stored, now)).toBe(stored);
   });
@@ -286,7 +284,7 @@ describe('applyTodoNote bullet matching', () => {
 
     expect(parseNoteEntries(next)).toEqual([
       { at: first.toISOString(), text: '- call mom' },
-      { at: now.toISOString(), text: '- call mom later tonight' },
+      { at: first.toISOString(), text: '- call mom later tonight' },
     ]);
   });
 
@@ -297,7 +295,7 @@ describe('applyTodoNote bullet matching', () => {
 
     expect(parseNoteEntries(next)).toEqual([
       { at: first.toISOString(), text: '- call bank' },
-      { at: now.toISOString(), text: '- call bank' },
+      { at: first.toISOString(), text: '- call bank' },
     ]);
   });
 
@@ -317,9 +315,9 @@ describe('applyTodoNote bullet matching', () => {
 
     expect(parseNoteEntries(next)).toEqual([
       { at: first.toISOString(), text: '- a' },
-      { at: now.toISOString(), text: '- b' },
+      { at: first.toISOString(), text: '- b' },
     ]);
-    expect(next).toBe(`@ ${formatNoteAtLocal(first)}\n- a\n\n@ ${formatNoteAtLocal(now)}\n- b`);
+    expect(next).toBe(`Start: ${formatNoteAtLocal(first)}\n- a\n- b`);
   });
 
   it('still serializes an empty structural bullet bare while backfilling a legacy-unstamped unit', () => {
@@ -329,7 +327,7 @@ describe('applyTodoNote bullet matching', () => {
 
     expect(parseNoteEntries(next)).toEqual([
       { at: first.toISOString(), text: '- a' },
-      { at: now.toISOString(), text: '- b' },
+      { at: first.toISOString(), text: '- b' },
       { at: null, text: '- ' },
     ]);
   });

@@ -1,5 +1,11 @@
 import { getTimes } from 'suncalc';
-import { applyTodoNote, formatNoteAtLocal, isEmptyNoteUnitText, parseNoteEntries } from './noteEntries.js';
+import {
+  applyTodoNote,
+  closeNoteTimeBlock,
+  formatNoteAtLocal,
+  isEmptyNoteUnitText,
+  parseNoteEntries,
+} from './noteEntries.js';
 import { SAN_FRANCISCO_TIME_ZONE, dateAtSanFranciscoTime, getSanFranciscoDateTimeParts } from './sanFranciscoTime.js';
 
 export { applyTodoNote, dateAtSanFranciscoTime, formatNoteAtLocal, parseNoteEntries };
@@ -220,6 +226,7 @@ export function closeActiveTimeSegment(todo, stoppedAt) {
     return {
       trackedSeconds: normalizedTrackedSeconds(todo),
       timeSegments,
+      note: todo.note ?? '',
     };
   }
 
@@ -229,6 +236,7 @@ export function closeActiveTimeSegment(todo, stoppedAt) {
     return {
       trackedSeconds: normalizedTrackedSeconds(todo),
       timeSegments,
+      note: todo.note ?? '',
     };
   }
 
@@ -244,6 +252,7 @@ export function closeActiveTimeSegment(todo, stoppedAt) {
         endedAt: normalizedEnd.toISOString(),
       },
     ],
+    note: closeNoteTimeBlock(todo.note ?? '', normalizedEnd),
   };
 }
 

@@ -1,14 +1,21 @@
-// Notes are stored as text with "@ YYYY-MM-DD HH:mm" stamp headers, one per
-// bullet (list item) or free-text line. Every stampable unit keeps its own
-// time, tracked by matching text identity rather than array position, so
-// reordering or editing bullets does not steal or smear timestamps.
+// Notes are stored as timer session blocks:
+//   Start: YYYY-MM-DD HH:mm
+//   - bullet
+//   End: YYYY-MM-DD HH:mm
+// Legacy "@ YYYY-MM-DD HH:mm" headers still parse. Editor drafts strip both
+// kinds of headings; identity matching keeps bullets in their original block
+// when the user reorders or edits them.
 import { dateAtSanFranciscoTime, getSanFranciscoDateTimeParts } from './sanFranciscoTime.js';
 
-const NOTE_STAMP_PATTERN = /^@ (\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2})\s*$/;
+const LOCAL_TIME_PATTERN = '(\\d{4}-\\d{2}-\\d{2}) (\\d{2}):(\\d{2})';
+const NOTE_STAMP_PATTERN = new RegExp(`^@ ${LOCAL_TIME_PATTERN}\\s*$`);
+const START_HEADING_PATTERN = new RegExp(`^Start:\\s+${LOCAL_TIME_PATTERN}\\s*$`);
+const END_HEADING_PATTERN = new RegExp(`^End:\\s+${LOCAL_TIME_PATTERN}\\s*$`);
 const LIST_MARKER_PATTERN = /^(?:[-*+]|\d+[.)])(?:[\t ]+([\s\S]*))?$/;
 const CHECKBOX_PATTERN = /^\[[ xX]\](?:[\t ]+([\s\S]*))?$/;
 const SIMILARITY_THRESHOLD = 0.5;
 const TOKEN_MATCH_RATIO = 0.75;
+const NEW_BLOCK_INDEX = -1;
 
 export function formatNoteAtLocal(date) {
   const parts = getSanFranciscoDateTimeParts(new Date(date));
@@ -16,6 +23,13 @@ export function formatNoteAtLocal(date) {
 }
 
 export function parseNoteEntries(note) {
+  return flattenNoteTimeBlocks(parseNoteTimeBlocks(note)).map((entry) => ({
+    at: entry.at,
+    text: entry.text,
+  }));
+}
+
+export function parseNoteTimeBlocks(note) {
   // Trim trailing newlines only, not all trailing whitespace: a note that
   // ends in an empty structural line ("- ") must keep that line's trailing
   // space intact, or the reseeded editor draft would no longer match what
@@ -25,7 +39,106 @@ export function parseNoteEntries(note) {
     return [];
   }
 
-  return splitIntoStampedChunks(raw).flatMap((chunk) => splitChunkIntoUnits(chunk.text, chunk.at));
+  const blocks = [];
+  let current = null;
+
+  function startBlock(startedAt, kind) {
+    if (current) {
+      blocks.push(current);
+    }
+    current = { startedAt, endedAt: null, kind, lines: [] };
+  }
+
+  for (const line of raw.split('\n')) {
+    const startAt = matchLocalHeading(line, START_HEADING_PATTERN);
+    if (startAt) {
+      startBlock(startAt, 'session');
+      continue;
+    }
+
+    const stampAt = matchLocalHeading(line, NOTE_STAMP_PATTERN);
+    if (stampAt) {
+      startBlock(stampAt, 'stamp');
+      continue;
+    }
+
+    const endAt = matchLocalHeading(line, END_HEADING_PATTERN);
+    if (endAt) {
+      if (!current) {
+        current = { startedAt: endAt, endedAt: endAt, kind: 'session', lines: [] };
+      } else {
+        current.endedAt = endAt;
+        current.kind = 'session';
+      }
+      blocks.push(current);
+      current = null;
+      continue;
+    }
+
+    if (!current) {
+      current = { startedAt: null, endedAt: null, kind: 'plain', lines: [] };
+    }
+    current.lines.push(line);
+  }
+
+  if (current) {
+    blocks.push(current);
+  }
+
+  return blocks;
+}
+
+export function openNoteTimeBlock(note, startedAt) {
+  const startedAtIso = new Date(startedAt).toISOString();
+  const blocks = parseNoteTimeBlocks(note);
+  const last = blocks.at(-1);
+  if (last && !last.endedAt) {
+    if (!last.startedAt) {
+      last.startedAt = startedAtIso;
+      last.kind = 'session';
+    }
+    return serializeNoteTimeBlocks(blocks);
+  }
+
+  blocks.push({ startedAt: startedAtIso, endedAt: null, kind: 'session', lines: [] });
+  return serializeNoteTimeBlocks(blocks);
+}
+
+export function closeNoteTimeBlock(note, endedAt) {
+  const endedAtIso = new Date(endedAt).toISOString();
+  const blocks = parseNoteTimeBlocks(note);
+  const last = blocks.at(-1);
+  if (!last || last.endedAt) {
+    return serializeNoteTimeBlocks(blocks);
+  }
+
+  if (!last.startedAt) {
+    last.startedAt = endedAtIso;
+  }
+  last.endedAt = endedAtIso;
+  last.kind = 'session';
+  return serializeNoteTimeBlocks(blocks);
+}
+
+export function serializeNoteTimeBlocks(blocks) {
+  return blocks
+    .map((block) => {
+      const parts = [];
+      if (block.startedAt) {
+        parts.push(`Start: ${formatNoteAtLocal(block.startedAt)}`);
+      }
+      for (const line of block.lines) {
+        if (line.trim() || line.endsWith(' ')) {
+          parts.push(line);
+        }
+      }
+      if (block.endedAt) {
+        parts.push(`End: ${formatNoteAtLocal(block.endedAt)}`);
+      }
+      return parts.join('\n');
+    })
+    .filter(Boolean)
+    .join('\n');
 }
 
 // True for a unit with no visible content once its marker/checkbox is
@@ -41,12 +154,16 @@ export function isEmptyNoteUnitText(text) {
 // units that already carry a header from parsing pass through unchanged;
 // only unstamped units go through identity matching against previousNote.
 export function applyTodoNote(previousNote, nextNote, now = new Date()) {
-  const nextEntries = parseNoteEntries(nextNote);
+  const previousBlocks = parseNoteTimeBlocks(previousNote);
+  const nextEntries = flattenNoteTimeBlocks(parseNoteTimeBlocks(nextNote));
   if (nextEntries.length === 0) {
+    if (previousBlocks.some((block) => block.startedAt && !block.endedAt && block.lines.length === 0)) {
+      return serializeNoteTimeBlocks(previousBlocks);
+    }
     return '';
   }
 
-  const previousUnits = parseNoteEntries(previousNote).map((entry, index) => ({
+  const previousUnits = flattenNoteTimeBlocks(previousBlocks).map((entry, index) => ({
     entry,
     index,
     normalized: normalizeUnitText(entry.text),
@@ -71,7 +188,7 @@ export function applyTodoNote(previousNote, nextNote, now = new Date()) {
     const normalized = normalizeUnitText(entry.text);
     if (!normalized) {
       // Marker-only unit ("- "): stays a bare unstamped line, never matched.
-      resolved[index] = { at: null, text: entry.text };
+      resolved[index] = assignEmptyUnit(entry, previousBlocks);
       return;
     }
     pending.push({ entry, index, normalized });
@@ -86,22 +203,24 @@ export function applyTodoNote(previousNote, nextNote, now = new Date()) {
     if (resolved[item.index]) {
       continue;
     }
-    resolved[item.index] = { at: now.toISOString(), text: item.entry.text };
+    resolved[item.index] = assignToOpenBlock(item.entry, previousBlocks, now);
   }
 
   // A unit can match a previous unit that itself has no stamp (a legacy
   // chunk only stamps its first paragraph; a later paragraph parses as
   // at: null). A non-empty unit must not stay unstamped forever, so it gets
-  // backfilled with now here - empty structural units are exempt, they are
-  // never stamped.
+  // backfilled with the open block start (or now) here - empty structural
+  // units are exempt, they are never stamped.
   for (let index = 0; index < resolved.length; index += 1) {
     const entry = resolved[index];
     if (!entry.at && !isEmptyNoteUnitText(entry.text)) {
-      resolved[index] = { at: now.toISOString(), text: entry.text };
+      resolved[index] = assignToOpenBlock(entry, previousBlocks, now);
     }
   }
 
-  return serializeNoteEntries(resolved);
+  inheritOpenBlockMeta(resolved);
+
+  return serializeResolvedTimeBlocks(resolved);
 }
 
 // Editor draft with no "@ " headers and no blank separators between bullets,
@@ -151,7 +270,7 @@ function matchUniquePairs(pending, previousUnits, resolved) {
       continue;
     }
     match.used = true;
-    resolved[item.index] = { at: match.entry.at, text: item.entry.text };
+    resolved[item.index] = copyResolvedUnit(match.entry, item.entry.text);
   }
 }
 
@@ -166,7 +285,7 @@ function matchFirstAvailableByText(pending, previousUnits, resolved) {
       continue;
     }
     match.used = true;
-    resolved[item.index] = { at: match.entry.at, text: item.entry.text };
+    resolved[item.index] = copyResolvedUnit(match.entry, item.entry.text);
   }
 }
 
@@ -206,7 +325,7 @@ function matchBySimilarity(pending, previousUnits, resolved) {
       continue;
     }
     best.used = true;
-    resolved[item.index] = { at: best.entry.at, text: item.entry.text };
+    resolved[item.index] = copyResolvedUnit(best.entry, item.entry.text);
   }
 }
 
@@ -303,33 +422,130 @@ function normalizeUnitText(rawLine) {
   return text.replace(/\s+/g, ' ').toLowerCase();
 }
 
-// Groups lines by "@ " header, same shape as the pre-bullet-granularity
-// parser: a header flushes the current chunk and starts a new one, so a
-// header line can never itself become unit text.
-function splitIntoStampedChunks(raw) {
-  const chunks = [];
-  let current = { at: null, lines: [] };
-
-  function flush() {
-    const text = current.lines.join('\n').replace(/^\n+|\n+$/g, '');
-    if (current.at || text.trim()) {
-      chunks.push({ at: current.at, text });
-    }
-    current = { at: null, lines: [] };
+function matchLocalHeading(line, pattern) {
+  const match = line.match(pattern);
+  if (!match) {
+    return null;
   }
+  return dateAtSanFranciscoTime(match[1], Number(match[2]) * 60 + Number(match[3])).toISOString();
+}
 
-  for (const line of raw.split('\n')) {
-    const match = line.match(NOTE_STAMP_PATTERN);
-    if (match) {
-      flush();
-      current.at = dateAtSanFranciscoTime(match[1], Number(match[2]) * 60 + Number(match[3])).toISOString();
+function flattenNoteTimeBlocks(blocks) {
+  return blocks.flatMap((block, blockIndex) => {
+    const chunkText = block.lines.join('\n').replace(/^\n+|\n+$/g, '');
+    if (block.kind === 'stamp' || (block.kind === 'plain' && !block.startedAt)) {
+      return splitChunkIntoUnits(chunkText, block.startedAt).map((unit) => ({
+        ...unit,
+        blockIndex,
+        startedAt: unit.at,
+        endedAt: block.endedAt,
+      }));
+    }
+
+    return block.lines
+      .filter((line) => line.trim())
+      .map((line) => {
+        const isEmpty = isEmptyNoteUnitText(line);
+        return {
+          at: isEmpty ? null : block.startedAt,
+          text: line,
+          blockIndex,
+          startedAt: block.startedAt,
+          endedAt: block.endedAt,
+        };
+      });
+  });
+}
+
+function findOpenBlockIndex(blocks) {
+  for (let index = blocks.length - 1; index >= 0; index -= 1) {
+    if (!blocks[index].endedAt) {
+      return index;
+    }
+  }
+  return NEW_BLOCK_INDEX;
+}
+
+function copyResolvedUnit(source, text) {
+  return {
+    at: source.at,
+    text,
+    blockIndex: source.blockIndex,
+    startedAt: source.startedAt ?? source.at,
+    endedAt: source.endedAt ?? null,
+  };
+}
+
+function assignEmptyUnit(entry, previousBlocks) {
+  const openIndex = findOpenBlockIndex(previousBlocks);
+  const openBlock = openIndex === NEW_BLOCK_INDEX ? null : previousBlocks[openIndex];
+  return {
+    at: null,
+    text: entry.text,
+    blockIndex: openBlock ? openIndex : (entry.blockIndex ?? NEW_BLOCK_INDEX),
+    startedAt: openBlock?.startedAt ?? entry.startedAt ?? null,
+    endedAt: null,
+  };
+}
+
+function assignToOpenBlock(entry, previousBlocks, now) {
+  const openIndex = findOpenBlockIndex(previousBlocks);
+  const openBlock = openIndex === NEW_BLOCK_INDEX ? null : previousBlocks[openIndex];
+  const startedAt = openBlock?.startedAt ?? now.toISOString();
+  return {
+    at: startedAt,
+    text: entry.text,
+    blockIndex: openBlock ? openIndex : NEW_BLOCK_INDEX,
+    startedAt,
+    endedAt: null,
+  };
+}
+
+function inheritOpenBlockMeta(resolved) {
+  for (let index = 0; index < resolved.length; index += 1) {
+    const entry = resolved[index];
+    if (!entry || !isEmptyNoteUnitText(entry.text) || entry.startedAt) {
       continue;
     }
-    current.lines.push(line);
+    const neighbor = resolved[index - 1] ?? resolved[index + 1];
+    if (!neighbor) {
+      continue;
+    }
+    resolved[index] = {
+      ...entry,
+      blockIndex: neighbor.blockIndex,
+      startedAt: neighbor.startedAt ?? null,
+      endedAt: neighbor.endedAt ?? null,
+    };
+  }
+}
+
+function serializeResolvedTimeBlocks(resolved) {
+  const blocks = [];
+  for (const entry of resolved) {
+    if (!entry || !entry.text.trim()) {
+      continue;
+    }
+    const startedAt = entry.startedAt ?? entry.at ?? null;
+    const endedAt = entry.endedAt ?? null;
+    const blockIndex = entry.blockIndex ?? NEW_BLOCK_INDEX;
+    const last = blocks.at(-1);
+    const sameBlock =
+      last && last.blockIndex === blockIndex && last.startedAt === startedAt && last.endedAt === endedAt;
+    if (sameBlock) {
+      last.lines.push(entry.text);
+      continue;
+    }
+    blocks.push({
+      blockIndex,
+      startedAt,
+      endedAt,
+      kind: 'session',
+      lines: [entry.text],
+    });
   }
 
-  flush();
-  return chunks;
+  return serializeNoteTimeBlocks(blocks);
 }
 
 // Within one chunk, blank lines still delimit paragraphs; only the first
@@ -357,9 +573,3 @@ function splitChunkIntoUnits(text, at) {
   return units;
 }
 
-function serializeNoteEntries(entries) {
-  return entries
-    .filter((entry) => entry && entry.text.trim())
-    .map((entry) => (entry.at ? `@ ${formatNoteAtLocal(entry.at)}\n${entry.text}` : entry.text))
-    .join('\n\n');
-}

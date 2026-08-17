@@ -1,4 +1,5 @@
 import { chromium } from 'playwright';
+import { noteBody, waitForStoredNoteBody } from './note-body-smoke.mjs';
 
 const targetUrl = new URL(process.env.UI_SMOKE_URL ?? 'http://127.0.0.1:5176/menubar');
 targetUrl.searchParams.set('local', '1');
@@ -431,8 +432,9 @@ try {
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     const todo = state.todos.find((item) => item.id === 'menubar-open');
-    return todo?.title === 'Renamed in menu bar' && todo?.note === 'Compact\tnote';
+    return todo?.title === 'Renamed in menu bar';
   });
+  await waitForStoredNoteBody(page, 'menubar-open', 'Compact\tnote');
   await page.waitForFunction(
     () =>
       document.querySelector('[data-menubar-details="menubar-open"] .menubar-note-save-status')
@@ -452,10 +454,7 @@ try {
   await page.locator('[data-menubar-details="menubar-open"] .menubar-note-input').press('End');
   await page.locator('[data-menubar-details="menubar-open"] .menubar-note-input').press('Enter');
   await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
-  await page.waitForFunction(() => {
-    const state = JSON.parse(localStorage.getItem('done-log-state'));
-    return state.todos.find((todo) => todo.id === 'menubar-open')?.note === '\tIndented line\n\t';
-  });
+  await waitForStoredNoteBody(page, 'menubar-open', '\tIndented line\n\t');
   const enterIndentPresentation = await page.evaluate(() => {
     const textarea = document.querySelector(
       '[data-menubar-details="menubar-open"] .menubar-note-input',
@@ -471,10 +470,7 @@ try {
     '[data-menubar-details="menubar-open"] .menubar-note-input',
     '/todo Review menu bar',
   );
-  await page.waitForFunction(() => {
-    const state = JSON.parse(localStorage.getItem('done-log-state'));
-    return state.todos.find((todo) => todo.id === 'menubar-open')?.note === '- [ ] Review menu bar';
-  });
+  await waitForStoredNoteBody(page, 'menubar-open', '- [ ] Review menu bar');
   const slashTodoPresentation = await page.evaluate(() => {
     const details = document.querySelector('[data-menubar-details="menubar-open"]');
     return {
@@ -484,10 +480,7 @@ try {
     };
   });
   await page.click('[data-menubar-details="menubar-open"] .note-todo-item');
-  await page.waitForFunction(() => {
-    const state = JSON.parse(localStorage.getItem('done-log-state'));
-    return state.todos.find((todo) => todo.id === 'menubar-open')?.note === '- [x] Review menu bar';
-  });
+  await waitForStoredNoteBody(page, 'menubar-open', '- [x] Review menu bar');
   const toggledTodoPressed = await page
     .locator('[data-menubar-details="menubar-open"] .note-todo-item')
     .getAttribute('aria-pressed');
@@ -770,7 +763,7 @@ try {
     !final.added ||
     !final.addedDueDate ||
     final.renamed !== 'Renamed in menu bar' ||
-    final.note !== '- [x] Review menu bar' ||
+    noteBody(final.note) !== '- [x] Review menu bar' ||
     final.completed ||
     !final.pausedCompleted ||
     final.progress !== 'Chapter\t3' ||
@@ -909,7 +902,12 @@ async function inspectFloatingNote() {
   await notePage.fill('.floating-note-input', 'Note from floating window');
   await notePage.waitForFunction(() => {
     const todo = JSON.parse(localStorage.getItem('done-log-state')).todos[0];
-    return todo?.note === 'Note from floating window';
+    const pattern = /^(?:Start:|End:|@) \d{4}-\d{2}-\d{2} \d{2}:\d{2}\s*$/;
+    const body = String(todo?.note ?? '')
+      .split('\n')
+      .filter((line) => !pattern.test(line))
+      .join('\n');
+    return body === 'Note from floating window';
   });
   await notePage.waitForFunction(
     () =>
@@ -940,7 +938,12 @@ async function inspectFloatingNote() {
   await page.click('.menubar-start');
   const noteSurvivedTimerChanges = await page.evaluate(() => {
     const todo = JSON.parse(localStorage.getItem('done-log-state')).todos[0];
-    return Boolean(todo?.activeStartedAt) && todo?.note === 'Note from floating window';
+    const pattern = /^(?:Start:|End:|@) \d{4}-\d{2}-\d{2} \d{2}:\d{2}\s*$/;
+    const body = String(todo?.note ?? '')
+      .split('\n')
+      .filter((line) => !pattern.test(line))
+      .join('\n');
+    return Boolean(todo?.activeStartedAt) && body === 'Note from floating window';
   });
   await context.close();
 

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it } from 'vitest';
 import {
   applyTodoNote,
   closeNoteTimeBlock,
@@ -12,6 +12,7 @@ import {
   addTodo,
   createInitialState,
   pauseTodoTimer,
+  resetNoteBurstBaselines,
   startTodoTimer,
   updateTodoNote,
 } from './todoStore.js';
@@ -70,11 +71,13 @@ describe('note time blocks', () => {
       {
         startedAt: START.toISOString(),
         endedAt: PAUSE.toISOString(),
+        kind: 'session',
         lines: ['- first', '- second'],
       },
       {
         startedAt: RESUME.toISOString(),
         endedAt: null,
+        kind: 'session',
         lines: ['- third'],
       },
     ]);
@@ -120,6 +123,10 @@ describe('note time blocks', () => {
 });
 
 describe('timer-backed note time blocks', () => {
+  beforeEach(() => {
+    resetNoteBurstBaselines();
+  });
+
   it('writes Start into the note when the timer starts', () => {
     let state = createInitialState();
     state = addTodo(state, 'Write the talk', START);

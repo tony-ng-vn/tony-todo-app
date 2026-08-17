@@ -534,7 +534,9 @@ describe('todo day summary', () => {
 
     expect(state.todos[0]).toEqual({
       ...todo,
-      note: `@ ${formatNoteAtLocal(now)}\nAsk about the scholarship deadline.`,
+      firstStartedAt: now.toISOString(),
+      activeStartedAt: now.toISOString(),
+      note: `Start: ${formatNoteAtLocal(now)}\nAsk about the scholarship deadline.`,
     });
   });
 
@@ -1265,7 +1267,7 @@ describe('note editing bursts', () => {
 
     expect(lastCallAt.toISOString()).not.toBe(savedAt.toISOString());
     expect(parseNoteEntries(state.todos[0].note)).toEqual([
-      { at: lastCallAt.toISOString(), text: '- Not getting lunch yet' },
+      { at: savedAt.toISOString(), text: '- Not getting lunch yet' },
     ]);
   });
 
@@ -1298,7 +1300,7 @@ describe('note editing bursts', () => {
     state = updateTodoNote(state, todoId, '- Walk the dog\n- Buy milk', laterBurstAt);
 
     expect(parseNoteEntries(state.todos[0].note)).toEqual([
-      { at: laterStamp.toISOString(), text: '- Walk the dog' },
+      { at: first.toISOString(), text: '- Walk the dog' },
       { at: first.toISOString(), text: '- Buy milk' },
     ]);
   });
