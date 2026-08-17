@@ -24,6 +24,7 @@ import {
   normalizedTrackedSeconds,
 } from './todoCommands.js';
 import {
+  closeNoteTimeBlock,
   isEmptyNoteUnitText,
   openNoteTimeBlock,
   parseNoteEntries,
@@ -826,6 +827,7 @@ export function logProgressSession(state, todoId, completedAt = new Date()) {
         todo.id === todoId
           ? {
               ...todo,
+              note: closeNoteTimeBlock(todo.note ?? '', new Date(session.completedAt)),
               firstStartedAt: null,
               activeStartedAt: null,
               trackedSeconds: 0,
