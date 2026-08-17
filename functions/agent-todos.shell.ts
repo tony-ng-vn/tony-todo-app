@@ -159,6 +159,21 @@ async function persistTodoCommand(client, ownerUserId, persist) {
     }
   }
 
+  for (const session of persist.sessionUpdates ?? []) {
+    const { error: updateError } = await client.database
+      .from('todos')
+      .update({
+        ...toRemoteCompletionFields(session),
+        note: session.note ?? '',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', session.id)
+      .eq('user_id', ownerUserId);
+    if (updateError) {
+      throw updateError;
+    }
+  }
+
   const { error } = await client.database
     .from('todos')
     .update({

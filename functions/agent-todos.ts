@@ -487,9 +487,11 @@ function findDuplicateTodo(state, title, { excludeTodoId = null } = {}) {
 }
 
 function completeTodo(state, todoId, completedAt = new Date()) {
+  const archived = archivePriorDaySessions(state, completedAt);
+
   return {
-    ...state,
-    todos: state.todos.map((todo) => {
+    ...archived,
+    todos: archived.todos.map((todo) => {
       if (todo.id !== todoId) {
         return todo;
       }
@@ -514,6 +516,7 @@ function archivePriorDaySessions(state, now = new Date()) {
   }
 
   const sessions = [];
+  const updatedSessions = [];
   const todos = state.todos.map((todo) => {
     if (todo.completedAt || todo.isProgressSession || parseTodoKind(todo.kind) !== 'task') {
       return todo;
@@ -525,16 +528,23 @@ function archivePriorDaySessions(state, now = new Date()) {
     }
 
     sessions.push(...archived.sessions);
+    updatedSessions.push(...archived.updatedSessions);
     return archived.parent;
   });
 
-  if (sessions.length === 0 && todos.every((todo, index) => todo === state.todos[index])) {
+  if (
+    sessions.length === 0 &&
+    updatedSessions.length === 0 &&
+    todos.every((todo, index) => todo === state.todos[index])
+  ) {
     return state;
   }
 
+  const updatedById = new Map(updatedSessions.map((session) => [session.id, session]));
+
   return {
     ...state,
-    todos: [...todos, ...sessions],
+    todos: [...todos.map((todo) => updatedById.get(todo.id) ?? todo), ...sessions],
   };
 }
 
@@ -1068,16 +1078,34 @@ function runCompleteCommand(state, target, now) {
     };
   }
 
-  const next = completeTodo(archivePriorDaySessions(state, now), todo.id, now);
+  const next = completeTodo(state, todo.id, now);
   const updated = next.todos.find((item) => item.id === todo.id);
   const sessions = next.todos.filter(
-    (item) => item.isProgressSession && item.parentTaskId === todo.id && !state.todos.some((before) => before.id === item.id),
+    (item) =>
+      item.isProgressSession &&
+      item.parentTaskId === todo.id &&
+      !state.todos.some((before) => before.id === item.id),
   );
+  const sessionUpdates = next.todos.filter((item) => {
+    if (!item.isProgressSession || item.parentTaskId !== todo.id) {
+      return false;
+    }
+
+    const before = state.todos.find((existing) => existing.id === item.id);
+    return Boolean(
+      before &&
+        (before.completedAt !== item.completedAt ||
+          before.trackedSeconds !== item.trackedSeconds ||
+          before.firstStartedAt !== item.firstStartedAt ||
+          JSON.stringify(normalizeTimeSegments(before.timeSegments)) !==
+            JSON.stringify(normalizeTimeSegments(item.timeSegments))),
+    );
+  });
 
   return {
     ok: true,
     view: { kind: 'complete', task: toCompletedTaskView(updated) },
-    persist: { kind: 'update', todo: updated, sessions },
+    persist: { kind: 'update', todo: updated, sessions, sessionUpdates },
   };
 }
 
@@ -1334,10 +1362,23 @@ function archiveOpenTodoPriorDays(todo, now, todayKey, existingTodos) {
     sessionsByDay.set(piece.dayKey, current);
   }
 
-  const sessions = [...sessionsByDay.entries()]
-    .toSorted(([firstDay], [secondDay]) => firstDay.localeCompare(secondDay))
-    .map(([dayKey, segments]) => createDayProgressSession(todo, dayKey, segments))
-    .filter((session) => !hasProgressSessionForDay(existingTodos, todo.id, session));
+  const sessions = [];
+  const updatedSessions = [];
+  for (const [dayKey, segments] of [...sessionsByDay.entries()].toSorted(([firstDay], [secondDay]) =>
+    firstDay.localeCompare(secondDay),
+  )) {
+    const existing = findProgressSessionForDay(existingTodos, todo.id, dayKey);
+    if (existing) {
+      const mergedSegments = mergeTimeSegments(existing.timeSegments, segments);
+      const updated = rebuildProgressSession(existing, mergedSegments);
+      if (progressSessionChanged(existing, updated)) {
+        updatedSessions.push(updated);
+      }
+      continue;
+    }
+
+    sessions.push(createDayProgressSession(todo, dayKey, segments));
+  }
 
   const remainingClosed = closedPieces
     .filter((piece) => piece.dayKey >= todayKey)
@@ -1358,6 +1399,7 @@ function archiveOpenTodoPriorDays(todo, now, todayKey, existingTodos) {
       timeSegments: remainingClosed,
     },
     sessions,
+    updatedSessions,
   };
 }
 
@@ -1438,19 +1480,60 @@ function createDayProgressSession(parent, dayKey, segments) {
   });
 }
 
-function hasProgressSessionForDay(existingTodos, parentId, session) {
-  const sessionDay = formatSummaryDayKey(new Date(session.completedAt));
-  return existingTodos.some((item) => {
-    if (item.id === session.id) {
-      return true;
-    }
+function findProgressSessionForDay(existingTodos, parentId, dayKey) {
+  return (
+    existingTodos.find((item) => {
+      if (!item.isProgressSession || item.parentTaskId !== parentId || !item.completedAt) {
+        return false;
+      }
 
-    if (!item.isProgressSession || item.parentTaskId !== parentId || !item.completedAt) {
-      return false;
-    }
+      return formatSummaryDayKey(new Date(item.completedAt)) === dayKey;
+    }) ?? null
+  );
+}
 
-    return formatSummaryDayKey(new Date(item.completedAt)) === sessionDay;
+function rebuildProgressSession(session, segments) {
+  const firstStart = new Date(segments[0].startedAt);
+  const lastEnd = new Date(segments.at(-1).endedAt);
+
+  return normalizeTodo({
+    ...session,
+    completedAt: lastEnd.toISOString(),
+    firstStartedAt: firstStart.toISOString(),
+    activeStartedAt: null,
+    trackedSeconds: totalSegmentSeconds(segments),
+    timeSegments: segments,
   });
+}
+
+function progressSessionChanged(before, after) {
+  return (
+    before.completedAt !== after.completedAt ||
+    before.trackedSeconds !== after.trackedSeconds ||
+    before.firstStartedAt !== after.firstStartedAt ||
+    JSON.stringify(normalizeTimeSegments(before.timeSegments)) !==
+      JSON.stringify(normalizeTimeSegments(after.timeSegments))
+  );
+}
+
+function mergeTimeSegments(first, second) {
+  const merged = [];
+
+  for (const segment of [...normalizeTimeSegments(first), ...normalizeTimeSegments(second)].toSorted(
+    (left, right) => new Date(left.startedAt) - new Date(right.startedAt),
+  )) {
+    const last = merged.at(-1);
+    if (last && new Date(segment.startedAt) <= new Date(last.endedAt)) {
+      if (new Date(segment.endedAt) > new Date(last.endedAt)) {
+        last.endedAt = segment.endedAt;
+      }
+      continue;
+    }
+
+    merged.push({ startedAt: segment.startedAt, endedAt: segment.endedAt });
+  }
+
+  return merged;
 }
 
 function createProgressSessionId(parentId, completedAt) {
@@ -1658,6 +1741,21 @@ async function persistTodoCommand(client, ownerUserId, persist) {
     ]);
     if (insertError) {
       throw insertError;
+    }
+  }
+
+  for (const session of persist.sessionUpdates ?? []) {
+    const { error: updateError } = await client.database
+      .from('todos')
+      .update({
+        ...toRemoteCompletionFields(session),
+        note: session.note ?? '',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', session.id)
+      .eq('user_id', ownerUserId);
+    if (updateError) {
+      throw updateError;
     }
   }
 
