@@ -670,7 +670,7 @@
   }
 
   .menubar-task-details input[type='text'],
-  .menubar-task-details textarea {
+  .menubar-task-details :global(textarea) {
     width: 100%;
     min-width: 0;
     border: 1px solid var(--border);
@@ -695,13 +695,13 @@
     line-height: 1.4;
   }
 
-  .menubar-task-details textarea {
+  .menubar-task-details :global(textarea) {
     resize: vertical;
   }
 
   .menubar-task-details input:focus-visible,
   .menubar-task-details :global(.menubar-calendar-trigger:focus-visible),
-  .menubar-task-details textarea:focus-visible,
+  .menubar-task-details :global(textarea:focus-visible),
   .note-todo-item:focus-visible,
   .menubar-details-toggle:focus-visible,
   .menubar-icon-button:focus-visible,
