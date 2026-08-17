@@ -80,12 +80,6 @@ export function updateTodoCompletedAt(state, todoId, completedAt) {
     return state;
   }
 
-  const todo = state.todos.find((item) => item.id === todoId);
-  const startedAt = todo?.firstStartedAt ? new Date(todo.firstStartedAt) : null;
-  if (startedAt && !Number.isNaN(startedAt.getTime()) && startedAt >= doneDate) {
-    return state;
-  }
-
   const doneAt = doneDate.toISOString();
 
   return {
@@ -201,7 +195,7 @@ export function updateTodoTimeSegments(state, todoId, segments) {
         ...todo,
         firstStartedAt,
         activeStartedAt: wasRunning ? latestEndedAt : null,
-        completedAt: wasCompleted ? latestEndedAt : null,
+        completedAt: wasCompleted ? todo.completedAt : null,
         trackedSeconds: totalTimeSegmentSeconds(timeSegments),
         timeSegments,
       };
@@ -759,11 +753,30 @@ export function getEditableTaskTimeSegments(todo, activeEndedAt = new Date()) {
     return recordedSegments;
   }
 
-  const completedAt = todo?.completedAt ? new Date(todo.completedAt) : null;
+  if (todo?.completedAt) {
+    const startedAt = todo.firstStartedAt ? new Date(todo.firstStartedAt) : null;
+    const completedAt = new Date(todo.completedAt);
+    if (
+      startedAt &&
+      !Number.isNaN(startedAt.getTime()) &&
+      !Number.isNaN(completedAt.getTime()) &&
+      startedAt.getTime() < completedAt.getTime()
+    ) {
+      return [
+        {
+          startedAt: startedAt.toISOString(),
+          endedAt: completedAt.toISOString(),
+        },
+      ];
+    }
+
+    return [];
+  }
+
   return [
     {
       startedAt: getDefaultTaskStartTimestamp(todo),
-      endedAt: completedAt && !Number.isNaN(completedAt.getTime()) ? completedAt.toISOString() : null,
+      endedAt: null,
     },
   ];
 }
