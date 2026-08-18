@@ -204,8 +204,13 @@
       {/each}
     {:else}
       <div class="empty-summary">
-        <strong>No finished tasks for this date.</strong>
-        <span>Complete a task and it will land here automatically.</span>
+        {#if searchActive}
+          <strong>Nothing finished on this date matches that search.</strong>
+          <span>Clear the search to see the whole recap.</span>
+        {:else}
+          <strong>No finished tasks for this date.</strong>
+          <span>Complete a task and it will land here automatically.</span>
+        {/if}
       </div>
     {/if}
   </div>
