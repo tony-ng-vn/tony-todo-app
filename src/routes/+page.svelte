@@ -63,6 +63,7 @@
   import {
     completeRemoteTodo,
     deleteRemoteTodo,
+    insertRemoteProgressSession,
     insertRemoteTodo,
     loadRemoteTodos,
     updateRemoteTodoCompletion,
@@ -676,7 +677,7 @@
 
     if (createdTodos.length > 0 || changedWorkflowTodos.length > 0) {
       await syncRemoteChange('Saving task state', async () => {
-        await persistCreatedTodos(createdTodos);
+        await persistArchivedSessions(createdTodos);
         await Promise.all(changedWorkflowTodos.map((todo) => persistTodoWorkflow(todo)));
       });
     }
@@ -1357,12 +1358,13 @@
     await updateRemoteTodoWorkflow(insforge, authUser.id, todo);
   }
 
-  async function persistCreatedTodos(todos) {
-    await Promise.all(todos.map((todo) => persistNewTodo(todo)));
+  async function persistArchivedSessions(sessions) {
+    if (!useRemote || !authUser) return;
+    await Promise.all(sessions.map((session) => insertRemoteProgressSession(insforge, authUser.id, session)));
   }
 
   async function persistArchivedTodos(beforeTodos, afterTodos) {
-    await persistCreatedTodos(getCreatedTodos(beforeTodos, afterTodos));
+    await persistArchivedSessions(getCreatedTodos(beforeTodos, afterTodos));
     const changedTodos = getTodosWithChangedFields(beforeTodos, afterTodos, ARCHIVE_SYNC_FIELDS);
     await Promise.all(
       changedTodos.map((todo) => (todo.completedAt ? persistCompletedTodo(todo) : persistTodoTimer(todo))),

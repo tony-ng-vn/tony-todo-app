@@ -146,14 +146,19 @@ async function persistTodoCommand(client, ownerUserId, persist) {
     return;
   }
 
+  // Session ids are deterministic and web/menubar clients archive the same
+  // work, so an existing row is left alone instead of failing the command.
   for (const session of persist.sessions ?? []) {
-    const { error: insertError } = await client.database.from('todos').insert([
-      {
-        ...toRemoteRecord(session, ownerUserId),
-        due_date: session.dueDate,
-        loop_status: 'accepted',
-      },
-    ]);
+    const { error: insertError } = await client.database.from('todos').upsert(
+      [
+        {
+          ...toRemoteRecord(session, ownerUserId),
+          due_date: session.dueDate,
+          loop_status: 'accepted',
+        },
+      ],
+      { onConflict: 'id', ignoreDuplicates: true },
+    );
     if (insertError) {
       throw insertError;
     }

@@ -65,6 +65,7 @@
   import {
     completeRemoteTodo,
     deleteRemoteTodo,
+    insertRemoteProgressSession,
     insertRemoteTodo,
     loadRemoteTodos,
     updateRemoteTodoDueDate,
@@ -761,12 +762,13 @@
     await updateRemoteTodoWorkflow(insforge, authUser.id, todo);
   }
 
-  async function persistCreatedTodos(todos) {
-    await Promise.all(todos.map((todo) => persistNewTodo(todo)));
+  async function persistArchivedSessions(sessions) {
+    if (!useRemote || !authUser) return;
+    await Promise.all(sessions.map((session) => insertRemoteProgressSession(insforge, authUser.id, session)));
   }
 
   async function persistArchivedTodos(beforeTodos, afterTodos) {
-    await persistCreatedTodos(getCreatedTodos(beforeTodos, afterTodos));
+    await persistArchivedSessions(getCreatedTodos(beforeTodos, afterTodos));
     const changedTodos = getChangedTodos(beforeTodos, afterTodos, TIMING_FIELDS);
     await Promise.all(
       changedTodos.map((todo) => (todo.completedAt ? persistCompletedTodo(todo) : persistTodoTimer(todo))),

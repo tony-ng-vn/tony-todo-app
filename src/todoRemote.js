@@ -24,6 +24,16 @@ export async function insertRemoteTodo(client, userId, todo) {
   throwIfError(error);
 }
 
+// Session ids are deterministic and every client archives on load, focus and
+// rollover, so a plain insert races between the web app and the menubar.
+export async function insertRemoteProgressSession(client, userId, session) {
+  const { error } = await client.database
+    .from('todos')
+    .upsert([toRemoteRecord(session, userId)], { onConflict: 'id', ignoreDuplicates: true });
+
+  throwIfError(error);
+}
+
 export async function completeRemoteTodo(client, userId, todo) {
   await updateRemoteTodo(client, userId, todo, completionFields(todo));
 }
