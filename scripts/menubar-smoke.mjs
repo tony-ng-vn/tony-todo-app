@@ -26,6 +26,21 @@ async function moveCalendarToMonth(page, target) {
   throw new Error(`Could not navigate calendar to ${targetTitle}`);
 }
 
+// Opens the New task overlay (if needed), types the title, and submits with Enter.
+async function submitOverlayTitle(page, title) {
+  if (!(await page.locator('.composer-overlay[open]').count())) {
+    await page.locator('.new-task-button').click();
+    await page.waitForSelector('.composer-overlay[open]');
+  }
+  await page.fill('#overlay-todo-title', title);
+  await page.locator('#overlay-todo-title').press('Enter');
+}
+
+async function dismissOverlay(page) {
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.composer-overlay[open]'));
+}
+
 async function chooseCalendarDay(page, selector, value) {
   const target = new Date(`${value}T12:00:00`);
   await page.locator(selector).click();
@@ -287,12 +302,13 @@ try {
     hasCacheBuster: updateUrl.searchParams.has('updated'),
   };
 
-  await page.locator('#menubar-quick-add').press('Enter');
+  await submitOverlayTitle(page, '');
   await page.waitForTimeout(50);
   const countAfterEmptyAdd = await page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     return state.todos.length;
   });
+  await dismissOverlay(page);
 
   await page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
@@ -311,8 +327,7 @@ try {
   });
   await page.waitForSelector('[data-menubar-id="menubar-external"]');
 
-  await page.fill('#menubar-quick-add', 'Captured from menu bar');
-  await page.locator('#menubar-quick-add').press('Enter');
+  await submitOverlayTitle(page, 'Captured from menu bar');
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     return state.todos.some((todo) => todo.title === 'Captured from menu bar');
@@ -342,8 +357,7 @@ try {
         .textContent()
     )?.trim(),
   };
-  await page.fill('#menubar-quick-add', 'Captured from menu ba');
-  await page.locator('#menubar-quick-add').press('Enter');
+  await submitOverlayTitle(page, 'Captured from menu ba');
   await page.waitForFunction(() =>
     document.querySelector('.menubar-sync')?.textContent.includes('Duplicate task'),
   );
@@ -352,10 +366,12 @@ try {
     return {
       matchingTasks: state.todos.filter((todo) => todo.title.startsWith('Captured from menu ba'))
         .length,
-      draft: document.querySelector('#menubar-quick-add')?.value,
+      draft: document.querySelector('#overlay-todo-title')?.value,
+      overlayError: document.querySelector('.composer-error')?.textContent.trim(),
       message: document.querySelector('.menubar-sync')?.textContent.trim(),
     };
   });
+  await dismissOverlay(page);
   await page.click('[data-menubar-id="menubar-open"] .menubar-start');
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
@@ -704,6 +720,7 @@ try {
   if (
     duplicateTask.matchingTasks !== 1 ||
     duplicateTask.draft !== 'Captured from menu ba' ||
+    duplicateTask.overlayError !== 'That is already open as "Captured from menu bar".' ||
     duplicateTask.message !== 'Duplicate task: "Captured from menu bar" is already open'
   ) {
     failures.push(`menu bar duplicate matching failed: ${JSON.stringify(duplicateTask)}`);

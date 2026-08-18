@@ -92,6 +92,15 @@ export function iconSun() {
   `;
 }
 
+export function iconSearch() {
+  return `
+    <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <circle cx="7" cy="7" r="4.25" />
+      <path d="m10.25 10.25 3 3" />
+    </svg>
+  `;
+}
+
 export function iconPlus() {
   return `
     <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">

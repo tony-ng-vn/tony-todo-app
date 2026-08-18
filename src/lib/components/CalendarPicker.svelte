@@ -10,6 +10,7 @@
   export let invalid = false;
   export let describedBy = undefined;
   export let allowClear = false;
+  export let portalTarget = null;
 
   const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const PICKER_OPEN_EVENT = 'done-log-calendar-picker-open';
@@ -104,6 +105,8 @@
 
   function handleKeydown(event) {
     if (isOpen && event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
       closeCalendar();
     }
   }
@@ -141,7 +144,8 @@
       return {};
     }
 
-    document.body.appendChild(node);
+    const host = portalTarget ?? document.body;
+    host.appendChild(node);
     return {
       destroy() {
         node.remove();
@@ -249,7 +253,7 @@
   }
 </script>
 
-<svelte:window on:keydown={handleKeydown} on:resize={handleViewportChange} on:scroll={handleViewportChange} />
+<svelte:window on:keydown|capture={handleKeydown} on:resize={handleViewportChange} on:scroll={handleViewportChange} />
 
 <div class="calendar-picker">
   <button

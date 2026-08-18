@@ -278,6 +278,66 @@ export function getSomedayTodos(state) {
   return getPendingTodos(state).filter((todo) => Boolean(todo.somedayAt));
 }
 
+// Anything that is not a letter or digit in any script separates search words.
+const SEARCH_WORD_SEPARATOR = /[^\p{L}\p{N}]+/u;
+
+function normalizeSearchQuery(value) {
+  return String(value ?? '').trim().toLowerCase();
+}
+
+function toSearchWords(text) {
+  return String(text ?? '').toLowerCase().split(SEARCH_WORD_SEPARATOR).filter(Boolean);
+}
+
+export function todoMatchesSearchQuery(todo, query) {
+  const tokens = toSearchWords(query);
+  if (!tokens.length) {
+    return true;
+  }
+
+  const words = [
+    ...toSearchWords(todo?.title),
+    ...toSearchWords(todo?.note),
+    ...toSearchWords(todo?.progressLabel),
+  ];
+
+  return tokens.every((token) => words.some((word) => word.startsWith(token)));
+}
+
+export function filterTodosBySearch(todos, query) {
+  if (!normalizeSearchQuery(query)) {
+    return todos;
+  }
+
+  return todos.filter((todo) => todoMatchesSearchQuery(todo, query));
+}
+
+export function filterTodoSections(sections, query) {
+  if (!normalizeSearchQuery(query)) {
+    return sections;
+  }
+
+  return sections
+    .map((section) => ({
+      ...section,
+      items: filterTodosBySearch(section.items, query),
+    }))
+    .filter((section) => section.items.length > 0);
+}
+
+// Matches outside the rendered lists (done, parked, other days) so a search can still surface them.
+export function findOverflowSearchMatches(todos, visibleTodos, query) {
+  if (!normalizeSearchQuery(query)) {
+    return [];
+  }
+
+  const visibleIds = new Set(visibleTodos.map((todo) => todo.id));
+  return todos.filter(
+    (todo) =>
+      !todo.isProgressSession && !visibleIds.has(todo.id) && todoMatchesSearchQuery(todo, query),
+  );
+}
+
 export function partitionPendingTodos(todos) {
   const groups = { ready: [], ongoing: [], paused: [] };
 
@@ -881,6 +941,17 @@ export function formatDayKey(date) {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+}
+
+// A due date is a calendar day, so anchor the picked YYYY-MM-DD to local
+// midnight before storing it as an ISO string. Empty input -> no due date.
+export function dueDateInputToIso(value) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
 }
 
 export function shiftDayKey(dayKey, offset) {

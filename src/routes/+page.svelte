@@ -3,6 +3,7 @@
   import '../styles.css';
   import FlowRail from '../lib/components/FlowRail.svelte';
   import LottieAnimation from '../lib/components/LottieAnimation.svelte';
+  import AddTaskOverlay from '../lib/components/AddTaskOverlay.svelte';
   import AuthGate from '../lib/components/AuthGate.svelte';
   import BoardPanel from '../lib/components/BoardPanel.svelte';
   import CalendarPanel from '../lib/components/CalendarPanel.svelte';
@@ -28,6 +29,7 @@
     completeTodo,
     createInitialState,
     deleteTodo,
+    dueDateInputToIso,
     failTodo,
     findDuplicateTodo,
     formatDayKey,
@@ -41,6 +43,9 @@
     getOpenTodoSections,
     getProgressSessions,
     getProjectTodos,
+    filterTodoSections,
+    filterTodosBySearch,
+    findOverflowSearchMatches,
     moveCompletedTodoToSummaryBucket,
     moveTodoToBoardColumn,
     pauseTodoTimer,
@@ -59,6 +64,7 @@
     stripNoteStampsForEditor,
   } from '../todoStore.js';
   import { insforge, isInsForgeConfigured } from '../insforgeClient.js';
+  import { isNewTaskShortcut } from '../newTaskShortcut.js';
   import { getCurrentUser, signInWithPassword, signOut, signUp } from '../auth.js';
   import {
     completeRemoteTodo,
@@ -129,11 +135,12 @@
   let authPassword = '';
   let authError = '';
   let authLoading = false;
+  let composerOpen = false;
+  let composerError = '';
+  let taskSearchQuery = '';
   let titleDraft = '';
   let composerKind = 'task';
   let dueDateDraft = formatDayKey(new Date());
-  let lastSelectedDayForDraft = dueDateDraft;
-  let draftTitle = '';
   let selectedTaskId = null;
   let photoBusy = false;
   let photoError = '';
@@ -175,14 +182,18 @@
     pendingViewTodos,
     new Date(`${currentDayKey}T00:00:00`),
   );
-  $: ongoingTodos = pendingTodoGroups.ongoing;
-  $: pausedTodos = pendingTodoGroups.paused;
-  $: openTodos = pendingTodoGroups.scheduled;
+  $: ongoingTodos = filterTodosBySearch(pendingTodoGroups.ongoing, taskSearchQuery);
+  $: pausedTodos = filterTodosBySearch(pendingTodoGroups.paused, taskSearchQuery);
+  $: openTodos = filterTodosBySearch(pendingTodoGroups.scheduled, taskSearchQuery);
   $: openTodoSections = getOpenTodoSections(openTodos, new Date(`${currentDayKey}T00:00:00`));
-  $: openCount = openTodos.length;
-  $: summary = getDaySummary(state, selectedDay);
+  $: summary = filterTodoSections(getDaySummary(state, selectedDay), taskSearchQuery);
   $: boardColumns = getBoardColumns(state, { dayKey: selectedDay, dueFilter: boardDueFilter });
   $: projectTodos = getProjectTodos(state);
+  $: searchMatches = findOverflowSearchMatches(
+    state.todos,
+    [...ongoingTodos, ...pausedTodos, ...openTodos, ...summary.flatMap((section) => section.items)],
+    taskSearchQuery,
+  );
   $: calendarMonthData = getCalendarMonth(state, { year: calendarYear, month: calendarMonth });
   $: completedToday = summary.reduce(
     (total, section) => total + section.items.filter((item) => item.outcome !== 'failed').length,
@@ -192,10 +203,6 @@
   $: selectedNoteSaveStatus = noteSaveStatuses[selectedTaskId] ?? 'saved';
   $: selectedTaskSessions = selectedTaskId ? getProgressSessions(state, selectedTaskId) : [];
 
-  $: if (selectedDay !== lastSelectedDayForDraft && dueDateDraft === lastSelectedDayForDraft) {
-    dueDateDraft = selectedDay;
-    lastSelectedDayForDraft = selectedDay;
-  }
 
   onMount(() => {
     useRemote = isInsForgeConfigured && !new URLSearchParams(window.location.search).has('local');
@@ -246,20 +253,36 @@
     noteDraft = nextDraft.noteDraft;
   }
 
-  // A due date is a calendar day, so anchor the picked YYYY-MM-DD to local
-  // midnight before storing it as an ISO string. Empty input -> no due date.
-  function dueDateInputToIso(value) {
-    if (!value) {
-      return null;
+  function openComposer(kind = 'task') {
+    composerKind = kind === 'project' ? 'project' : 'task';
+    if (!titleDraft.trim()) {
+      dueDateDraft = formatDayKey(new Date());
+    }
+    composerError = '';
+    composerOpen = true;
+  }
+
+  function closeComposer() {
+    composerOpen = false;
+  }
+
+  function handleWorkspaceKeydown(event) {
+    if (!isNewTaskShortcut(event) || (useRemote && authChecked && !authUser)) {
+      return;
     }
 
-    const date = new Date(`${value}T00:00:00`);
-    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+    event.preventDefault();
+    if (composerOpen) {
+      document.getElementById('overlay-todo-title')?.focus();
+      return;
+    }
+    openComposer(viewMode === 'projects' ? 'project' : 'task');
   }
 
   async function handleSubmit() {
     const duplicate = findDuplicateTodo(state, titleDraft);
     if (duplicate) {
+      composerError = `That is already open as "${duplicate.title}".`;
       syncMessage = `Duplicate task: "${duplicate.title}" is already open`;
       return;
     }
@@ -268,7 +291,7 @@
     const kind = composerKind === 'project' ? 'project' : 'task';
     state = addTodo(state, titleDraft, new Date(), {
       kind,
-      dueDate: kind === 'project' ? null : dueDateInputToIso(dueDateDraft || selectedDay),
+      dueDate: kind === 'project' ? null : dueDateInputToIso(dueDateDraft || formatDayKey(new Date())),
     });
     const createdTodo = state.todos.find((todo) => !existingIds.has(todo.id));
 
@@ -276,12 +299,12 @@
       return;
     }
 
+    composerError = '';
     newlyAddedTodoId = createdTodo.id;
-    draftTitle = '';
     titleDraft = '';
     composerKind = 'task';
-    dueDateDraft = selectedDay;
-    lastSelectedDayForDraft = selectedDay;
+    dueDateDraft = formatDayKey(new Date());
+    composerOpen = false;
     saveLocalState(state);
     window.setTimeout(() => {
       if (newlyAddedTodoId === createdTodo.id) {
@@ -294,10 +317,6 @@
     }
 
     await syncRemoteChange('Saving', () => persistNewTodo(createdTodo));
-  }
-
-  function handleDraftInput() {
-    draftTitle = titleDraft.trim();
   }
 
   function withLatestProgressSession(todos) {
@@ -961,11 +980,6 @@
     });
   }
 
-  async function handleProjectSubmit() {
-    composerKind = 'project';
-    await handleSubmit();
-  }
-
   async function handlePromoteProject(todoId) {
     const before = findTodo(todoId);
     if (!before || before.kind !== 'project') {
@@ -1432,6 +1446,8 @@
   }
 </script>
 
+<svelte:window on:keydown={handleWorkspaceKeydown} />
+
 {#if useRemote && authChecked && !authUser}
   <AuthGate
     mode={authMode}
@@ -1454,9 +1470,7 @@
       projects={projectTodos}
       inboxCount={inboxLoops.length}
       waitingCount={waitingLoops.length}
-      bind:titleDraft
-      onSubmit={handleProjectSubmit}
-      onDraftInput={handleDraftInput}
+      onOpenComposer={openComposer}
       onOpenTask={openTask}
       onPromote={handlePromoteProject}
       onDelete={handleDeleteTask}
@@ -1554,11 +1568,8 @@
       {ongoingTodos}
       {pausedTodos}
       {openTodoSections}
-      {openCount}
-      bind:titleDraft
-      bind:dueDateDraft
-      bind:composerKind
-      {draftTitle}
+      bind:searchQuery={taskSearchQuery}
+      {searchMatches}
       {editingTaskId}
       {newlyAddedTodoId}
       {draggedSummaryId}
@@ -1567,8 +1578,8 @@
       {viewMode}
       inboxCount={inboxLoops.length}
       waitingCount={waitingLoops.length}
-      onSubmit={handleSubmit}
-      onDraftInput={handleDraftInput}
+      onOpenComposer={openComposer}
+      composerOpen={composerOpen}
       onStartTitleEdit={startTitleEdit}
       onTitleKeydown={handleTitleKeydown}
       onCommitTitleEdit={commitTitleEdit}
@@ -1602,6 +1613,7 @@
       onBucketDrop={handleBucketDrop}
       onCompletedTimeChange={handleSummaryCompletedTimeChange}
       {completedTime}
+      searchActive={Boolean(taskSearchQuery.trim())}
     />
   {/if}
 
@@ -1635,6 +1647,16 @@
       <span>Done</span>
     </aside>
   {/if}
+
+  <AddTaskOverlay
+    bind:open={composerOpen}
+    bind:title={titleDraft}
+    bind:kind={composerKind}
+    bind:dueDate={dueDateDraft}
+    bind:error={composerError}
+    onClose={closeComposer}
+    onSubmit={handleSubmit}
+  />
 
   <div class="workspace-feedback">
     <FeedbackSdkWidget theme={themeMode === 'dark' ? 'dark' : 'light'} />

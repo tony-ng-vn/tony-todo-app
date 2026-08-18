@@ -20,7 +20,11 @@ import {
   getDaySummary,
   getMillisecondsUntilNextDay,
   getPendingTodos,
+  filterTodoSections,
+  findOverflowSearchMatches,
+  filterTodosBySearch,
   getProgressSessions,
+  todoMatchesSearchQuery,
   getProjectTodos,
   getSomedayTodos,
   getTaskTimeSegments,
@@ -39,6 +43,7 @@ import {
   reopenTodo,
   startTodoTimer,
   deleteTodo,
+  dueDateInputToIso,
   updateTodoTiming,
   updateTodoTimeSegments,
   updateCompletedTodoTiming,
@@ -1802,6 +1807,13 @@ describe('board view columns', () => {
 });
 
 describe('task due dates', () => {
+  it('anchors a picked calendar day to local midnight and rejects bad input', () => {
+    expect(dueDateInputToIso('2026-06-12')).toBe(new Date(2026, 5, 12).toISOString());
+    expect(dueDateInputToIso('')).toBeNull();
+    expect(dueDateInputToIso(null)).toBeNull();
+    expect(dueDateInputToIso('not-a-date')).toBeNull();
+  });
+
   it('assigns a new todo to its creation date when no date is chosen', () => {
     let state = createInitialState();
     state = addTodo(state, 'No deadline', new Date('2026-06-08T08:00:00'));
@@ -1861,6 +1873,92 @@ describe('task due dates', () => {
   it('formats a missing or invalid due date as an empty string', () => {
     expect(formatDueDate(null)).toBe('');
     expect(formatDueDate('not-a-date')).toBe('');
+  });
+});
+
+describe('task search matching', () => {
+  it('keeps every task when the query is empty', () => {
+    const todos = [{ id: '1', title: 'Action item' }, { id: '2', title: 'Review draft' }];
+    expect(filterTodosBySearch(todos, '')).toEqual(todos);
+    expect(filterTodosBySearch(todos, '   ')).toEqual(todos);
+  });
+
+  it('narrows by prefix as each letter is typed', () => {
+    const action = { id: '1', title: 'Action item', note: '' };
+    const review = { id: '2', title: 'Review draft', note: '' };
+
+    expect(filterTodosBySearch([action, review], 'a').map((todo) => todo.id)).toEqual(['1']);
+    expect(filterTodosBySearch([action, review], 'ac').map((todo) => todo.id)).toEqual(['1']);
+    expect(filterTodosBySearch([action, review], 'act').map((todo) => todo.id)).toEqual(['1']);
+    expect(filterTodosBySearch([action, review], 'action').map((todo) => todo.id)).toEqual(['1']);
+    expect(filterTodosBySearch([action, review], 'actionx')).toEqual([]);
+  });
+
+  it('matches a later word prefix, not a letter in the middle of a word', () => {
+    const todo = { id: '1', title: 'Review action items', note: '' };
+    expect(todoMatchesSearchQuery(todo, 'act')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'ction')).toBe(false);
+    expect(todoMatchesSearchQuery(todo, 'rev')).toBe(true);
+  });
+
+  it('matches note text with the same prefix rule', () => {
+    const todo = { id: '1', title: 'Capital One', note: 'Follow up on action' };
+    expect(todoMatchesSearchQuery(todo, 'act')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'capital')).toBe(true);
+  });
+
+  it('requires every typed word to prefix some word of the task', () => {
+    const todo = { id: '1', title: 'Review action items', note: 'Ask Sam' };
+    expect(todoMatchesSearchQuery(todo, 'rev act')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'act rev')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'review sam')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'review sun')).toBe(false);
+    expect(todoMatchesSearchQuery(todo, '  rev   act  ')).toBe(true);
+  });
+
+  it('ignores punctuation in the query and the task text', () => {
+    const todo = { id: '1', title: 'Send e-mail (draft)', note: '' };
+    expect(todoMatchesSearchQuery(todo, 'e-mail')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'mail')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, '(dra')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'send!')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, '???')).toBe(true);
+  });
+
+  it('treats non-ASCII letters as part of a word', () => {
+    const todo = { id: '1', title: 'D\u00e9cor for the caf\u00e9', note: '' };
+    expect(todoMatchesSearchQuery(todo, 'd\u00e9c')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'D\u00c9C')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'caf')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'cor')).toBe(false);
+  });
+
+  it('drops empty date groups after filtering', () => {
+    const sections = [
+      { id: 'today', items: [{ id: '1', title: 'Action item' }] },
+      { id: 'tomorrow', items: [{ id: '2', title: 'Review draft' }] },
+    ];
+    expect(filterTodoSections(sections, 'act').map((section) => section.id)).toEqual(['today']);
+  });
+
+  it('filters recap buckets the same way', () => {
+    const summary = [
+      { label: 'Morning', items: [{ id: '1', title: 'Action item', note: '' }] },
+      { label: 'Lunch', items: [{ id: '2', title: 'Shower', note: '' }] },
+    ];
+    expect(filterTodoSections(summary, 'act').map((section) => section.label)).toEqual(['Morning']);
+  });
+
+  it('lists matching tasks that are not already on screen as overflow hits', () => {
+    const visible = { id: '1', title: 'Action item' };
+    const hidden = { id: '2', title: 'Archived action', completedAt: '2026-01-02T10:00:00.000Z' };
+    const session = { id: '3', title: 'Action session', isProgressSession: true };
+    const other = { id: '4', title: 'Shower' };
+    const todos = [visible, hidden, session, other];
+
+    expect(findOverflowSearchMatches(todos, [visible], 'act')).toEqual([hidden]);
+    expect(findOverflowSearchMatches(todos, [], 'act')).toEqual([visible, hidden]);
+    expect(findOverflowSearchMatches(todos, [visible], '')).toEqual([]);
   });
 });
 
