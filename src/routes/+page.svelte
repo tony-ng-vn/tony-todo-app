@@ -55,6 +55,7 @@
     updateTodoTimeSegments,
     updateTodoCompletedAt,
     updateTodoNote,
+    updateTodoNoteFromEditor,
     updateTodoProgress,
     updateTodoTitle,
     stripNoteStampsForEditor,
@@ -783,7 +784,7 @@
     }
 
     noteDraft = nextNote;
-    state = updateTodoNote(state, selectedTaskId, nextNote);
+    state = updateTodoNoteFromEditor(state, selectedTaskId, nextNote);
     saveLocalState(state);
     const edit = recordNoteEdit(selectedTaskId, nextNote);
     setNoteSaveStatus(selectedTaskId, 'saving');

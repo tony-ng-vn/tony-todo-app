@@ -642,6 +642,22 @@ export function hasNoteBurstBaseline(todoId) {
   return noteBurstBaselines.has(todoId);
 }
 
+// The editor's own input path: typing the first note into an idle task starts
+// its timer, so the Start heading and the tracked time begin together.
+// Replaying a pending edit on load or merging a synced note must not, so
+// those callers use updateTodoNote directly.
+export function updateTodoNoteFromEditor(state, todoId, note, now = new Date()) {
+  const todo = state.todos.find((item) => item.id === todoId);
+  const shouldAutoStart =
+    todo &&
+    !todo.completedAt &&
+    !todo.somedayAt &&
+    !todo.activeStartedAt &&
+    parseNoteEntries(note).some((entry) => !isEmptyNoteUnitText(entry.text));
+  const nextState = shouldAutoStart ? startTodoTimer(state, todoId, now) : state;
+  return updateTodoNote(nextState, todoId, note, now);
+}
+
 export function updateTodoNote(state, todoId, note, now = new Date()) {
   const todo = state.todos.find((item) => item.id === todoId);
   if (!todo) {
@@ -658,27 +674,22 @@ export function updateTodoNote(state, todoId, note, now = new Date()) {
     }
   }
 
-  const shouldAutoStart =
-    !todo.completedAt &&
-    !todo.activeStartedAt &&
-    parseNoteEntries(note).some((entry) => !isEmptyNoteUnitText(entry.text));
-  const nextState = shouldAutoStart ? startTodoTimer(state, todoId, now) : state;
-  const nextTodo = nextState.todos.find((item) => item.id === todoId) ?? todo;
-
   const tracked = noteBurstBaselines.get(todoId);
   const elapsed = tracked ? nowMs - tracked.updatedAt : Number.POSITIVE_INFINITY;
+  // elapsed < 0 means the clock went backwards (or a replay carries an older
+  // timestamp): that is not a continuation of the burst, so start a fresh one.
   const withinBurst =
     Boolean(tracked) &&
     elapsed >= 0 &&
     elapsed < NOTE_BURST_GAP_MS &&
-    tracked.written === (nextTodo.note ?? '');
-  const baseline = withinBurst ? tracked.note : (nextTodo.note ?? '');
+    tracked.written === (todo.note ?? '');
+  const baseline = withinBurst ? tracked.note : (todo.note ?? '');
   const nextNote = applyTodoNote(baseline, note, now);
   noteBurstBaselines.set(todoId, { note: baseline, written: nextNote, updatedAt: nowMs });
 
   return {
-    ...nextState,
-    todos: nextState.todos.map((item) => (item.id === todoId ? { ...item, note: nextNote } : item)),
+    ...state,
+    todos: state.todos.map((item) => (item.id === todoId ? { ...item, note: nextNote } : item)),
   };
 }
 

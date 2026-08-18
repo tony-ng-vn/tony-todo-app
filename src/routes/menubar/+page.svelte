@@ -34,6 +34,7 @@
     startTodoTimer,
     updateTodoTimeSegments,
     updateTodoNote,
+    updateTodoNoteFromEditor,
     updateTodoProgress,
     updateTodoTitle,
     stripNoteStampsForEditor,
@@ -485,7 +486,7 @@
 
   function handleNoteInput(todoId, note) {
     const edit = recordNoteEdit(todoId, note);
-    state = updateTodoNote(loadLocalState(), todoId, note);
+    state = updateTodoNoteFromEditor(loadLocalState(), todoId, note);
     saveLocalState(state);
     setNoteSaveStatus(todoId, 'saving');
     noteAutosave.schedule(todoId, edit);
