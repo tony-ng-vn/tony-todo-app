@@ -56,15 +56,9 @@ function dateAtSanFranciscoTime(dayKey, minutesAfterMidnight) {
 // when the user reorders or edits them.
 
 const LOCAL_TIME_PATTERN = '(\\d{4}-\\d{2}-\\d{2}) (\\d{2}):(\\d{2})';
-const NOTE_STAMP_PATTERN = new RegExp(`^@ ${LOCAL_TIME_PATTERN}\\s*import { createAdminClient, createClient } from 'npm:@insforge/sdk';
-
-);
-const START_HEADING_PATTERN = new RegExp(`^Start:\\s+${LOCAL_TIME_PATTERN}\\s*import { createAdminClient, createClient } from 'npm:@insforge/sdk';
-
-);
-const END_HEADING_PATTERN = new RegExp(`^End:\\s+${LOCAL_TIME_PATTERN}\\s*import { createAdminClient, createClient } from 'npm:@insforge/sdk';
-
-);
+const NOTE_STAMP_PATTERN = new RegExp(`^@ ${LOCAL_TIME_PATTERN}\\s*$`);
+const START_HEADING_PATTERN = new RegExp(`^Start:\\s+${LOCAL_TIME_PATTERN}\\s*$`);
+const END_HEADING_PATTERN = new RegExp(`^End:\\s+${LOCAL_TIME_PATTERN}\\s*$`);
 const LIST_MARKER_PATTERN = /^(?:[-*+]|\d+[.)])(?:[\t ]+([\s\S]*))?$/;
 const CHECKBOX_PATTERN = /^\[[ xX]\](?:[\t ]+([\s\S]*))?$/;
 const SIMILARITY_THRESHOLD = 0.5;

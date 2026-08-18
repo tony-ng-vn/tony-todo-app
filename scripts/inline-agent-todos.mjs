@@ -28,7 +28,9 @@ export function inlineAgentTodos({ check = false } = {}) {
     throw new Error(`Missing ${MARKER} in functions/agent-todos.shell.ts`);
   }
 
-  const generated = shell.replace(MARKER, domain.trimEnd());
+  // Function replacer: a literal "$`" or "$&" in the domain source must be
+  // spliced verbatim, not expanded as a String.prototype.replace pattern.
+  const generated = shell.replace(MARKER, () => domain.trimEnd());
 
   if (check) {
     let existing = '';
