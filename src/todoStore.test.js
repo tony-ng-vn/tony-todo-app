@@ -1374,6 +1374,48 @@ describe('todo day summary', () => {
     expect(parent.trackedSeconds).toBe(0);
   });
 
+  it('keeps legacy tracked time that has no segments when archiving', () => {
+    const mondayStart = new Date('2026-06-08T09:00:00-07:00').toISOString();
+    const mondayEnd = new Date('2026-06-08T09:20:00-07:00').toISOString();
+    // Tasks from before time_segments existed carry trackedSeconds only.
+    let state = createInitialState([
+      {
+        id: 'legacy-parent',
+        title: 'Legacy work',
+        createdAt: '2026-06-01T15:00:00.000Z',
+        completedAt: null,
+        firstStartedAt: mondayStart,
+        activeStartedAt: null,
+        trackedSeconds: 45 * 60 + 20 * 60,
+        timeSegments: [{ startedAt: mondayStart, endedAt: mondayEnd }],
+      },
+      {
+        id: 'legacy-session',
+        title: 'Legacy work',
+        createdAt: '2026-06-08T15:00:00.000Z',
+        completedAt: new Date('2026-06-08T08:30:00-07:00').toISOString(),
+        parentTaskId: 'legacy-parent',
+        isProgressSession: true,
+        firstStartedAt: null,
+        activeStartedAt: null,
+        trackedSeconds: 10 * 60,
+        timeSegments: [],
+      },
+    ]);
+
+    state = archivePriorDaySessions(state, new Date('2026-06-10T12:00:00-07:00'));
+
+    const parent = state.todos.find((todo) => todo.id === 'legacy-parent');
+    const sessions = getProgressSessions(state, 'legacy-parent');
+    expect(parent).toMatchObject({ trackedSeconds: 45 * 60, timeSegments: [] });
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]).toMatchObject({
+      id: 'legacy-session',
+      trackedSeconds: 30 * 60,
+      timeSegments: [{ startedAt: mondayStart, endedAt: mondayEnd }],
+    });
+  });
+
   it('archives the pre-midnight part when pausing after midnight', () => {
     let state = createInitialState();
     state = addTodo(state, 'Late night write', new Date('2026-06-08T20:00:00-07:00'));
