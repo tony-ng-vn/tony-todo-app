@@ -19,7 +19,11 @@ import {
   getDaySummary,
   getMillisecondsUntilNextDay,
   getPendingTodos,
+  filterSummaryBySearch,
+  filterTodoSections,
+  filterTodosBySearch,
   getProgressSessions,
+  todoMatchesSearchQuery,
   getProjectTodos,
   getSomedayTodos,
   getTaskTimeSegments,
@@ -1627,6 +1631,54 @@ describe('task due dates', () => {
   it('formats a missing or invalid due date as an empty string', () => {
     expect(formatDueDate(null)).toBe('');
     expect(formatDueDate('not-a-date')).toBe('');
+  });
+});
+
+describe('task search matching', () => {
+  it('keeps every task when the query is empty', () => {
+    const todos = [{ id: '1', title: 'Action item' }, { id: '2', title: 'Review draft' }];
+    expect(filterTodosBySearch(todos, '')).toEqual(todos);
+    expect(filterTodosBySearch(todos, '   ')).toEqual(todos);
+  });
+
+  it('narrows by prefix as each letter is typed', () => {
+    const action = { id: '1', title: 'Action item', note: '' };
+    const review = { id: '2', title: 'Review draft', note: '' };
+
+    expect(filterTodosBySearch([action, review], 'a').map((todo) => todo.id)).toEqual(['1']);
+    expect(filterTodosBySearch([action, review], 'ac').map((todo) => todo.id)).toEqual(['1']);
+    expect(filterTodosBySearch([action, review], 'act').map((todo) => todo.id)).toEqual(['1']);
+    expect(filterTodosBySearch([action, review], 'action').map((todo) => todo.id)).toEqual(['1']);
+    expect(filterTodosBySearch([action, review], 'actionx')).toEqual([]);
+  });
+
+  it('matches a later word prefix, not a letter in the middle of a word', () => {
+    const todo = { id: '1', title: 'Review action items', note: '' };
+    expect(todoMatchesSearchQuery(todo, 'act')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'ction')).toBe(false);
+    expect(todoMatchesSearchQuery(todo, 'rev')).toBe(true);
+  });
+
+  it('matches note text with the same prefix rule', () => {
+    const todo = { id: '1', title: 'Capital One', note: 'Follow up on action' };
+    expect(todoMatchesSearchQuery(todo, 'act')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'capital')).toBe(true);
+  });
+
+  it('drops empty date groups after filtering', () => {
+    const sections = [
+      { id: 'today', items: [{ id: '1', title: 'Action item' }] },
+      { id: 'tomorrow', items: [{ id: '2', title: 'Review draft' }] },
+    ];
+    expect(filterTodoSections(sections, 'act').map((section) => section.id)).toEqual(['today']);
+  });
+
+  it('filters recap buckets the same way', () => {
+    const summary = [
+      { label: 'Morning', items: [{ id: '1', title: 'Action item', note: '' }] },
+      { label: 'Lunch', items: [{ id: '2', title: 'Shower', note: '' }] },
+    ];
+    expect(filterSummaryBySearch(summary, 'act').map((section) => section.label)).toEqual(['Morning']);
   });
 });
 
