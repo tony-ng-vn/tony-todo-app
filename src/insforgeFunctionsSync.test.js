@@ -18,7 +18,7 @@ const syncScript = readFileSync(
 
 describe('InsForge CLI execution', () => {
   it('uses the exact locked CLI package without network resolution', () => {
-    expect(syncScript).toContain("'@insforge/cli@0.2.6'");
+    expect(syncScript).toContain("'@insforge/cli@0.2.7'");
     expect(syncScript).toContain("'--offline'");
     expect(syncScript).toContain("['diff', '--no-renames'");
   });
