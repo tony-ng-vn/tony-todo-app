@@ -11,11 +11,10 @@ import {
 } from './noteEntries.js';
 import {
   addTodo,
+  completeTodo,
   createInitialState,
-  logProgressSession,
   pauseTodoTimer,
   resetNoteBurstBaselines,
-  setTodoProgressive,
   setTodoSomeday,
   startTodoTimer,
   updateTodoNote,
@@ -393,14 +392,13 @@ describe('timer-backed note time blocks', () => {
     expect(next.todos[0].note).toContain('- leftover thought');
   });
 
-  it('closes the open note block when a progressive session is logged', () => {
+  it('closes the open note block when the task is completed', () => {
     let state = createInitialState();
     state = addTodo(state, 'Read the book', START);
     const todoId = state.todos[0].id;
-    state = setTodoProgressive(state, todoId, true);
     state = startTodoTimer(state, todoId, START);
     state = updateTodoNote(state, todoId, '- chapter 1', START);
-    state = logProgressSession(state, todoId, PAUSE);
+    state = completeTodo(state, todoId, PAUSE);
 
     expect(state.todos.find((todo) => todo.id === todoId).note).toBe(
       `${startHeading(START)}\n- chapter 1\n${endHeading(PAUSE)}`,

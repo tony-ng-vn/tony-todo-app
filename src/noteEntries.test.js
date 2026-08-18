@@ -82,7 +82,7 @@ describe('applyTodoNote bullet matching', () => {
   const later = new Date('2026-06-08T15:05:00.000Z');
   const now = new Date('2026-06-08T16:00:00.000Z');
 
-  it('stamps only the newly added bullet when one is appended after an existing bullet', () => {
+  it('keeps a newly appended bullet in the open session of the existing bullet', () => {
     const stored = applyTodoNote('', '- Call the vet', first);
 
     const next = applyTodoNote(stored, '- Call the vet\n- Buy dog food', now);
@@ -147,7 +147,7 @@ describe('applyTodoNote bullet matching', () => {
     expect(parseNoteEntries(next)).toEqual([{ at: first.toISOString(), text: '- [x] Pack snacks' }]);
   });
 
-  it('gives the first half of a split bullet the old time and the second half now, by document order', () => {
+  it('keeps both halves of a split bullet in the open session', () => {
     const stored = applyTodoNote('', '- hello world', first);
 
     const next = applyTodoNote(stored, '- hello\n- world', now);
@@ -158,7 +158,7 @@ describe('applyTodoNote bullet matching', () => {
     ]);
   });
 
-  it('mints a new time when similarity is below threshold', () => {
+  it('keeps a rewritten bullet in the open session when similarity is below threshold', () => {
     const stored = applyTodoNote('', '- a note', first);
 
     const next = applyTodoNote(stored, '- b note', now);
@@ -166,7 +166,7 @@ describe('applyTodoNote bullet matching', () => {
     expect(parseNoteEntries(next)).toEqual([{ at: first.toISOString(), text: '- b note' }]);
   });
 
-  it('mints a new time when the replacement bullet reads too differently', () => {
+  it('keeps a replacement bullet in the open session even when it reads too differently', () => {
     const stored = applyTodoNote('', '- Getting lunch now', first);
 
     const next = applyTodoNote(stored, '- Not getting lunch yet', now);
