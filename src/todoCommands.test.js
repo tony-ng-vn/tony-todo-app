@@ -346,6 +346,43 @@ describe('runTodoCommand complete', () => {
     expect(result.persist.todo.completedAt).toBe('2026-06-10T17:30:00.000Z');
   });
 
+  it('persists new recap sessions and other archived tasks on complete', () => {
+    const mondayStart = '2026-06-08T16:00:00.000Z';
+    const mondayEnd = '2026-06-08T16:20:00.000Z';
+    const state = createInitialState([
+      openTodo({
+        id: 'parent',
+        title: 'Read',
+        createdAt: mondayStart,
+        firstStartedAt: mondayStart,
+        trackedSeconds: 20 * 60,
+        timeSegments: [{ startedAt: mondayStart, endedAt: mondayEnd }],
+      }),
+      openTodo({
+        id: 'other',
+        title: 'Write',
+        createdAt: mondayStart,
+        firstStartedAt: mondayStart,
+        trackedSeconds: 20 * 60,
+        timeSegments: [{ startedAt: mondayStart, endedAt: mondayEnd }],
+      }),
+    ]);
+    const result = runTodoCommand(
+      state,
+      { kind: 'complete', target: { by: 'id', id: 'parent' } },
+      new Date('2026-06-10T17:30:00.000Z'),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.persist.todo).toMatchObject({ id: 'parent', trackedSeconds: 0, timeSegments: [] });
+    expect(result.persist.sessions.map((session) => session.parentTaskId).toSorted()).toEqual([
+      'other',
+      'parent',
+    ]);
+    expect(result.persist.updates).toHaveLength(1);
+    expect(result.persist.updates[0]).toMatchObject({ id: 'other', trackedSeconds: 0, timeSegments: [] });
+  });
+
   it('completes an open task by title', () => {
     const state = createInitialState([openTodo({ title: 'Send weekly update' })]);
     const result = runTodoCommand(
