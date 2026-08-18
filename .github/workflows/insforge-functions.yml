@@ -132,18 +132,18 @@ jobs:
             echo "Add repository secret INSFORGE_API_KEY from the linked Todo App project."
             exit 1
           fi
-          npx -y --offline @insforge/cli@0.2.6 link --api-base-url "$INSFORGE_API_BASE_URL" --api-key "$INSFORGE_API_KEY" -y
+          npx -y --offline @insforge/cli@0.2.7 link --api-base-url "$INSFORGE_API_BASE_URL" --api-key "$INSFORGE_API_KEY" -y
           local_versions=$(find migrations -maxdepth 1 -type f -name '*.sql' -print \
             | sed -E 's#^.*/([0-9]+)_.*#\1#' \
             | sort -u)
-          remote_versions=$(npx -y --offline @insforge/cli@0.2.6 --json db migrations list \
+          remote_versions=$(npx -y --offline @insforge/cli@0.2.7 --json db migrations list \
             | jq -r '.migrations[].version' \
             | sort -u)
           if [ "$local_versions" != "$remote_versions" ]; then
             echo "Live migration versions do not match migrations/. Apply and reconcile them before replaying this workflow."
             exit 1
           fi
-          config_plan=$(npx -y --offline @insforge/cli@0.2.6 --json config plan)
+          config_plan=$(npx -y --offline @insforge/cli@0.2.7 --json config plan)
           if [ "$(jq '.changes | length' <<<"$config_plan")" -ne 0 ] || \
              [ "$(jq '.skipped | length' <<<"$config_plan")" -ne 0 ]; then
             echo "Live InsForge config does not match insforge.toml. Apply and verify it before replaying this workflow."
@@ -168,7 +168,7 @@ jobs:
           DEPLOY_HEAD: ${{ steps.range.outputs.head }}
           INSFORGE_API_KEY: ${{ secrets.INSFORGE_API_KEY }}
         run: |
-          npx -y --offline @insforge/cli@0.2.6 link --api-base-url "$INSFORGE_API_BASE_URL" --api-key "$INSFORGE_API_KEY" -y
+          npx -y --offline @insforge/cli@0.2.7 link --api-base-url "$INSFORGE_API_BASE_URL" --api-key "$INSFORGE_API_KEY" -y
           if [ "${GITHUB_EVENT_NAME}" = "workflow_dispatch" ]; then
             npm run sync:insforge-functions -- --deploy-all --check
           else

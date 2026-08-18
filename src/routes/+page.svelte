@@ -949,7 +949,7 @@
     }, 0);
   }
 
-  async function handleCompletedAtChange(todoId, dateValue, timeValue) {
+  async function handleCompletedAtChange(todoId, dateValue, timeValue, { allowBeforeStart = false } = {}) {
     if (!dateValue || !timeValue) {
       return { ok: false, error: 'Choose a valid end date and time.' };
     }
@@ -959,10 +959,12 @@
       return { ok: false, error: 'Choose a valid end date and time.' };
     }
 
-    const todo = findTodo(todoId);
-    const startedAt = todo?.firstStartedAt ? new Date(todo.firstStartedAt) : null;
-    if (startedAt && !Number.isNaN(startedAt.getTime()) && startedAt >= completedAt) {
-      return { ok: false, error: 'End time must be after start time.' };
+    if (!allowBeforeStart) {
+      const todo = findTodo(todoId);
+      const startedAt = todo?.firstStartedAt ? new Date(todo.firstStartedAt) : null;
+      if (startedAt && !Number.isNaN(startedAt.getTime()) && startedAt >= completedAt) {
+        return { ok: false, error: 'End time must be after start time.' };
+      }
     }
 
     const beforeTodos = state.todos;
@@ -1685,6 +1687,7 @@
     onProgressiveChange={handleProgressiveChange}
     onProgressInput={handleProgressInput}
     onTimeSegmentsChange={handleTimeSegmentsChange}
+    onCompletedAtChange={handleCompletedAtChange}
     onDueDateChange={handleDueDateChange}
     onSomedayChange={handleSomedayChange}
     onDeleteTask={handleDeleteTask}
