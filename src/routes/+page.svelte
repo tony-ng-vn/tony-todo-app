@@ -104,6 +104,7 @@
     withNoteSaveLock,
   } from '../noteAutosave.js';
   import { normalizeViewMode } from '../viewModes.js';
+  import { requestNativeUpdate } from '../appUpdate.js';
   import {
     acceptLoop,
     dismissLoop,
@@ -175,6 +176,7 @@
   let checkStatus = '';
   let currentDayKey = formatDayKey(new Date());
   let refreshInFlight = false;
+  let hasNativeUpdater = false;
   const noteAutosave = createDebouncedSaveQueue(saveNoteToRemote);
 
   $: pendingTodos = getActiveTodos(state);
@@ -206,6 +208,9 @@
 
 
   onMount(() => {
+    hasNativeUpdater = Boolean(
+      window.__doneLogNativeUpdater && window.webkit?.messageHandlers?.doneLogUpdater,
+    );
     useRemote = isInsForgeConfigured && !new URLSearchParams(window.location.search).has('local');
     syncMessage = useRemote ? 'Connecting' : 'Local only';
     state = archivePriorDaySessions(loadLocalState());
@@ -1172,6 +1177,15 @@
     syncMessage = 'Signed out';
   }
 
+  async function handleCheckForUpdates() {
+    try {
+      await noteAutosave.flushAll();
+    } catch {
+      // Pending notes remain in local storage and retry after the update check.
+    }
+    requestNativeUpdate(window);
+  }
+
   async function hydrateRemoteTodos() {
     if (!useRemote || !authUser) {
       return;
@@ -1567,7 +1581,9 @@
       inboxCount={inboxLoops.length}
       waitingCount={waitingLoops.length}
       showSignOut={useRemote && Boolean(authUser)}
+      showNativeUpdate={hasNativeUpdater}
       onSignOut={handleSignOut}
+      onCheckForUpdates={handleCheckForUpdates}
       onViewChange={setViewMode}
       insforge={useRemote ? insforge : null}
       userId={authUser?.id ?? null}
