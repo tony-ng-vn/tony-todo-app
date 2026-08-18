@@ -1,5 +1,6 @@
 import { getTimes } from 'suncalc';
 import {
+  appendNoteText,
   applyTodoNote,
   closeNoteTimeBlock,
   formatNoteAtLocal,
@@ -662,10 +663,9 @@ function runAppendNoteCommand(state, target, text, now) {
   }
 
   const todo = resolved.todo;
-  const nextNote = todo.note?.trim() ? `${todo.note.trimEnd()}\n\n${text}` : text;
   const updated = {
     ...todo,
-    note: applyTodoNote(todo.note ?? '', nextNote, now),
+    note: appendNoteText(todo.note ?? '', text, now),
   };
 
   return {

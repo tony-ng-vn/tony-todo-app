@@ -51,9 +51,11 @@ function dateAtSanFranciscoTime(dayKey, minutesAfterMidnight) {
 //   Start: YYYY-MM-DD HH:mm
 //   - bullet
 //   End: YYYY-MM-DD HH:mm
-// Legacy "@ YYYY-MM-DD HH:mm" headers still parse. Editor drafts strip both
-// kinds of headings; identity matching keeps bullets in their original block
-// when the user reorders or edits them.
+// Editor drafts strip the headings; identity matching keeps bullets in their
+// original block when the user reorders or edits them.
+// Legacy "@ YYYY-MM-DD HH:mm" notes: one run of consecutive "@" chunks parses
+// as a single closed block, kept verbatim by timer operations and rewritten
+// as one Start/End pair (first stamp to last stamp) by the first edit.
 
 const LOCAL_TIME_PATTERN = '(\\d{4}-\\d{2}-\\d{2}) (\\d{2}):(\\d{2})';
 const NOTE_STAMP_PATTERN = new RegExp(`^@ ${LOCAL_TIME_PATTERN}\\s*$`);
@@ -90,23 +92,40 @@ function parseNoteTimeBlocks(note) {
   const blocks = [];
   let current = null;
 
-  function startBlock(startedAt, kind) {
-    if (current) {
-      blocks.push(current);
+  function finishBlock() {
+    if (!current) {
+      return;
     }
-    current = { startedAt, endedAt: null, kind, lines: [] };
+    if (current.kind === 'stamp') {
+      // Blank lines after the last legacy chunk only separated it from the
+      // next block; they are not part of the chunk.
+      while (current.lines.length && !current.lines.at(-1).trim()) {
+        current.lines.pop();
+      }
+    }
+    blocks.push(current);
+    current = null;
   }
 
   for (const line of raw.split('\n')) {
     const startAt = matchLocalHeading(line, START_HEADING_PATTERN);
     if (startAt) {
-      startBlock(startAt, 'session');
+      finishBlock();
+      current = { startedAt: startAt, endedAt: null, kind: 'session', lines: [] };
       continue;
     }
 
     const stampAt = matchLocalHeading(line, NOTE_STAMP_PATTERN);
     if (stampAt) {
-      startBlock(stampAt, 'stamp');
+      if (current?.kind === 'stamp') {
+        // A run of "@" chunks is one legacy block; the inner header lines
+        // stay in `lines` so the run serializes back verbatim.
+        current.lines.push(line);
+        current.endedAt = stampAt;
+        continue;
+      }
+      finishBlock();
+      current = { startedAt: stampAt, endedAt: stampAt, kind: 'stamp', lines: [] };
       continue;
     }
 
@@ -118,8 +137,7 @@ function parseNoteTimeBlocks(note) {
         current.endedAt = endAt;
         current.kind = 'session';
       }
-      blocks.push(current);
-      current = null;
+      finishBlock();
       continue;
     }
 
@@ -133,21 +151,18 @@ function parseNoteTimeBlocks(note) {
     current.lines.push(line);
   }
 
-  if (current) {
-    blocks.push(current);
-  }
-
+  finishBlock();
   return blocks;
 }
 
 function openNoteTimeBlock(note, startedAt) {
   const startedAtIso = new Date(startedAt).toISOString();
   const blocks = parseNoteTimeBlocks(note);
-  const last = blocks.at(-1);
-  if (last && !last.endedAt) {
-    if (!last.startedAt) {
-      last.startedAt = startedAtIso;
-      last.kind = 'session';
+  const open = findOpenBlock(blocks);
+  if (open) {
+    if (!open.startedAt) {
+      open.startedAt = startedAtIso;
+      open.kind = 'session';
     }
     return serializeNoteTimeBlocks(blocks);
   }
@@ -159,16 +174,33 @@ function openNoteTimeBlock(note, startedAt) {
 function closeNoteTimeBlock(note, endedAt) {
   const endedAtIso = new Date(endedAt).toISOString();
   const blocks = parseNoteTimeBlocks(note);
-  const last = blocks.at(-1);
-  if (!last || last.endedAt) {
+  const open = findOpenBlock(blocks);
+  if (!open) {
     return serializeNoteTimeBlocks(blocks);
   }
 
-  if (!last.startedAt) {
-    last.startedAt = endedAtIso;
+  if (!open.startedAt) {
+    open.startedAt = endedAtIso;
   }
-  last.endedAt = endedAtIso;
-  last.kind = 'session';
+  open.endedAt = endedAtIso;
+  open.kind = 'session';
+  return serializeNoteTimeBlocks(blocks);
+}
+
+// Agent path: text lands under the open session, or opens one at `now`.
+function appendNoteText(note, text, now = new Date()) {
+  const blocks = parseNoteTimeBlocks(note);
+  const lines = String(text).split('\n');
+  const open = findOpenBlock(blocks);
+  if (open) {
+    if (!open.startedAt) {
+      open.startedAt = now.toISOString();
+      open.kind = 'session';
+    }
+    open.lines.push(...lines);
+  } else {
+    blocks.push({ startedAt: now.toISOString(), endedAt: null, kind: 'session', lines });
+  }
   return serializeNoteTimeBlocks(blocks);
 }
 
@@ -176,15 +208,17 @@ function serializeNoteTimeBlocks(blocks) {
   return blocks
     .map((block) => {
       const parts = [];
-      if (block.startedAt) {
+      if (block.kind === 'stamp') {
+        parts.push(`@ ${formatNoteAtLocal(block.startedAt)}`);
+      } else if (block.startedAt) {
         parts.push(`Start: ${formatNoteAtLocal(block.startedAt)}`);
       }
       for (const line of block.lines) {
-        if (line.trim() || line.endsWith(' ')) {
+        if (block.kind === 'stamp' || line.trim() || line.endsWith(' ')) {
           parts.push(line);
         }
       }
-      if (block.endedAt) {
+      if (block.kind !== 'stamp' && block.endedAt) {
         parts.push(`End: ${formatNoteAtLocal(block.endedAt)}`);
       }
       return parts.join('\n');
@@ -258,16 +292,19 @@ function applyTodoNote(previousNote, nextNote, now = new Date()) {
     resolved[item.index] = assignToOpenBlock(item.entry, previousBlocks, now);
   }
 
-  // A unit can match a previous unit that itself has no stamp (a legacy
-  // chunk only stamps its first paragraph; a later paragraph parses as
-  // at: null). A non-empty unit must not stay unstamped forever, so it gets
-  // backfilled with the open block start (or now) here - empty structural
-  // units are exempt, they are never stamped.
+  // A unit can match a previous unit that itself has no time: a legacy "@"
+  // chunk only stamps its first paragraph, and a plain (never stamped) note
+  // has none at all. A non-empty unit must not stay unstamped forever, so it
+  // takes its block's start when it has one and the open block (or now)
+  // otherwise - empty structural units are exempt, they are never stamped.
   for (let index = 0; index < resolved.length; index += 1) {
     const entry = resolved[index];
-    if (!entry.at && !isEmptyNoteUnitText(entry.text)) {
-      resolved[index] = assignToOpenBlock(entry, previousBlocks, now);
+    if (entry.at || isEmptyNoteUnitText(entry.text)) {
+      continue;
     }
+    resolved[index] = entry.startedAt
+      ? { ...entry, at: entry.startedAt }
+      : assignToOpenBlock(entry, previousBlocks, now);
   }
 
   inheritOpenBlockMeta(resolved);
@@ -483,36 +520,57 @@ function matchLocalHeading(line, pattern) {
   return dateAtSanFranciscoTime(match[1], Number(match[2]) * 60 + Number(match[3])).toISOString();
 }
 
+// A legacy stamp block is re-split into its "@" chunks so each bullet
+// reports the time of the header it sat under, while the block-level
+// startedAt/endedAt (first stamp to last) is what an edit rewrites it as.
 function flattenNoteTimeBlocks(blocks) {
   return blocks.flatMap((block, blockIndex) => {
+    const meta = { blockIndex, startedAt: block.startedAt, endedAt: block.endedAt };
+    if (block.kind === 'stamp') {
+      return splitLegacyChunks(block).flatMap((chunk) =>
+        splitChunkIntoUnits(chunk.text, chunk.at).map((unit) => ({ ...unit, ...meta })),
+      );
+    }
+
     const chunkText = block.lines.join('\n').replace(/^\n+|\n+$/g, '');
-    if (block.kind === 'stamp' || (block.kind === 'plain' && !block.startedAt)) {
-      return splitChunkIntoUnits(chunkText, block.startedAt).map((unit) => ({
-        ...unit,
-        blockIndex,
-        startedAt: unit.at,
-        endedAt: block.endedAt,
-      }));
+    if (block.kind === 'plain' && !block.startedAt) {
+      return splitChunkIntoUnits(chunkText, null).map((unit) => ({ ...unit, ...meta }));
     }
 
     return block.lines
       .filter((line) => line.trim())
-      .map((line) => {
-        const isEmpty = isEmptyNoteUnitText(line);
-        return {
-          at: isEmpty ? null : block.startedAt,
-          text: line,
-          blockIndex,
-          startedAt: block.startedAt,
-          endedAt: block.endedAt,
-        };
-      });
+      .map((line) => ({
+        at: isEmptyNoteUnitText(line) ? null : block.startedAt,
+        text: line,
+        ...meta,
+      }));
   });
+}
+
+function splitLegacyChunks(block) {
+  const chunks = [{ at: block.startedAt, lines: [] }];
+  for (const line of block.lines) {
+    const stampAt = matchLocalHeading(line, NOTE_STAMP_PATTERN);
+    if (stampAt) {
+      chunks.push({ at: stampAt, lines: [] });
+      continue;
+    }
+    chunks.at(-1).lines.push(line);
+  }
+  return chunks.map((chunk) => ({ at: chunk.at, text: chunk.lines.join('\n') }));
+}
+
+// The block a timer operation acts on: the last one that is still open
+// (a session without End, or plain text that never had a heading). Legacy
+// stamp blocks are always closed history.
+function findOpenBlock(blocks) {
+  const index = findOpenBlockIndex(blocks);
+  return index === NEW_BLOCK_INDEX ? null : blocks[index];
 }
 
 function findOpenBlockIndex(blocks) {
   for (let index = blocks.length - 1; index >= 0; index -= 1) {
-    if (!blocks[index].endedAt) {
+    if (blocks[index].kind !== 'stamp' && !blocks[index].endedAt) {
       return index;
     }
   }
@@ -520,13 +578,7 @@ function findOpenBlockIndex(blocks) {
 }
 
 function copyResolvedUnit(source, text) {
-  return {
-    at: source.at,
-    text,
-    blockIndex: source.blockIndex,
-    startedAt: source.startedAt ?? source.at,
-    endedAt: source.endedAt ?? null,
-  };
+  return { ...source, text };
 }
 
 function assignEmptyUnit(entry, previousBlocks) {
@@ -1278,10 +1330,9 @@ function runAppendNoteCommand(state, target, text, now) {
   }
 
   const todo = resolved.todo;
-  const nextNote = todo.note?.trim() ? `${todo.note.trimEnd()}\n\n${text}` : text;
   const updated = {
     ...todo,
-    note: applyTodoNote(todo.note ?? '', nextNote, now),
+    note: appendNoteText(todo.note ?? '', text, now),
   };
 
   return {

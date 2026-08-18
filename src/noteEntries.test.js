@@ -339,7 +339,7 @@ describe('applyTodoNote bullet matching', () => {
       { at: first.toISOString(), text: '- a' },
       { at: first.toISOString(), text: '- b' },
     ]);
-    expect(next).toBe(`Start: ${formatNoteAtLocal(first)}\n- a\n- b`);
+    expect(next).toBe(`Start: ${formatNoteAtLocal(first)}\n- a\n- b\nEnd: ${formatNoteAtLocal(first)}`);
   });
 
   it('still serializes an empty structural bullet bare while backfilling a legacy-unstamped unit', () => {
