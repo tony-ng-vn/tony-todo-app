@@ -203,7 +203,7 @@
   {@const elapsedSeconds = getElapsedSeconds(todo)}
   {@const latestSession = todo.latestProgressSession}
   {@const timerAction = isRunning ? 'pause' : 'start'}
-  {@const timerText = isRunning ? 'Stop' : 'Start'}
+  {@const timerText = isRunning ? 'Pause' : 'Start'}
   <li
     data-todo-id={todo.id}
     data-task-state={isRunning ? 'running' : isPaused ? 'paused' : 'ready'}
