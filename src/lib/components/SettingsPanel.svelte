@@ -17,8 +17,6 @@
   export let onViewChange;
   export let showSignOut = false;
   export let onSignOut;
-  export let showNativeUpdate = false;
-  export let onCheckForUpdates;
   export let insforge = null;
   export let userId = null;
 
@@ -169,16 +167,6 @@
     </div>
     <WorkspaceTabs currentView="settings" {inboxCount} {waitingCount} {onViewChange} />
   </div>
-
-  {#if showNativeUpdate}
-    <div class="settings-section">
-      <h3 class="section-title">Desktop app</h3>
-      <p class="empty-note">Daymark checks for signed releases automatically. You can also check now.</p>
-      <button type="button" class="settings-update-button" on:click={onCheckForUpdates}>
-        Check for Updates
-      </button>
-    </div>
-  {/if}
 
   {#if showSignOut}
     <div class="settings-section">
@@ -334,38 +322,6 @@
     margin: 0;
     font-size: 12px;
     color: var(--subtle);
-  }
-
-  .settings-update-button {
-    align-self: flex-start;
-    min-height: 36px;
-    padding: 0 var(--space-3);
-    border: 1px solid var(--border);
-    border-radius: 999px;
-    background: var(--surface-strong);
-    color: var(--strong);
-    font: inherit;
-    font-size: 12px;
-    font-weight: 600;
-    cursor: pointer;
-    transition:
-      background-color var(--motion-hover) ease,
-      border-color var(--motion-hover) ease,
-      transform var(--motion-press) var(--ease-out);
-  }
-
-  .settings-update-button:hover {
-    border-color: var(--subtle);
-    background: var(--block-hover);
-  }
-
-  .settings-update-button:active {
-    transform: scale(0.97);
-  }
-
-  .settings-update-button:focus-visible {
-    outline: 2px solid var(--focus-ring);
-    outline-offset: 1px;
   }
 
   .agent-name-form {

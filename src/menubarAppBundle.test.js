@@ -304,10 +304,10 @@ describe('menu bar app bundle', () => {
     expect(styles).toContain('padding-top: calc(18px + var(--native-titlebar-inset));');
   });
 
-  it('offers the native updater from the full app settings', () => {
+  it('offers the native updater from the Today header', () => {
     const page = readFileSync(path.join(repoRoot, 'src/routes/+page.svelte'), 'utf8');
-    const settings = readFileSync(
-      path.join(repoRoot, 'src/lib/components/SettingsPanel.svelte'),
+    const taskPanel = readFileSync(
+      path.join(repoRoot, 'src/lib/components/TaskPanel.svelte'),
       'utf8',
     );
 
@@ -315,10 +315,10 @@ describe('menu bar app bundle', () => {
     expect(page).toContain('window.__doneLogNativeUpdater');
     expect(page).toContain('showNativeUpdate={hasNativeUpdater}');
     expect(page).toContain('onCheckForUpdates={handleCheckForUpdates}');
-    expect(settings).toContain('export let showNativeUpdate = false;');
-    expect(settings).toContain('class="settings-update-button"');
-    expect(settings).toContain('on:click={onCheckForUpdates}');
-    expect(settings).toContain('Check for Updates');
+    expect(taskPanel).toContain('export let showNativeUpdate = false;');
+    expect(taskPanel).toContain('class="sign-out-button header-update-button"');
+    expect(taskPanel).toContain('on:click={onCheckForUpdates}');
+    expect(taskPanel).toContain('Check for Updates');
   });
 
   it('keeps native workspace status compact and removes redundant labels', () => {

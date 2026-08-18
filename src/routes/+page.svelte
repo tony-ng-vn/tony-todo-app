@@ -1581,9 +1581,7 @@
       inboxCount={inboxLoops.length}
       waitingCount={waitingLoops.length}
       showSignOut={useRemote && Boolean(authUser)}
-      showNativeUpdate={hasNativeUpdater}
       onSignOut={handleSignOut}
-      onCheckForUpdates={handleCheckForUpdates}
       onViewChange={setViewMode}
       insforge={useRemote ? insforge : null}
       userId={authUser?.id ?? null}
@@ -1619,7 +1617,9 @@
       onToggleTheme={toggleThemeMode}
       onViewChange={setViewMode}
       showSignOut={useRemote && Boolean(authUser)}
+      showNativeUpdate={hasNativeUpdater}
       onSignOut={handleSignOut}
+      onCheckForUpdates={handleCheckForUpdates}
     />
 
     <FlowRail {completedToday} />
