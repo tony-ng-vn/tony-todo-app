@@ -190,7 +190,6 @@
     getOpenTodoSections(openTodos, new Date(`${currentDayKey}T00:00:00`)),
     taskSearchQuery,
   );
-  $: openCount = openTodos.length;
   $: summary = filterSummaryBySearch(getDaySummary(state, selectedDay), taskSearchQuery);
   $: boardColumns = getBoardColumns(state, { dayKey: selectedDay, dueFilter: boardDueFilter });
   $: projectTodos = getProjectTodos(state);
