@@ -3,6 +3,7 @@ import {
   completeRemoteTodo,
   deleteRemoteTodo,
   fromRemoteRecord,
+  insertRemoteProgressSession,
   loadRemoteTodos,
   toRemoteRecord,
   updateRemoteTodoDueDate,
@@ -483,6 +484,40 @@ describe('todo remote mapping', () => {
     });
     expect(calls).toContainEqual(['eq', 'id', 'todo-1']);
     expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
+  });
+
+  it('inserts a recap session idempotently so concurrent clients cannot collide', async () => {
+    const calls = [];
+    const client = {
+      database: {
+        from(table) {
+          calls.push(['from', table]);
+          return {
+            upsert(values, options) {
+              calls.push(['upsert', values, options]);
+              return Promise.resolve({ error: null });
+            },
+          };
+        },
+      },
+    };
+    const session = {
+      id: 'session-1',
+      title: 'Read book',
+      createdAt: '2026-06-08T08:00:00.000Z',
+      completedAt: '2026-06-08T08:30:00.000Z',
+      parentTaskId: 'parent-1',
+      isProgressSession: true,
+      trackedSeconds: 30 * 60,
+      timeSegments: [{ startedAt: '2026-06-08T08:00:00.000Z', endedAt: '2026-06-08T08:30:00.000Z' }],
+    };
+
+    await insertRemoteProgressSession(client, 'user-123', session);
+
+    expect(calls[0]).toEqual(['from', 'todos']);
+    expect(calls[1][0]).toBe('upsert');
+    expect(calls[1][1]).toEqual([toRemoteRecord(session, 'user-123')]);
+    expect(calls[1][2]).toEqual({ onConflict: 'id', ignoreDuplicates: true });
   });
 
   it('deletes a remote todo scoped by user id', async () => {
