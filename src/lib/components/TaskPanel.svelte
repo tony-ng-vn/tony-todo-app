@@ -43,6 +43,8 @@
   export let onViewChange;
   export let showSignOut = false;
   export let onSignOut;
+  export let showNativeUpdate = false;
+  export let onCheckForUpdates;
 
   $: todayOpenSection = openTodoSections.find((section) => section.isToday);
   $: datedOpenSections = openTodoSections.filter((section) => !section.isToday);
@@ -100,6 +102,15 @@
     </div>
     <div class="header-actions">
       <output class="sync-status" id="sync-status" aria-live="polite">{syncMessage}</output>
+      {#if showNativeUpdate}
+        <button
+          type="button"
+          class="sign-out-button header-update-button"
+          on:click={onCheckForUpdates}
+        >
+          Check for Updates
+        </button>
+      {/if}
       <ThemeToggle {themeMode} onToggle={onToggleTheme} />
       {#if showSignOut}
         <button type="button" class="sign-out-button" on:click={onSignOut}>Sign out</button>
