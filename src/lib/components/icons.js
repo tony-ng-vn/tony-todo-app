@@ -58,6 +58,8 @@ export function iconTrash() {
     </svg>
   `;
 }
+
+export function iconPause() {
   return `
     <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">
       <path d="M5.25 3.5v9" />
