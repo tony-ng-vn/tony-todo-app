@@ -1434,19 +1434,19 @@ async function exerciseDetailEditing(page) {
   });
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
-    return state.todos.find((item) => item.id === 'ui-smoke-local-task')?.note?.includes('Smoke note');
+    return state.todos.find((item) => item.id === 'ui-smoke-local-task')?.note === 'Smoke note';
   });
   await page.fill('#detail-note', '/todo Follow up with USCIS');
   await page.waitForFunction(() => document.querySelector('#detail-note')?.value === '- [ ] Follow up with USCIS');
   const slashTodoValue = await page.locator('#detail-note').inputValue();
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
-    return state.todos.find((item) => item.id === 'ui-smoke-local-task')?.note?.includes('- [ ] Follow up with USCIS');
+    return state.todos.find((item) => item.id === 'ui-smoke-local-task')?.note === '- [ ] Follow up with USCIS';
   });
   await page.click('.note-todo-checkbox');
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
-    return state.todos.find((item) => item.id === 'ui-smoke-local-task')?.note?.includes('- [x] Follow up with USCIS');
+    return state.todos.find((item) => item.id === 'ui-smoke-local-task')?.note === '- [x] Follow up with USCIS';
   });
   const clickedTodoValue = await page.locator('#detail-note').inputValue();
   await page.focus('#detail-note');
@@ -1463,7 +1463,7 @@ async function exerciseDetailEditing(page) {
   await page.keyboard.press('Enter');
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
-    return state.todos.find((item) => item.id === 'ui-smoke-local-task')?.note?.includes('\t- [x] Follow up with USCIS');
+    return state.todos.find((item) => item.id === 'ui-smoke-local-task')?.note === '\t- [x] Follow up with USCIS\n\t- [ ] ';
   });
   const enterIndentCheck = await page.evaluate(() => ({
     noteValue: document.querySelector('#detail-note')?.value,
@@ -1691,7 +1691,7 @@ function assertHasMotion(result, selector, label) {
 function assertTimerControlLabel(result) {
   const control = result.timerControl;
   const iconSized = control.width === 42 && control.width === control.otherWidth;
-  const named = /Start|Pause|Stop/.test(control.ariaLabel);
+  const named = /Start|Pause/.test(control.ariaLabel);
   return !control.visibleText && iconSized && named && control.hasDelete
     ? []
     : [`timer and delete row actions are not icon-only: ${JSON.stringify(control)}`];
@@ -1914,7 +1914,7 @@ function assertDetailEditing(result) {
     failures.push(`missing start time does not default to creation time: ${JSON.stringify(summaryTimeEdit)}`);
   }
 
-  if (!editChecks.storedNote?.includes('\t- [x] Follow up with USCIS') || editChecks.storedTitle !== 'Smoke renamed task') {
+  if (editChecks.storedNote !== '\t- [x] Follow up with USCIS\n\t- [ ] ' || editChecks.storedTitle !== 'Smoke renamed task') {
     failures.push(`detail editing failed: ${JSON.stringify(editChecks)}`);
   }
 
@@ -1953,7 +1953,7 @@ function assertDetailEditing(result) {
   }
 
   if (
-    !editChecks.noteAfterInput?.storedNote?.includes('Smoke note') ||
+    editChecks.noteAfterInput?.storedNote !== 'Smoke note' ||
     editChecks.noteAfterInput?.saveVisible ||
     editChecks.noteAfterInput?.statusText !== 'Saving details...'
   ) {
