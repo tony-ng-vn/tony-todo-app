@@ -35,6 +35,15 @@ describe('rollUp', () => {
     const css = motion.css(0);
     expect(css).toContain('clip-path:inset(0 0 100% 0)');
     expect(css).toContain('translateY(-10px)');
+    expect(motion.css(1)).toBe('opacity:1;transform:translateY(0px);clip-path:inset(0 0 0% 0)');
+  });
+
+  it('leaves no inline styles behind on the node', () => {
+    stubReducedMotion(false);
+    const node = fakeNode();
+    const motion = rollUp(node, { enabled: true });
+    expect(motion.tick).toBeUndefined();
+    expect(node.style).toEqual({});
   });
 });
 
