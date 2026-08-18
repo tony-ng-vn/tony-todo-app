@@ -77,7 +77,8 @@ DONE_LOG_MENUBAR_URL=https://example.com/menubar npm run menubar
 - Right-click the tray icon to control launch at login, open the full app, or quit the shell.
 - Ongoing tasks appear before open tasks.
 - Starting a timer does not pause other running tasks because the current app supports parallel timers.
-- Finishing a task moves it to the recap. Work from earlier San Francisco days is archived into that day's recap automatically; Done always finishes the task.
+- Finishing a task moves it to the recap.
+  Work from earlier San Francisco days is archived into that day's recap automatically; Done always finishes the task.
 - Inline details support title, note, due date, and delete.
 - Completed-task timing edits remain in the full app because the companion only lists ongoing and open tasks.
 - Note text areas accept Tab as indentation.
