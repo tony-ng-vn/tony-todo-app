@@ -1360,7 +1360,9 @@
 
   async function persistArchivedSessions(sessions) {
     if (!useRemote || !authUser) return;
-    await Promise.all(sessions.map((session) => insertRemoteProgressSession(insforge, authUser.id, session)));
+    await Promise.all(
+      sessions.map((session) => insertRemoteProgressSession(insforge, authUser.id, session)),
+    );
   }
 
   async function persistArchivedTodos(beforeTodos, afterTodos) {
