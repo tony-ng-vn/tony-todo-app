@@ -935,7 +935,8 @@ function isPausedTodo(todo) {
 }
 
 function archiveOpenTodoPriorDays(todo, now, todayKey, existingTodos) {
-  const closedPieces = normalizeTimeSegments(todo.timeSegments).flatMap(splitSegmentBySummaryDays);
+  const closedSegments = normalizeTimeSegments(todo.timeSegments);
+  const closedPieces = closedSegments.flatMap(splitSegmentBySummaryDays);
   const livePieces = todo.activeStartedAt
     ? splitSegmentBySummaryDays({
         startedAt: todo.activeStartedAt,
@@ -978,7 +979,8 @@ function archiveOpenTodoPriorDays(todo, now, todayKey, existingTodos) {
   const liveRemainderStart = liveRemainderStartedAt(todo, now, todayKey);
   // Like closeActiveTimeSegment, trackedSeconds covers closed segments only;
   // the live remainder is counted from activeStartedAt until it is closed.
-  const trackedSeconds = totalSegmentSeconds(remainingClosed);
+  const trackedSeconds =
+    totalSegmentSeconds(remainingClosed) + unsegmentedTrackedSeconds(todo, closedSegments);
   const firstStartedAt = remainingClosed[0]?.startedAt ?? liveRemainderStart?.toISOString() ?? null;
 
   return {
@@ -1099,9 +1101,17 @@ function rebuildProgressSession(session, dayKey, segments) {
     completedAt: progressSessionEndedAt(dayKey, lastEnd).toISOString(),
     firstStartedAt: firstStart.toISOString(),
     activeStartedAt: null,
-    trackedSeconds: totalSegmentSeconds(segments),
+    trackedSeconds:
+      totalSegmentSeconds(segments) +
+      unsegmentedTrackedSeconds(session, normalizeTimeSegments(session.timeSegments)),
     timeSegments: segments,
   });
+}
+
+// Time tracked before time_segments existed (no backfill) is not covered by
+// any segment; keep it when trackedSeconds is rebuilt from segments.
+function unsegmentedTrackedSeconds(todo, segments) {
+  return Math.max(0, normalizedTrackedSeconds(todo) - totalSegmentSeconds(segments));
 }
 
 function progressSessionChanged(before, after) {
