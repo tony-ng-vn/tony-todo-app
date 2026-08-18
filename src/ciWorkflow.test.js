@@ -266,7 +266,7 @@ describe('CI workflow', () => {
     expect(deploy.env.INSFORGE_API_BASE_URL).toBe(
       'https://y26ze9je.us-east.insforge.app',
     );
-    expect(packageJson.devDependencies['@insforge/cli']).toBe('0.2.6');
+    expect(packageJson.devDependencies['@insforge/cli']).toBe('0.2.7');
 
     const stepsByName = Object.fromEntries(deploy.steps.map((step) => [step.name, step]));
     expect(stepsByName['Check out repository'].with.ref).toContain('workflow_run.head_sha');

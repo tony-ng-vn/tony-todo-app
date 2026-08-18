@@ -358,6 +358,8 @@ describe('runTodoCommand complete', () => {
     expect(result.persist.kind).toBe('update');
     expect(result.persist.todo.id).toBe('task-1');
     expect(result.persist.todo.completedAt).toBe('2026-01-15T21:00:00.000Z');
+    expect(result.persist.todo.timeSegments).toEqual([]);
+    expect(result.persist.todo.firstStartedAt).toBeNull();
   });
 
   it('returns not_found or ambiguous_title for title resolution', () => {
