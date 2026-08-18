@@ -991,6 +991,17 @@ export function formatDayKey(date) {
   return `${year}-${month}-${day}`;
 }
 
+// A due date is a calendar day, so anchor the picked YYYY-MM-DD to local
+// midnight before storing it as an ISO string. Empty input -> no due date.
+export function dueDateInputToIso(value) {
+  if (!value) {
+    return null;
+  }
+
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date.toISOString();
+}
+
 export function shiftDayKey(dayKey, offset) {
   const [year, month, day] = dayKey.split('-').map(Number);
   const shiftedDate = new Date(year, month - 1, day);

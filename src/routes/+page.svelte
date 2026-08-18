@@ -27,6 +27,7 @@
     addTodo,
     createInitialState,
     deleteTodo,
+    dueDateInputToIso,
     failTodo,
     findDuplicateTodo,
     formatDayKey,
@@ -251,17 +252,6 @@
     });
     noteDraftTaskId = nextDraft.noteDraftTaskId;
     noteDraft = nextDraft.noteDraft;
-  }
-
-  // A due date is a calendar day, so anchor the picked YYYY-MM-DD to local
-  // midnight before storing it as an ISO string. Empty input -> no due date.
-  function dueDateInputToIso(value) {
-    if (!value) {
-      return null;
-    }
-
-    const date = new Date(`${value}T00:00:00`);
-    return Number.isNaN(date.getTime()) ? null : date.toISOString();
   }
 
   function openComposer(kind = 'task') {

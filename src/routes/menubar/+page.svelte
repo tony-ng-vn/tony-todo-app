@@ -21,6 +21,7 @@
     addTodo,
     createInitialState,
     deleteTodo,
+    dueDateInputToIso,
     findDuplicateTodo,
     formatDayKey,
     getActiveTodos,
@@ -434,11 +435,9 @@
     const existingIds = new Set(state.todos.map((todo) => todo.id));
     const createdAt = new Date();
     const kind = composerKind === 'project' ? 'project' : 'task';
-    const dueDate =
-      kind === 'project' || !dueDateDraft ? null : new Date(`${dueDateDraft}T00:00:00`);
     state = addTodo(state, titleDraft, createdAt, {
       kind,
-      dueDate: dueDate && !Number.isNaN(dueDate.getTime()) ? dueDate.toISOString() : null,
+      dueDate: kind === 'project' ? null : dueDateInputToIso(dueDateDraft),
     });
     const createdTodo = state.todos.find((todo) => !existingIds.has(todo.id));
 
@@ -660,9 +659,7 @@
 
   async function handleDueDateChange(todoId, value) {
     const before = findTodo(todoId);
-    const dueDate = value ? new Date(`${value}T00:00:00`) : null;
-    const nextDueDate = dueDate && !Number.isNaN(dueDate.getTime()) ? dueDate.toISOString() : null;
-    state = setTodoDueDate(state, todoId, nextDueDate);
+    state = setTodoDueDate(state, todoId, dueDateInputToIso(value));
     const after = findTodo(todoId);
     saveLocalState(state);
 
