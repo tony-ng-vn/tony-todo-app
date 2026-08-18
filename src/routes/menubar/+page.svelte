@@ -1017,86 +1017,86 @@
       {/if}
 
       {#if ongoingTodos.length || !isSearching}
-      <section data-menubar-section="ongoing" aria-labelledby="menubar-ongoing-heading">
-        <div class="menubar-section-heading">
-          <h2 id="menubar-ongoing-heading">Ongoing</h2>
-          <span>{ongoingTodos.length} running</span>
-        </div>
-        <div class="menubar-section-list">
-          {#each ongoingTodos as todo (todo.id)}
-                      <div
-            class="menubar-task-motion"
-            animate:flip={searchFlip(isSearching)}
-            in:rollUp|local={{ enabled: isSearching }}
-            out:rollUp|local={{ enabled: isSearching }}
-          >
-            {@render taskRow(todo)}
+        <section data-menubar-section="ongoing" aria-labelledby="menubar-ongoing-heading">
+          <div class="menubar-section-heading">
+            <h2 id="menubar-ongoing-heading">Ongoing</h2>
+            <span>{ongoingTodos.length} running</span>
           </div>
-          {:else}
-            <p class="menubar-empty">No timers are running.</p>
-          {/each}
-        </div>
-      </section>
+          <div class="menubar-section-list">
+            {#each ongoingTodos as todo (todo.id)}
+              <div
+                class="menubar-task-motion"
+                animate:flip={searchFlip(isSearching)}
+                in:rollUp|local={{ enabled: isSearching }}
+                out:rollUp|local={{ enabled: isSearching }}
+              >
+                {@render taskRow(todo)}
+              </div>
+            {:else}
+              <p class="menubar-empty">No timers are running.</p>
+            {/each}
+          </div>
+        </section>
       {/if}
 
       {#if todayOpenSection || !isSearching}
-      <section data-menubar-section="ready" aria-labelledby="menubar-ready-heading">
-        <div class="menubar-section-heading">
-          <h2 id="menubar-ready-heading">Today</h2>
-          <span>{todayOpenSection?.items.length ?? 0} tasks</span>
-        </div>
-        <div class="menubar-date-groups">
-          {#if todayOpenSection}
-            <div
-              class="menubar-date-group"
-              data-menubar-date-group={todayOpenSection.id}
-              data-menubar-is-today="true"
-            >
-              <div class="menubar-date-heading">
-                <h3>{todayOpenSection.label}</h3>
-                <span>{todayOpenSection.items.length}</span>
-              </div>
-              <div class="menubar-section-list">
-                {#each todayOpenSection.items as todo (todo.id)}
-                            <div
-            class="menubar-task-motion"
-            animate:flip={searchFlip(isSearching)}
-            in:rollUp|local={{ enabled: isSearching }}
-            out:rollUp|local={{ enabled: isSearching }}
-          >
-            {@render taskRow(todo)}
+        <section data-menubar-section="ready" aria-labelledby="menubar-ready-heading">
+          <div class="menubar-section-heading">
+            <h2 id="menubar-ready-heading">Today</h2>
+            <span>{todayOpenSection?.items.length ?? 0} tasks</span>
           </div>
-                {/each}
+          <div class="menubar-date-groups">
+            {#if todayOpenSection}
+              <div
+                class="menubar-date-group"
+                data-menubar-date-group={todayOpenSection.id}
+                data-menubar-is-today="true"
+              >
+                <div class="menubar-date-heading">
+                  <h3>{todayOpenSection.label}</h3>
+                  <span>{todayOpenSection.items.length}</span>
+                </div>
+                <div class="menubar-section-list">
+                  {#each todayOpenSection.items as todo (todo.id)}
+                    <div
+                      class="menubar-task-motion"
+                      animate:flip={searchFlip(isSearching)}
+                      in:rollUp|local={{ enabled: isSearching }}
+                      out:rollUp|local={{ enabled: isSearching }}
+                    >
+                      {@render taskRow(todo)}
+                    </div>
+                  {/each}
+                </div>
               </div>
-            </div>
-          {:else}
-            <p class="menubar-empty">Nothing ready for today.</p>
-          {/if}
-        </div>
-      </section>
+            {:else}
+              <p class="menubar-empty">Nothing ready for today.</p>
+            {/if}
+          </div>
+        </section>
       {/if}
 
       {#if pausedTodos.length || !isSearching}
-      <section data-menubar-section="paused" aria-labelledby="menubar-paused-heading">
-        <div class="menubar-section-heading">
-          <h2 id="menubar-paused-heading">Paused</h2>
-          <span>{pausedTodos.length} paused</span>
-        </div>
-        <div class="menubar-section-list">
-          {#each pausedTodos as todo (todo.id)}
-                      <div
-            class="menubar-task-motion"
-            animate:flip={searchFlip(isSearching)}
-            in:rollUp|local={{ enabled: isSearching }}
-            out:rollUp|local={{ enabled: isSearching }}
-          >
-            {@render taskRow(todo)}
+        <section data-menubar-section="paused" aria-labelledby="menubar-paused-heading">
+          <div class="menubar-section-heading">
+            <h2 id="menubar-paused-heading">Paused</h2>
+            <span>{pausedTodos.length} paused</span>
           </div>
-          {:else}
-            <p class="menubar-empty">No paused tasks.</p>
-          {/each}
-        </div>
-      </section>
+          <div class="menubar-section-list">
+            {#each pausedTodos as todo (todo.id)}
+              <div
+                class="menubar-task-motion"
+                animate:flip={searchFlip(isSearching)}
+                in:rollUp|local={{ enabled: isSearching }}
+                out:rollUp|local={{ enabled: isSearching }}
+              >
+                {@render taskRow(todo)}
+              </div>
+            {:else}
+              <p class="menubar-empty">No paused tasks.</p>
+            {/each}
+          </div>
+        </section>
       {/if}
 
       {#if datedOpenSections.length}
@@ -1122,14 +1122,14 @@
                 </div>
                 <div class="menubar-section-list">
                   {#each section.items as todo (todo.id)}
-                              <div
-            class="menubar-task-motion"
-            animate:flip={searchFlip(isSearching)}
-            in:rollUp|local={{ enabled: isSearching }}
-            out:rollUp|local={{ enabled: isSearching }}
-          >
-            {@render taskRow(todo)}
-          </div>
+                    <div
+                      class="menubar-task-motion"
+                      animate:flip={searchFlip(isSearching)}
+                      in:rollUp|local={{ enabled: isSearching }}
+                      out:rollUp|local={{ enabled: isSearching }}
+                    >
+                      {@render taskRow(todo)}
+                    </div>
                   {/each}
                 </div>
               </div>
@@ -1150,14 +1150,14 @@
           </div>
           <div class="menubar-section-list">
             {#each somedayTodos as todo (todo.id)}
-                        <div
-            class="menubar-task-motion"
-            animate:flip={searchFlip(isSearching)}
-            in:rollUp|local={{ enabled: isSearching }}
-            out:rollUp|local={{ enabled: isSearching }}
-          >
-            {@render taskRow(todo)}
-          </div>
+              <div
+                class="menubar-task-motion"
+                animate:flip={searchFlip(isSearching)}
+                in:rollUp|local={{ enabled: isSearching }}
+                out:rollUp|local={{ enabled: isSearching }}
+              >
+                {@render taskRow(todo)}
+              </div>
             {/each}
           </div>
         </section>
@@ -1185,14 +1185,14 @@
                 </div>
                 <div class="menubar-section-list">
                   {#each section.items as todo (todo.id)}
-                              <div
-            class="menubar-task-motion"
-            animate:flip={searchFlip(isSearching)}
-            in:rollUp|local={{ enabled: isSearching }}
-            out:rollUp|local={{ enabled: isSearching }}
-          >
-            {@render taskRow(todo)}
-          </div>
+                    <div
+                      class="menubar-task-motion"
+                      animate:flip={searchFlip(isSearching)}
+                      in:rollUp|local={{ enabled: isSearching }}
+                      out:rollUp|local={{ enabled: isSearching }}
+                    >
+                      {@render taskRow(todo)}
+                    </div>
                   {/each}
                 </div>
               </div>

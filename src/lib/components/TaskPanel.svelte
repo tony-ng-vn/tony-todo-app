@@ -58,6 +58,25 @@
     openTodoSections.reduce((count, section) => count + section.items.length, 0) +
     searchMatches.length;
 
+  function taskRowState(todo) {
+    if (todo.activeStartedAt) {
+      return 'running';
+    }
+    return todo.firstStartedAt && !todo.completedAt ? 'paused' : 'ready';
+  }
+
+  // The <li> itself stays inline in each list because animate:flip must sit
+  // directly under a keyed each block; only its attributes are shared here.
+  function taskRowAttributes(todo, state, isNew) {
+    return {
+      'data-todo-id': todo.id,
+      'data-task-state': state,
+      class: ['todo-item', state !== 'ready' && `is-${state}`, isNew && 'is-new-block']
+        .filter(Boolean)
+        .join(' '),
+    };
+  }
+
   function handleTaskTitleClick(event, todoId) {
     if (event.target.closest('a')) {
       return;
@@ -154,20 +173,14 @@
         </div>
         <ol class="task-section-list">
           {#each ongoingTodos as todo (todo.id)}
-            {@const isRunning = Boolean(todo.activeStartedAt)}
-            {@const isPaused = Boolean(todo.firstStartedAt && !todo.activeStartedAt && !todo.completedAt)}
+            {@const state = taskRowState(todo)}
             <li
-              data-todo-id={todo.id}
-              data-task-state={isRunning ? 'running' : isPaused ? 'paused' : 'ready'}
-              class:is-running={isRunning}
-              class:is-paused={isPaused}
-              class:is-new-block={newlyAddedTodoId === todo.id}
-              class="todo-item"
+              {...taskRowAttributes(todo, state, newlyAddedTodoId === todo.id)}
               animate:flip={searchFlip(isSearching)}
               in:rollUp|local={{ enabled: isSearching }}
               out:rollUp|local={{ enabled: isSearching }}
             >
-              {@render taskRow(todo)}
+              {@render taskRow(todo, state)}
             </li>
           {/each}
         </ol>
@@ -188,20 +201,14 @@
         </div>
         <ol class="task-section-list">
           {#each todayOpenSection.items as todo (todo.id)}
-            {@const isRunning = Boolean(todo.activeStartedAt)}
-            {@const isPaused = Boolean(todo.firstStartedAt && !todo.activeStartedAt && !todo.completedAt)}
+            {@const state = taskRowState(todo)}
             <li
-              data-todo-id={todo.id}
-              data-task-state={isRunning ? 'running' : isPaused ? 'paused' : 'ready'}
-              class:is-running={isRunning}
-              class:is-paused={isPaused}
-              class:is-new-block={newlyAddedTodoId === todo.id}
-              class="todo-item"
+              {...taskRowAttributes(todo, state, newlyAddedTodoId === todo.id)}
               animate:flip={searchFlip(isSearching)}
               in:rollUp|local={{ enabled: isSearching }}
               out:rollUp|local={{ enabled: isSearching }}
             >
-              {@render taskRow(todo)}
+              {@render taskRow(todo, state)}
             </li>
           {/each}
         </ol>
@@ -220,20 +227,14 @@
         </div>
         <ol class="task-section-list">
           {#each pausedTodos as todo (todo.id)}
-            {@const isRunning = Boolean(todo.activeStartedAt)}
-            {@const isPaused = Boolean(todo.firstStartedAt && !todo.activeStartedAt && !todo.completedAt)}
+            {@const state = taskRowState(todo)}
             <li
-              data-todo-id={todo.id}
-              data-task-state={isRunning ? 'running' : isPaused ? 'paused' : 'ready'}
-              class:is-running={isRunning}
-              class:is-paused={isPaused}
-              class:is-new-block={newlyAddedTodoId === todo.id}
-              class="todo-item"
+              {...taskRowAttributes(todo, state, newlyAddedTodoId === todo.id)}
               animate:flip={searchFlip(isSearching)}
               in:rollUp|local={{ enabled: isSearching }}
               out:rollUp|local={{ enabled: isSearching }}
             >
-              {@render taskRow(todo)}
+              {@render taskRow(todo, state)}
             </li>
           {/each}
         </ol>
@@ -254,20 +255,14 @@
         </div>
         <ol class="task-section-list">
           {#each section.items as todo (todo.id)}
-            {@const isRunning = Boolean(todo.activeStartedAt)}
-            {@const isPaused = Boolean(todo.firstStartedAt && !todo.activeStartedAt && !todo.completedAt)}
+            {@const state = taskRowState(todo)}
             <li
-              data-todo-id={todo.id}
-              data-task-state={isRunning ? 'running' : isPaused ? 'paused' : 'ready'}
-              class:is-running={isRunning}
-              class:is-paused={isPaused}
-              class:is-new-block={newlyAddedTodoId === todo.id}
-              class="todo-item"
+              {...taskRowAttributes(todo, state, newlyAddedTodoId === todo.id)}
               animate:flip={searchFlip(isSearching)}
               in:rollUp|local={{ enabled: isSearching }}
               out:rollUp|local={{ enabled: isSearching }}
             >
-              {@render taskRow(todo)}
+              {@render taskRow(todo, state)}
             </li>
           {/each}
         </ol>
@@ -327,85 +322,85 @@
   </ul>
 </section>
 
-{#snippet taskRow(todo)}
-  {@const isRunning = Boolean(todo.activeStartedAt)}
-  {@const isPaused = Boolean(todo.firstStartedAt && !todo.activeStartedAt && !todo.completedAt)}
+{#snippet taskRow(todo, state)}
+  {@const isRunning = state === 'running'}
+  {@const isPaused = state === 'paused'}
   {@const elapsedSeconds = getElapsedSeconds(todo)}
   {@const latestSession = todo.latestProgressSession}
   {@const timerAction = isRunning ? 'pause' : 'start'}
   {@const timerText = isRunning ? 'Pause' : 'Start'}
-    <span class="task-block-dot" aria-hidden="true"></span>
-    <div class="task-content">
-      {#if editingTaskId === todo.id}
-        <input
-          class="task-title-input"
-          data-title-input={todo.id}
-          value={todo.title}
-          aria-label={`Edit ${todo.title} title`}
-          on:keydown={(event) => onTitleKeydown(event, todo.id, event.currentTarget.value)}
-          on:focusout={(event) => onCommitTitleEdit(todo.id, event.currentTarget.value)}
-        />
+  <span class="task-block-dot" aria-hidden="true"></span>
+  <div class="task-content">
+    {#if editingTaskId === todo.id}
+      <input
+        class="task-title-input"
+        data-title-input={todo.id}
+        value={todo.title}
+        aria-label={`Edit ${todo.title} title`}
+        on:keydown={(event) => onTitleKeydown(event, todo.id, event.currentTarget.value)}
+        on:focusout={(event) => onCommitTitleEdit(todo.id, event.currentTarget.value)}
+      />
+    {:else}
+      <span
+        class="task-title"
+        data-title-id={todo.id}
+        title="Double-click to rename"
+        role="button"
+        tabindex="0"
+        on:click={(event) => handleTaskTitleClick(event, todo.id)}
+        on:dblclick={() => onStartTitleEdit(todo.id)}
+        on:keydown={(event) => event.key === 'Enter' && onStartTitleEdit(todo.id)}
+      >
+        {@html linkifyText(todo.title)}
+      </span>
+    {/if}
+    {#if isPaused}
+      <span class="task-state-badge">Paused</span>
+    {/if}
+    <span class:is-live={isRunning} class="task-duration" data-timer-label={todo.id}>
+      {#if todo.isProgressive}
+        {isRunning ? 'Tracking session' : 'Session'} {formatDuration(elapsedSeconds)}
       {:else}
-        <span
-          class="task-title"
-          data-title-id={todo.id}
-          title="Double-click to rename"
-          role="button"
-          tabindex="0"
-          on:click={(event) => handleTaskTitleClick(event, todo.id)}
-          on:dblclick={() => onStartTitleEdit(todo.id)}
-          on:keydown={(event) => event.key === 'Enter' && onStartTitleEdit(todo.id)}
-        >
-          {@html linkifyText(todo.title)}
-        </span>
+        {isRunning ? 'Tracking' : 'Duration'} {formatDuration(elapsedSeconds)}
       {/if}
-      {#if isPaused}
-        <span class="task-state-badge">Paused</span>
-      {/if}
-      <span class:is-live={isRunning} class="task-duration" data-timer-label={todo.id}>
-        {#if todo.isProgressive}
-          {isRunning ? 'Tracking session' : 'Session'} {formatDuration(elapsedSeconds)}
-        {:else}
-          {isRunning ? 'Tracking' : 'Duration'} {formatDuration(elapsedSeconds)}
+    </span>
+    {#if todo.firstStartedAt}
+      <span class="task-timing">
+        Started <time datetime={todo.firstStartedAt}>{formatTaskTimestamp(todo.firstStartedAt)}</time>
+      </span>
+    {/if}
+    {#if todo.dueDate}
+      <span class="task-due-badge" data-due-for={todo.id}>Due {formatDueDate(todo.dueDate)}</span>
+    {/if}
+    {#if todo.isProgressive}
+      <span class="task-progress-label">
+        {todo.progressLabel || 'Add session note in task page'}
+        {#if latestSession}
+          · last {formatDuration(latestSession.trackedSeconds)}
         {/if}
       </span>
-      {#if todo.firstStartedAt}
-        <span class="task-timing">
-          Started <time datetime={todo.firstStartedAt}>{formatTaskTimestamp(todo.firstStartedAt)}</time>
-        </span>
-      {/if}
-      {#if todo.dueDate}
-        <span class="task-due-badge" data-due-for={todo.id}>Due {formatDueDate(todo.dueDate)}</span>
-      {/if}
-      {#if todo.isProgressive}
-        <span class="task-progress-label">
-          {todo.progressLabel || 'Add session note in task page'}
-          {#if latestSession}
-            · last {formatDuration(latestSession.trackedSeconds)}
-          {/if}
-        </span>
-      {/if}
-    </div>
-    <div class="task-actions">
-      <button type="button" class="timer-button" title={`${timerText} timer`} on:click={() => onTimerAction(timerAction, todo.id)} aria-label={`${timerText} ${todo.title} timer`}>
-        {@html isRunning ? iconPause() : iconPlay()}
-        <span>{timerText}</span>
-      </button>
-      <button type="button" class="open-task-button" on:click={(event) => onOpenTask(todo.id, event.currentTarget)} aria-label={`Open ${todo.title} details`}>
-        {@html iconPage()}
-        <span>Open</span>
-      </button>
-      <button type="button" on:click={() => onComplete(todo.id)} aria-label={todo.isProgressive ? `Log ${todo.title} session` : `Mark ${todo.title} done`}>
-        {@html iconCheck()}
-        <span>{todo.isProgressive ? 'Log session' : 'Done'}</span>
-      </button>
-      <button type="button" class="fail-task-button" on:click={() => onFail(todo.id)} aria-label={`Mark ${todo.title} failed`}>
-        {@html iconX()}
-        <span>Fail</span>
-      </button>
-      <button type="button" class="delete-task-button" title="Delete" on:click={() => onDeleteTask(todo.id)} aria-label={`Delete ${todo.title}`}>
-        {@html iconTrash()}
-        <span>Delete</span>
-      </button>
-    </div>
+    {/if}
+  </div>
+  <div class="task-actions">
+    <button type="button" class="timer-button" title={`${timerText} timer`} on:click={() => onTimerAction(timerAction, todo.id)} aria-label={`${timerText} ${todo.title} timer`}>
+      {@html isRunning ? iconPause() : iconPlay()}
+      <span>{timerText}</span>
+    </button>
+    <button type="button" class="open-task-button" on:click={(event) => onOpenTask(todo.id, event.currentTarget)} aria-label={`Open ${todo.title} details`}>
+      {@html iconPage()}
+      <span>Open</span>
+    </button>
+    <button type="button" on:click={() => onComplete(todo.id)} aria-label={todo.isProgressive ? `Log ${todo.title} session` : `Mark ${todo.title} done`}>
+      {@html iconCheck()}
+      <span>{todo.isProgressive ? 'Log session' : 'Done'}</span>
+    </button>
+    <button type="button" class="fail-task-button" on:click={() => onFail(todo.id)} aria-label={`Mark ${todo.title} failed`}>
+      {@html iconX()}
+      <span>Fail</span>
+    </button>
+    <button type="button" class="delete-task-button" title="Delete" on:click={() => onDeleteTask(todo.id)} aria-label={`Delete ${todo.title}`}>
+      {@html iconTrash()}
+      <span>Delete</span>
+    </button>
+  </div>
 {/snippet}
