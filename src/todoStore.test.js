@@ -563,8 +563,6 @@ describe('todo day summary', () => {
 
     expect(state.todos[0]).toEqual({
       ...todo,
-      firstStartedAt: now.toISOString(),
-      activeStartedAt: now.toISOString(),
       note: `Start: ${formatNoteAtLocal(now)}\nAsk about the scholarship deadline.`,
     });
   });

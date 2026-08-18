@@ -16,8 +16,10 @@ import {
   pauseTodoTimer,
   resetNoteBurstBaselines,
   setTodoProgressive,
+  setTodoSomeday,
   startTodoTimer,
   updateTodoNote,
+  updateTodoNoteFromEditor,
 } from './todoStore.js';
 
 const START = new Date('2026-08-17T05:12:00.000Z');
@@ -258,12 +260,12 @@ describe('timer-backed note time blocks', () => {
     expect(state.todos[0].note).not.toContain('End:');
   });
 
-  it('auto-starts a new task when the first note arrives without a Start click', () => {
+  it('auto-starts a new task when the first note is typed without a Start click', () => {
     let state = createInitialState();
     state = addTodo(state, 'Brand new note', START);
     const todoId = state.todos[0].id;
 
-    state = updateTodoNote(state, todoId, '- forgot to press start', START);
+    state = updateTodoNoteFromEditor(state, todoId, '- forgot to press start', START);
 
     expect(state.todos[0].activeStartedAt).toBe(START.toISOString());
     expect(state.todos[0].firstStartedAt).toBe(START.toISOString());
@@ -278,7 +280,7 @@ describe('timer-backed note time blocks', () => {
     state = updateTodoNote(state, todoId, '- outline', START);
     state = pauseTodoTimer(state, todoId, PAUSE);
 
-    state = updateTodoNote(state, todoId, '- outline\n- next session', RESUME);
+    state = updateTodoNoteFromEditor(state, todoId, '- outline\n- next session', RESUME);
 
     expect(state.todos[0].activeStartedAt).toBe(RESUME.toISOString());
     expect(state.todos[0].note).toBe(
@@ -331,6 +333,49 @@ describe('timer-backed note time blocks', () => {
     );
   });
 
+  // Only a note the user types starts the timer. Replaying a pending edit
+  // on load or merging a synced note goes through updateTodoNote, which
+  // must never start anything; a Someday task stays parked either way.
+  it('does not auto-start when a note is replayed through updateTodoNote', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Replayed on load', START);
+    const todoId = state.todos[0].id;
+
+    state = updateTodoNote(state, todoId, '- typed before reload', START);
+
+    expect(state.todos[0].activeStartedAt).toBeNull();
+    expect(state.todos[0].firstStartedAt).toBeNull();
+    expect(state.todos[0].note).toBe(`${startHeading(START)}\n- typed before reload`);
+  });
+
+  it('does not auto-start or unpark a Someday task when its note is typed', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Parked idea', START);
+    const todoId = state.todos[0].id;
+    state = setTodoSomeday(state, todoId, START);
+
+    state = updateTodoNoteFromEditor(state, todoId, '- a thought', LATER_NOTE);
+
+    expect(state.todos[0].somedayAt).toBe(START.toISOString());
+    expect(state.todos[0].activeStartedAt).toBeNull();
+    expect(state.todos[0].note).toBe(`${startHeading(LATER_NOTE)}\n- a thought`);
+  });
+
+  it('files a typed note under the fresh session on a legacy note instead of the old stamps', () => {
+    const legacy = '@ 2026-06-08 10:00\n- a\n\n@ 2026-06-08 10:03\n- b';
+    let state = createInitialState();
+    state = addTodo(state, 'Old note', START);
+    const todoId = state.todos[0].id;
+    state = { ...state, todos: state.todos.map((todo) => ({ ...todo, note: legacy })) };
+
+    state = updateTodoNoteFromEditor(state, todoId, '- a\n- b\n- c', LATER_NOTE);
+
+    expect(state.todos[0].activeStartedAt).toBe(LATER_NOTE.toISOString());
+    expect(state.todos[0].note).toBe(
+      `Start: 2026-06-08 10:00\n- a\n- b\nEnd: 2026-06-08 10:03\n\n${startHeading(LATER_NOTE)}\n- c`,
+    );
+  });
+
   it('does not auto-start a completed task when its note is edited', () => {
     let state = createInitialState();
     state = addTodo(state, 'Already done', START);
@@ -342,7 +387,7 @@ describe('timer-backed note time blocks', () => {
       ),
     };
 
-    const next = updateTodoNote(state, todoId, '- leftover thought', LATER_NOTE);
+    const next = updateTodoNoteFromEditor(state, todoId, '- leftover thought', LATER_NOTE);
 
     expect(next.todos[0].activeStartedAt).toBeNull();
     expect(next.todos[0].note).toContain('- leftover thought');
