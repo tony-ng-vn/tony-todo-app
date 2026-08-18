@@ -137,12 +137,10 @@
 .brand-row,
 .summary-top,
 .section-heading,
-.input-row,
 .header-actions,
 .task-actions,
 .detail-window-actions,
 .open-task-button,
-.input-row > button,
 .theme-toggle,
 .sign-out-button {
   display: flex;
@@ -1338,16 +1336,6 @@ h2 {
   font-weight: 500;
 }
 
-.input-row {
-  gap: 10px;
-  margin-top: 10px;
-  padding: 8px;
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  background: var(--empty-surface);
-}
-
-.input-row input,
 .summary-top input,
 .task-title-input,
 .summary-time-input,
@@ -1361,16 +1349,6 @@ h2 {
   color: var(--strong);
 }
 
-.input-row input {
-  flex: 1 0 auto;
-  height: 48px;
-  padding: 0 14px;
-  border-color: transparent;
-  background: transparent;
-  font-size: 16px;
-}
-
-.input-row > button,
 .todo-item button {
   justify-content: center;
   gap: 6px;
@@ -1385,10 +1363,6 @@ h2 {
     background-color 180ms ease,
     border-color 180ms ease,
     transform 180ms ease;
-}
-
-.input-row > button {
-  padding: 0 20px;
 }
 
 .section-heading {
@@ -1456,22 +1430,6 @@ h2 {
 .todo-item:hover {
   border-color: var(--border);
   background: var(--block-hover);
-}
-
-.block-insertion-cue {
-  display: grid;
-  grid-template-columns: 10px minmax(0, 1fr);
-  align-content: start;
-  align-items: center;
-  align-self: start;
-  gap: 4px 12px;
-  min-height: 26px;
-  padding: 0 12px;
-  color: var(--subtle);
-  font-size: 12px;
-  font-weight: 500;
-  list-style: none;
-  animation: cue-enter 220ms cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .workspace-feedback {
@@ -1557,19 +1515,6 @@ h2 {
   border-color: var(--subtle);
   background: var(--block-hover);
   color: var(--strong);
-}
-
-.block-insertion-line {
-  grid-column: 2;
-  height: 2px;
-  border-radius: 999px;
-  background: var(--strong);
-  box-shadow: 0 0 0 4px var(--border);
-}
-
-.block-insertion-label {
-  grid-column: 2;
-  margin-top: -2px;
 }
 
 .todo-item.is-running {
@@ -1702,19 +1647,6 @@ h2 {
   color: color-mix(in srgb, var(--strong) 78%, #9f3030);
 }
 
-.new-task-calendar {
-  flex: 0 0 auto;
-  min-width: 180px;
-}
-
-/* Narrow, non-growing date picker beside the task title input. */
-.new-task-due {
-  height: 48px;
-  padding: 0 12px;
-  color: var(--subtle);
-  font-size: 14px;
-}
-
 .task-due-badge {
   width: max-content;
   padding: 2px 7px;
@@ -1809,14 +1741,12 @@ h2 {
   color: var(--strong);
 }
 
-.input-row > button:hover,
 .new-task-button:hover {
   border-color: var(--subtle);
   background: var(--button-bg);
   color: var(--button-fg);
 }
 
-.input-row > button:active,
 .new-task-button:active,
 .todo-item button:active,
 .open-task-button:active,
@@ -1827,12 +1757,10 @@ h2 {
 
 .task-search-clear:focus-visible,
 .new-task-button:focus-visible,
-.input-row input:focus-visible,
 .summary-top input:focus-visible,
 .task-title-input:focus-visible,
 .summary-time-button:focus-visible,
 .summary-time-input:focus-visible,
-.input-row > button:focus-visible,
 .todo-item button:focus-visible,
 .open-task-button:focus-visible,
 .theme-toggle:focus-visible,
@@ -2723,28 +2651,6 @@ h2 {
   font-weight: 500;
 }
 
-@container task-panel (max-width: 620px) {
-  .input-row {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    align-items: stretch;
-  }
-
-  .input-row input {
-    grid-column: 1 / -1;
-    width: 100%;
-  }
-
-  .new-task-calendar {
-    width: 100%;
-    min-width: 0;
-  }
-
-  .input-row > button {
-    min-width: 88px;
-  }
-}
-
 @container task-panel (max-width: 480px) {
   .todo-item {
     grid-template-columns: 10px minmax(0, 1fr);
@@ -2964,7 +2870,6 @@ h2 {
 
   .brand-row,
   .summary-top,
-  .input-row,
   .board-header {
     flex-direction: column;
     align-items: stretch;
@@ -2980,18 +2885,8 @@ h2 {
     justify-content: space-between;
   }
 
-  .input-row {
-    padding: 7px;
-  }
-
-  .summary-top input,
-  .input-row > button {
-    width: 100%;
-  }
-
-  .input-row input,
-  .new-task-calendar,
   .summary-top input {
+    width: 100%;
     flex: none;
     flex-basis: auto;
   }
@@ -3106,18 +3001,6 @@ h2 {
   to {
     opacity: 1;
     transform: rotate(0) scale(1);
-  }
-}
-
-@keyframes cue-enter {
-  from {
-    opacity: 0;
-    transform: translateY(-4px);
-  }
-
-  to {
-    opacity: 1;
-    transform: translateY(0);
   }
 }
 
