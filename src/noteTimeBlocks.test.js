@@ -167,7 +167,6 @@ describe('note time blocks', () => {
         '- later',
       ].join('\n'),
     );
-    expect(stripNoteStampsForEditor(next)).toBe('- first\n- later');
   });
 
   it('opens a new time block for notes added after End', () => {

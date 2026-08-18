@@ -2,6 +2,9 @@
 //   Start: YYYY-MM-DD HH:mm
 //   - bullet
 //   End: YYYY-MM-DD HH:mm
+// Session headings mirror the task timer: Start/Pause/complete write them,
+// every line typed in between belongs to the open session, and an edit never
+// removes a session heading (an emptied session keeps its Start/End pair).
 // Editor drafts strip the headings; identity matching keeps bullets in their
 // original block when the user reorders or edits them.
 // Legacy "@ YYYY-MM-DD HH:mm" notes: one run of consecutive "@" chunks parses
@@ -194,12 +197,6 @@ export function isEmptyNoteUnitText(text) {
 export function applyTodoNote(previousNote, nextNote, now = new Date()) {
   const previousBlocks = parseNoteTimeBlocks(previousNote);
   const nextEntries = flattenNoteTimeBlocks(parseNoteTimeBlocks(nextNote));
-  if (nextEntries.length === 0) {
-    if (previousBlocks.some((block) => block.startedAt && !block.endedAt && block.lines.length === 0)) {
-      return serializeNoteTimeBlocks(previousBlocks);
-    }
-    return '';
-  }
 
   const previousUnits = flattenNoteTimeBlocks(previousBlocks).map((entry, index) => ({
     entry,
@@ -261,7 +258,7 @@ export function applyTodoNote(previousNote, nextNote, now = new Date()) {
 
   inheritOpenBlockMeta(resolved);
 
-  return serializeResolvedTimeBlocks(resolved);
+  return serializeResolvedTimeBlocks(resolved, previousBlocks);
 }
 
 // Editor draft with no "@ " / Start / End headers. Blank lines remain between
@@ -577,8 +574,11 @@ function inheritOpenBlockMeta(resolved) {
   }
 }
 
-function serializeResolvedTimeBlocks(resolved) {
-  const blocks = [];
+// Consecutive units of the same block form one run; a session block that
+// received no units at all still keeps its Start/End pair, in place, so the
+// note's headings keep matching the timer history.
+function serializeResolvedTimeBlocks(resolved, previousBlocks) {
+  const runs = [];
   for (const entry of resolved) {
     if (!entry || !entry.text.trim()) {
       continue;
@@ -586,14 +586,14 @@ function serializeResolvedTimeBlocks(resolved) {
     const startedAt = entry.startedAt ?? entry.at ?? null;
     const endedAt = entry.endedAt ?? null;
     const blockIndex = entry.blockIndex ?? NEW_BLOCK_INDEX;
-    const last = blocks.at(-1);
+    const last = runs.at(-1);
     const sameBlock =
       last && last.blockIndex === blockIndex && last.startedAt === startedAt && last.endedAt === endedAt;
     if (sameBlock) {
       last.lines.push(entry.text);
       continue;
     }
-    blocks.push({
+    runs.push({
       blockIndex,
       startedAt,
       endedAt,
@@ -602,7 +602,16 @@ function serializeResolvedTimeBlocks(resolved) {
     });
   }
 
-  return serializeNoteTimeBlocks(blocks);
+  previousBlocks.forEach((block, blockIndex) => {
+    if (block.kind !== 'session' || runs.some((run) => run.blockIndex === blockIndex)) {
+      return;
+    }
+    const empty = { blockIndex, startedAt: block.startedAt, endedAt: block.endedAt, kind: 'session', lines: [] };
+    const nextRun = runs.findIndex((run) => run.blockIndex === NEW_BLOCK_INDEX || run.blockIndex > blockIndex);
+    runs.splice(nextRun === -1 ? runs.length : nextRun, 0, empty);
+  });
+
+  return serializeNoteTimeBlocks(runs);
 }
 
 // Within one chunk, blank lines still delimit paragraphs; only the first

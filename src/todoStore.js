@@ -624,9 +624,13 @@ export function getCalendarMonth(state, { year, month, now = new Date() } = {}) 
 // Matching runs against a baseline captured before the current typing burst,
 // not the per-keystroke previous state - otherwise a gradual rewrite chains
 // through many similar intermediate pairs and never mints a new time even
-// though the final wording is unrecognizable from where it started. Module
-// state, not part of `state`, so it never gets persisted; resetNoteBurstBaselines
-// and hasNoteBurstBaseline exist so tests can isolate and inspect bursts.
+// though the final wording is unrecognizable from where it started. The
+// baseline is only valid while this function is the sole writer of the note:
+// a timer Start/Pause or a sync that rewrites the stored note ends the burst,
+// or the next keystroke would re-apply against text that no longer exists.
+// Module state, not part of `state`, so it never gets persisted;
+// resetNoteBurstBaselines and hasNoteBurstBaseline exist so tests can
+// isolate and inspect bursts.
 const NOTE_BURST_GAP_MS = 5000;
 const noteBurstBaselines = new Map();
 
@@ -663,15 +667,18 @@ export function updateTodoNote(state, todoId, note, now = new Date()) {
 
   const tracked = noteBurstBaselines.get(todoId);
   const elapsed = tracked ? nowMs - tracked.updatedAt : Number.POSITIVE_INFINITY;
-  const withinBurst = Boolean(tracked) && elapsed >= 0 && elapsed < NOTE_BURST_GAP_MS;
+  const withinBurst =
+    Boolean(tracked) &&
+    elapsed >= 0 &&
+    elapsed < NOTE_BURST_GAP_MS &&
+    tracked.written === (nextTodo.note ?? '');
   const baseline = withinBurst ? tracked.note : (nextTodo.note ?? '');
-  noteBurstBaselines.set(todoId, { note: baseline, updatedAt: nowMs });
+  const nextNote = applyTodoNote(baseline, note, now);
+  noteBurstBaselines.set(todoId, { note: baseline, written: nextNote, updatedAt: nowMs });
 
   return {
     ...nextState,
-    todos: nextState.todos.map((item) =>
-      item.id === todoId ? { ...item, note: applyTodoNote(baseline, note, now) } : item,
-    ),
+    todos: nextState.todos.map((item) => (item.id === todoId ? { ...item, note: nextNote } : item)),
   };
 }
 
