@@ -35,10 +35,10 @@
 .workspace.has-detail {
   width: min(100vw, 1800px);
   grid-template-columns:
-    minmax(0, 1fr)
+    minmax(300px, 1fr)
     clamp(72px, 6vw, 96px)
-    minmax(0, 1fr)
-    minmax(0, 1fr);
+    minmax(300px, 0.95fr)
+    minmax(320px, 0.9fr);
 }
 
 .workspace.is-board-view {
@@ -48,7 +48,7 @@
 
 .workspace.is-board-view.has-detail {
   width: min(100vw, 1800px);
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-columns: minmax(0, 1.4fr) minmax(320px, 0.9fr);
 }
 
 .sr-only {
