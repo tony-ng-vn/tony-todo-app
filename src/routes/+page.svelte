@@ -1575,6 +1575,7 @@
       onTimerAction={handleTimerAction}
       onOpenTask={openTask}
       onComplete={handleComplete}
+      onDeleteTask={handleDeleteTask}
       onFail={handleFail}
       onOpenListDragOver={handleOpenListDragOver}
       onOpenListDrop={handleOpenListDrop}

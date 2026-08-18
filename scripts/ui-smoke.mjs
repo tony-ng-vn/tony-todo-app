@@ -34,6 +34,7 @@ try {
     ...assertHasMotion(mobile, '.todo-item button', 'Done button'),
     ...assertHasMotion(mobile, '.theme-toggle', 'Theme toggle'),
     ...assertTimerControlLabel(desktop),
+    ...assertRowDelete(desktop),
     ...assertTaskRowSpacing(desktop),
     ...assertCalendarConsistency(desktop),
     ...assertNewTaskCalendarClear(desktop),
@@ -108,6 +109,14 @@ async function inspectMobileTaskDetail(viewport) {
   await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
   await page.locator('[data-todo-id="ui-smoke-mobile-detail-task"] .open-task-button').tap();
   await page.waitForSelector('#task-detail');
+  await page.waitForFunction(() => {
+    const detail = document.querySelector('#task-detail');
+    if (!detail) {
+      return false;
+    }
+    const transform = getComputedStyle(detail).transform;
+    return transform === 'none' || transform === 'matrix(1, 0, 0, 1, 0, 0)';
+  });
 
   const layout = await page.evaluate(() => {
     const viewportHeight = window.innerHeight;
@@ -129,10 +138,18 @@ async function inspectMobileTaskDetail(viewport) {
         inViewport: visibleHeight > 24 && visibleWidth > 24,
       };
     }
+    const detailEl = document.querySelector('#task-detail');
+    const closeEl = document.querySelector('#detail-close');
+    const closeRect = closeEl?.getBoundingClientRect();
     return {
       viewportHeight,
+      viewportWidth,
       detail: box('#task-detail'),
       note: box('#detail-note'),
+      close: box('#detail-close'),
+      detailPosition: detailEl ? getComputedStyle(detailEl).position : null,
+      closeTop: closeRect ? Math.round(closeRect.top) : null,
+      closeRight: closeRect ? Math.round(closeRect.right) : null,
     };
   });
 
@@ -183,6 +200,22 @@ async function inspectMobileTaskDetail(viewport) {
   }
 
   await page.locator('.detail-start-picker').scrollIntoViewIfNeeded();
+  const closeAfterScroll = await page.evaluate(() => {
+    const closeEl = document.querySelector('#detail-close');
+    if (!closeEl) {
+      return null;
+    }
+    const rect = closeEl.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const visibleHeight = Math.max(0, Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0));
+    const visibleWidth = Math.max(0, Math.min(rect.right, viewportWidth) - Math.max(rect.left, 0));
+    return {
+      top: Math.round(rect.top),
+      right: Math.round(rect.right),
+      inViewport: visibleHeight > 24 && visibleWidth > 24,
+    };
+  });
   await page.locator('.detail-start-picker').tap();
   await page.waitForSelector('.calendar-popover');
   const calendar = await page.evaluate(() => {
@@ -206,16 +239,51 @@ async function inspectMobileTaskDetail(viewport) {
     };
   });
 
+  await page.keyboard.press('Escape');
+  await page.locator('#detail-close').tap();
+  await page.waitForSelector('#task-detail', { state: 'detached' });
+  const detailClosed = await page.evaluate(() => !document.querySelector('#task-detail'));
+
   await page.close();
-  return { layout, noteValue, noteFillError, noteLinkPresentation, calendar };
+  return { layout, noteValue, noteFillError, noteLinkPresentation, calendar, closeAfterScroll, detailClosed };
 }
 
 function assertMobileTaskDetail(result) {
   const failures = [];
-  if (!result.layout.detail || result.layout.detail.viewportCoverage < 0.85) {
+  if (
+    result.layout.detailPosition !== 'fixed' ||
+    !result.layout.detail ||
+    result.layout.detail.viewportCoverage < 0.98 ||
+    result.layout.detail.top > 2 ||
+    result.layout.detail.width < (result.layout.viewportWidth ?? 0) - 2
+  ) {
     failures.push(
-      `iPhone task details are not on screen after Open: ${JSON.stringify(result.layout.detail)}`,
+      `iPhone task details are not a full-screen overlay after Open: ${JSON.stringify(result.layout)}`,
     );
+  }
+  if (
+    !result.layout.close?.inViewport ||
+    result.layout.closeTop == null ||
+    result.layout.closeTop > 96 ||
+    result.layout.closeRight == null ||
+    (result.layout.viewportWidth ?? 0) - result.layout.closeRight > 80
+  ) {
+    failures.push(
+      `iPhone task detail close is not pinned to the top right: ${JSON.stringify({
+        close: result.layout.close,
+        closeTop: result.layout.closeTop,
+        closeRight: result.layout.closeRight,
+        viewportWidth: result.layout.viewportWidth,
+      })}`,
+    );
+  }
+  if (!result.closeAfterScroll?.inViewport || result.closeAfterScroll.top > 96) {
+    failures.push(
+      `iPhone task detail close scrolled away with the note: ${JSON.stringify(result.closeAfterScroll)}`,
+    );
+  }
+  if (!result.detailClosed) {
+    failures.push('iPhone task details could not be closed from the overlay');
   }
   if (!result.layout.note?.inViewport) {
     failures.push(`iPhone task note is not on screen after Open: ${JSON.stringify(result.layout.note)}`);
@@ -818,7 +886,7 @@ async function inspectBoardCardLayout(viewport) {
 }
 
 async function inspectViewport(viewport, isMobile) {
-  const page = await browser.newPage({ viewport, isMobile });
+  const page = await browser.newPage({ viewport, isMobile, timezoneId: 'America/Los_Angeles' });
   await page.addInitScript(() => {
     const today = new Date();
     const dayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -1035,13 +1103,22 @@ async function inspectViewport(viewport, isMobile) {
         '.theme-toggle': transitionFor('.theme-toggle'),
       },
       timerControl: (() => {
-        const button = document.querySelector('.timer-button');
-        const label = button?.querySelector('.timer-button-label');
-        const labelRect = label?.getBoundingClientRect();
+        const item = document.querySelector('.todo-item');
+        const button = item?.querySelector('.timer-button');
+        const other = item?.querySelector('.open-task-button');
+        const visibleLabel = Array.from(button?.querySelectorAll('span') ?? []).find((span) => {
+          const style = getComputedStyle(span);
+          const rect = span.getBoundingClientRect();
+          return style.position !== 'absolute' && rect.width > 1 && rect.height > 1;
+        });
+        const buttonRect = button?.getBoundingClientRect();
+        const otherRect = other?.getBoundingClientRect();
         return {
-          text: label?.textContent.trim(),
-          width: Math.round(labelRect?.width ?? 0),
+          visibleText: visibleLabel?.textContent.trim() ?? '',
+          width: Math.round(buttonRect?.width ?? 0),
+          otherWidth: Math.round(otherRect?.width ?? 0),
           ariaLabel: button?.getAttribute('aria-label') ?? '',
+          hasDelete: Boolean(item?.querySelector('.delete-task-button')),
         };
       })(),
       taskRowSpacing: (() => {
@@ -1067,6 +1144,8 @@ async function inspectViewport(viewport, isMobile) {
     }
   });
 
+  const rowDelete = isMobile ? null : await exerciseRowDelete(page);
+
   await page.close();
   return {
     viewport,
@@ -1076,8 +1155,32 @@ async function inspectViewport(viewport, isMobile) {
     summaryTimeEdit,
     taskFlowChecks,
     newTaskCalendarClear,
+    rowDelete,
     ...metrics,
   };
+}
+
+async function exerciseRowDelete(page) {
+  const button = page.locator('[data-todo-id="ui-smoke-today-task"] .delete-task-button');
+  const visible = await button.isVisible().catch(() => false);
+  if (!visible) {
+    return { visible: false, ariaLabel: '', removedFromList: false, removedFromState: false };
+  }
+  const ariaLabel = (await button.getAttribute('aria-label')) ?? '';
+  await button.click();
+  await page.waitForFunction(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    return !state.todos.some((item) => item.id === 'ui-smoke-today-task') &&
+      !document.querySelector('[data-todo-id="ui-smoke-today-task"]');
+  });
+  const after = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    return {
+      removedFromList: !document.querySelector('[data-todo-id="ui-smoke-today-task"]'),
+      removedFromState: !state.todos.some((item) => item.id === 'ui-smoke-today-task'),
+    };
+  });
+  return { visible, ariaLabel, ...after };
 }
 
 async function exerciseNewTaskCalendarClear(page) {
@@ -1561,11 +1664,21 @@ function assertHasMotion(result, selector, label) {
 }
 
 function assertTimerControlLabel(result) {
-  return ['Start', 'Stop'].includes(result.timerControl.text) &&
-    result.timerControl.width > 22 &&
-    result.timerControl.ariaLabel.includes(result.timerControl.text)
+  const control = result.timerControl;
+  const iconSized = control.width === 42 && control.width === control.otherWidth;
+  const named = /Start|Pause/.test(control.ariaLabel);
+  return !control.visibleText && iconSized && named && control.hasDelete
     ? []
-    : [`timer control label is not visible/clear: ${JSON.stringify(result.timerControl)}`];
+    : [`timer and delete row actions are not icon-only: ${JSON.stringify(control)}`];
+}
+
+function assertRowDelete(result) {
+  return result.rowDelete?.visible &&
+    result.rowDelete.ariaLabel.includes('Delete') &&
+    result.rowDelete.removedFromList &&
+    result.rowDelete.removedFromState
+    ? []
+    : [`row delete did not remove the task from the list: ${JSON.stringify(result.rowDelete)}`];
 }
 
 function assertTaskRowSpacing(result) {

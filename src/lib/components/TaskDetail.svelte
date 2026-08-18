@@ -271,6 +271,7 @@
       <button type="button" class="detail-close" id="detail-close" aria-label="Close task details" on:click={onClose}>Close</button>
     </div>
   </div>
+  <div class="detail-body">
     <label class="detail-title-label" for={editingDetailTitle ? 'detail-title-input' : undefined}>Task name</label>
     {#if editingDetailTitle}
       <input
@@ -492,5 +493,6 @@
         </ol>
       </div>
     {/if}
+  </div>
 </aside>
 {/if}
