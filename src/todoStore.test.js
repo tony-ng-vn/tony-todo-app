@@ -248,6 +248,35 @@ describe('todo day summary', () => {
     ]);
   });
 
+  it('does not invent a time block for a completed task that never used a timer', () => {
+    expect(
+      getEditableTaskTimeSegments({
+        createdAt: '2026-08-14T20:30:00.000Z',
+        firstStartedAt: null,
+        activeStartedAt: null,
+        completedAt: '2026-08-16T20:03:00.000Z',
+        timeSegments: [],
+      }),
+    ).toEqual([]);
+  });
+
+  it('recovers a work period for a completed task that has a start but no saved blocks', () => {
+    expect(
+      getEditableTaskTimeSegments({
+        createdAt: '2026-06-08T10:00:00.000Z',
+        firstStartedAt: '2026-06-08T12:05:00.000Z',
+        activeStartedAt: null,
+        completedAt: '2026-06-08T12:10:00.000Z',
+        timeSegments: [],
+      }),
+    ).toEqual([
+      {
+        startedAt: '2026-06-08T12:05:00.000Z',
+        endedAt: '2026-06-08T12:10:00.000Z',
+      },
+    ]);
+  });
+
   it('does not invent an end time for a task that has not started', () => {
     expect(
       getEditableTaskTimeSegments({
@@ -591,22 +620,33 @@ describe('todo day summary', () => {
     });
   });
 
-  it('rejects a completion time that is not after the recorded start', () => {
-    const startedAt = new Date('2026-06-09T21:00:00.000Z');
+  it('lets a done date land before the recorded start without rewriting time blocks', () => {
+    const startedAt = new Date('2026-08-16T20:30:00.000Z');
+    const originalSegments = [
+      {
+        startedAt: '2026-08-16T20:30:00.000Z',
+        endedAt: '2026-08-16T21:00:00.000Z',
+      },
+    ];
     let state = createInitialState([
       {
         id: 'timed-task',
         title: 'Timed task',
-        createdAt: '2026-06-09T20:00:00.000Z',
+        createdAt: '2026-08-14T20:30:00.000Z',
         firstStartedAt: startedAt.toISOString(),
-        completedAt: '2026-06-09T22:00:00.000Z',
+        completedAt: '2026-08-16T21:00:00.000Z',
+        timeSegments: originalSegments,
       },
     ]);
-    const original = state;
+    const doneAt = new Date('2026-08-14T13:03:00.000Z');
 
-    state = updateTodoCompletedAt(state, 'timed-task', startedAt);
+    state = updateTodoCompletedAt(state, 'timed-task', doneAt);
 
-    expect(state).toBe(original);
+    expect(state.todos[0]).toMatchObject({
+      completedAt: doneAt.toISOString(),
+      firstStartedAt: startedAt.toISOString(),
+      timeSegments: originalSegments,
+    });
   });
 
   it('updates completed task start and end times to recalculate duration', () => {
@@ -698,6 +738,23 @@ describe('todo day summary', () => {
     expect(
       updateTodoTiming(state, todoId, '2026-06-01T13:15:00.000Z', '2026-06-01T13:15:00.000Z'),
     ).toBe(original);
+  });
+
+  it('marks an untimed task done without recording a work period', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Book OpenAI Dev Day', new Date('2026-08-14T20:30:00.000Z'));
+    const todoId = state.todos[0].id;
+    const markedAt = new Date('2026-08-16T20:03:00.000Z');
+
+    state = completeTodo(state, todoId, markedAt);
+
+    expect(state.todos[0]).toMatchObject({
+      completedAt: markedAt.toISOString(),
+      firstStartedAt: null,
+      activeStartedAt: null,
+      timeSegments: [],
+    });
+    expect(getEditableTaskTimeSegments(state.todos[0])).toEqual([]);
   });
 
   it('finishes a paused task at the end of its most recent recorded segment', () => {
@@ -829,7 +886,7 @@ describe('todo day summary', () => {
     ]);
 
     expect(state.todos[0]).toMatchObject({
-      completedAt: '2026-06-10T11:15:00.000Z',
+      completedAt: '2026-06-10T11:00:00.000Z',
       trackedSeconds: 90 * 60,
     });
   });

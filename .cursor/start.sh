@@ -19,12 +19,12 @@ export NVM_DIR="${NVM_DIR:-$HOME/.nvm}"
 # instead of executing a floating registry build while the key is in scope.
 # Keep the version in lockstep with package.json's @insforge/cli devDependency;
 # src/ciWorkflow.test.js enforces the match.
-# The key rides argv because CLI 0.2.6's login has no env/stdin alternative
+# The key rides argv because CLI 0.2.7's login has no env/stdin alternative
 # (only INSFORGE_ACCESS_TOKEN session tokens are read from env, not uak_ keys).
 if [ -n "${INSFORGE_USER_API_KEY:-}" ]; then
   echo "Authenticating InsForge CLI (non-interactive)..."
-  if npx -y --offline @insforge/cli@0.2.6 login --user-api-key "$INSFORGE_USER_API_KEY" >/dev/null 2>&1 \
-    && npx -y --offline @insforge/cli@0.2.6 link \
+  if npx -y --offline @insforge/cli@0.2.7 login --user-api-key "$INSFORGE_USER_API_KEY" >/dev/null 2>&1 \
+    && npx -y --offline @insforge/cli@0.2.7 link \
       --project-id 7e77e15d-9e4d-4591-9951-8b99289200cd \
       --org-id b74bafa2-a05e-479e-a2b6-5290bfd9ad13 >/dev/null 2>&1; then
     echo "InsForge CLI authenticated and linked to Todo App."
