@@ -34,6 +34,7 @@ try {
     ...assertHasMotion(mobile, '.todo-item button', 'Done button'),
     ...assertHasMotion(mobile, '.theme-toggle', 'Theme toggle'),
     ...assertTimerControlLabel(desktop),
+    ...assertRowDelete(desktop),
     ...assertTaskRowSpacing(desktop),
     ...assertCalendarConsistency(desktop),
     ...assertNewTaskCalendarClear(desktop),
@@ -1035,13 +1036,22 @@ async function inspectViewport(viewport, isMobile) {
         '.theme-toggle': transitionFor('.theme-toggle'),
       },
       timerControl: (() => {
-        const button = document.querySelector('.timer-button');
-        const label = button?.querySelector('.timer-button-label');
-        const labelRect = label?.getBoundingClientRect();
+        const item = document.querySelector('.todo-item');
+        const button = item?.querySelector('.timer-button');
+        const other = item?.querySelector('.open-task-button');
+        const visibleLabel = Array.from(button?.querySelectorAll('span') ?? []).find((span) => {
+          const style = getComputedStyle(span);
+          const rect = span.getBoundingClientRect();
+          return style.position !== 'absolute' && rect.width > 1 && rect.height > 1;
+        });
+        const buttonRect = button?.getBoundingClientRect();
+        const otherRect = other?.getBoundingClientRect();
         return {
-          text: label?.textContent.trim(),
-          width: Math.round(labelRect?.width ?? 0),
+          visibleText: visibleLabel?.textContent.trim() ?? '',
+          width: Math.round(buttonRect?.width ?? 0),
+          otherWidth: Math.round(otherRect?.width ?? 0),
           ariaLabel: button?.getAttribute('aria-label') ?? '',
+          hasDelete: Boolean(item?.querySelector('.delete-task-button')),
         };
       })(),
       taskRowSpacing: (() => {
@@ -1067,6 +1077,8 @@ async function inspectViewport(viewport, isMobile) {
     }
   });
 
+  const rowDelete = isMobile ? null : await exerciseRowDelete(page);
+
   await page.close();
   return {
     viewport,
@@ -1076,8 +1088,32 @@ async function inspectViewport(viewport, isMobile) {
     summaryTimeEdit,
     taskFlowChecks,
     newTaskCalendarClear,
+    rowDelete,
     ...metrics,
   };
+}
+
+async function exerciseRowDelete(page) {
+  const button = page.locator('[data-todo-id="ui-smoke-today-task"] .delete-task-button');
+  const visible = await button.isVisible().catch(() => false);
+  if (!visible) {
+    return { visible: false, ariaLabel: '', removedFromList: false, removedFromState: false };
+  }
+  const ariaLabel = (await button.getAttribute('aria-label')) ?? '';
+  await button.click();
+  await page.waitForFunction(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    return !state.todos.some((item) => item.id === 'ui-smoke-today-task') &&
+      !document.querySelector('[data-todo-id="ui-smoke-today-task"]');
+  });
+  const after = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    return {
+      removedFromList: !document.querySelector('[data-todo-id="ui-smoke-today-task"]'),
+      removedFromState: !state.todos.some((item) => item.id === 'ui-smoke-today-task'),
+    };
+  });
+  return { visible, ariaLabel, ...after };
 }
 
 async function exerciseNewTaskCalendarClear(page) {
@@ -1586,11 +1622,21 @@ function assertHasMotion(result, selector, label) {
 }
 
 function assertTimerControlLabel(result) {
-  return ['Start', 'Stop'].includes(result.timerControl.text) &&
-    result.timerControl.width > 22 &&
-    result.timerControl.ariaLabel.includes(result.timerControl.text)
+  const control = result.timerControl;
+  const iconSized = control.width === 42 && control.width === control.otherWidth;
+  const named = /Start|Stop/.test(control.ariaLabel);
+  return !control.visibleText && iconSized && named && control.hasDelete
     ? []
-    : [`timer control label is not visible/clear: ${JSON.stringify(result.timerControl)}`];
+    : [`timer and delete row actions are not icon-only: ${JSON.stringify(control)}`];
+}
+
+function assertRowDelete(result) {
+  return result.rowDelete?.visible &&
+    result.rowDelete.ariaLabel.includes('Delete') &&
+    result.rowDelete.removedFromList &&
+    result.rowDelete.removedFromState
+    ? []
+    : [`row delete did not remove the task from the list: ${JSON.stringify(result.rowDelete)}`];
 }
 
 function assertTaskRowSpacing(result) {
