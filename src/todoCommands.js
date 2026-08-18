@@ -1001,21 +1001,14 @@ function liveRemainderStartedAt(todo, now, todayKey) {
   }
 
   const liveStart = new Date(todo.activeStartedAt);
-  if (Number.isNaN(liveStart.getTime()) || liveStart >= now) {
+  if (Number.isNaN(liveStart.getTime())) {
     return null;
   }
 
+  // A timer started before today keeps running from today's midnight (which
+  // may equal now when the day rollover fires); anything else runs untouched.
   const liveDayKey = formatSummaryDayKey(liveStart);
-  if (liveDayKey === todayKey) {
-    return liveStart;
-  }
-
-  if (liveDayKey && liveDayKey < todayKey) {
-    const todayStart = dateAtSanFranciscoTime(todayKey, 0);
-    return todayStart < now ? todayStart : null;
-  }
-
-  return liveStart;
+  return liveDayKey < todayKey ? dateAtSanFranciscoTime(todayKey, 0) : liveStart;
 }
 
 function splitSegmentBySummaryDays(segment) {
