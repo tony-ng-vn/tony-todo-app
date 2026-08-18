@@ -9,7 +9,7 @@
   import { rollUp, searchFlip } from '../motion/rollUp.js';
   import { isApplePlatform, newTaskShortcutLabel } from '../../newTaskShortcut.js';
   import { linkifyText } from '../../linkify.js';
-  import { iconCheck, iconPage, iconPause, iconPlay, iconSearch, iconX } from './icons.js';
+  import { iconCheck, iconPage, iconPause, iconPlay, iconSearch, iconTrash, iconX } from './icons.js';
   import ThemeToggle from './ThemeToggle.svelte';
   import WorkspaceTabs from './WorkspaceTabs.svelte';
 
@@ -35,6 +35,7 @@
   export let onTimerAction;
   export let onOpenTask;
   export let onComplete;
+  export let onDeleteTask;
   export let onFail;
   export let onOpenListDragOver;
   export let onOpenListDrop;
@@ -332,7 +333,7 @@
   {@const elapsedSeconds = getElapsedSeconds(todo)}
   {@const latestSession = todo.latestProgressSession}
   {@const timerAction = isRunning ? 'pause' : 'start'}
-  {@const timerText = isRunning ? 'Stop' : 'Start'}
+  {@const timerText = isRunning ? 'Pause' : 'Start'}
     <span class="task-block-dot" aria-hidden="true"></span>
     <div class="task-content">
       {#if editingTaskId === todo.id}
@@ -388,7 +389,7 @@
     <div class="task-actions">
       <button type="button" class="timer-button" title={`${timerText} timer`} on:click={() => onTimerAction(timerAction, todo.id)} aria-label={`${timerText} ${todo.title} timer`}>
         {@html isRunning ? iconPause() : iconPlay()}
-        <span class="timer-button-label">{timerText}</span>
+        <span>{timerText}</span>
       </button>
       <button type="button" class="open-task-button" on:click={(event) => onOpenTask(todo.id, event.currentTarget)} aria-label={`Open ${todo.title} details`}>
         {@html iconPage()}
@@ -401,6 +402,10 @@
       <button type="button" class="fail-task-button" on:click={() => onFail(todo.id)} aria-label={`Mark ${todo.title} failed`}>
         {@html iconX()}
         <span>Fail</span>
+      </button>
+      <button type="button" class="delete-task-button" title="Delete" on:click={() => onDeleteTask(todo.id)} aria-label={`Delete ${todo.title}`}>
+        {@html iconTrash()}
+        <span>Delete</span>
       </button>
     </div>
 {/snippet}
