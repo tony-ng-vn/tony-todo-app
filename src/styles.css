@@ -1598,7 +1598,7 @@ h2 {
   padding: 0;
 }
 
-.task-actions button span:not(.timer-button-label) {
+.task-actions button span {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -1610,21 +1610,6 @@ h2 {
 .task-actions {
   flex: 0 0 auto;
   gap: 6px;
-}
-
-.task-actions .timer-button {
-  width: auto;
-  min-width: 88px;
-  padding: 0 12px;
-}
-
-.timer-button-label {
-  position: static;
-  width: auto;
-  height: auto;
-  overflow: visible;
-  clip: auto;
-  white-space: nowrap;
 }
 
 .open-task-button {
