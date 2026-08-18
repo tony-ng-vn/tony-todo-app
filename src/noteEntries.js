@@ -219,7 +219,7 @@ export function applyTodoNote(previousNote, nextNote, now = new Date()) {
     }
     const normalized = normalizeUnitText(entry.text);
     if (!normalized) {
-      // Empty structural unit: placed next to its neighbours once every
+      // Empty structural unit: placed next to its neighbors once every
       // real unit knows its block.
       return;
     }
