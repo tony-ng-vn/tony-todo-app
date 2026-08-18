@@ -24,6 +24,7 @@
   --button-bg: #292929;
   --button-fg: #f5f5f5;
   --focus-ring: rgba(41, 41, 41, 0.58);
+  --danger: #9f3030;
   --inset-highlight: rgba(255, 255, 255, 0.86);
   --shadow: rgba(41, 41, 41, 0.1);
   --shadow-soft: 0 10px 30px rgba(41, 41, 41, 0.08);
@@ -37,6 +38,8 @@
   --motion-press: 140ms;
   --motion-hover: 160ms;
   --motion-reveal: 220ms;
+  --motion-filter: 280ms;
+  --motion-overlay: 280ms;
   --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
   --ease-in-out: cubic-bezier(0.77, 0, 0.175, 1);
   --board-not-started: #9065d0;
@@ -141,6 +144,7 @@
   --button-bg: #eee9dc;
   --button-fg: #171714;
   --focus-ring: rgba(244, 241, 232, 0.62);
+  --danger: #e08b84;
   --inset-highlight: rgba(255, 255, 255, 0.08);
   --shadow: rgba(0, 0, 0, 0.45);
   --shadow-soft: 0 16px 34px rgba(0, 0, 0, 0.34);
