@@ -19,8 +19,8 @@ import {
   getDaySummary,
   getMillisecondsUntilNextDay,
   getPendingTodos,
-  filterSummaryBySearch,
   filterTodoSections,
+  findOverflowSearchMatches,
   filterTodosBySearch,
   getProgressSessions,
   todoMatchesSearchQuery,
@@ -1761,7 +1761,19 @@ describe('task search matching', () => {
       { label: 'Morning', items: [{ id: '1', title: 'Action item', note: '' }] },
       { label: 'Lunch', items: [{ id: '2', title: 'Shower', note: '' }] },
     ];
-    expect(filterSummaryBySearch(summary, 'act').map((section) => section.label)).toEqual(['Morning']);
+    expect(filterTodoSections(summary, 'act').map((section) => section.label)).toEqual(['Morning']);
+  });
+
+  it('lists matching tasks that are not already on screen as overflow hits', () => {
+    const visible = { id: '1', title: 'Action item' };
+    const hidden = { id: '2', title: 'Archived action', completedAt: '2026-01-02T10:00:00.000Z' };
+    const session = { id: '3', title: 'Action session', isProgressSession: true };
+    const other = { id: '4', title: 'Shower' };
+    const todos = [visible, hidden, session, other];
+
+    expect(findOverflowSearchMatches(todos, [visible], 'act')).toEqual([hidden]);
+    expect(findOverflowSearchMatches(todos, [], 'act')).toEqual([visible, hidden]);
+    expect(findOverflowSearchMatches(todos, [visible], '')).toEqual([]);
   });
 });
 
