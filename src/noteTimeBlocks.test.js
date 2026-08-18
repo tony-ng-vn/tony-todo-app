@@ -137,6 +137,39 @@ describe('note time blocks', () => {
     ]);
   });
 
+  // Session headings mirror the timer, so an edit never removes one: a
+  // cleared draft leaves only the headings behind, an emptied session keeps
+  // its Start/End pair, and a session that never had notes still stands.
+  it('keeps only the session headings when the draft is cleared', () => {
+    const stored = `${startHeading(START)}\n- first\n${endHeading(PAUSE)}\n\n${startHeading(RESUME)}`;
+
+    expect(applyTodoNote(stored, '', LATER_NOTE)).toBe(
+      `${startHeading(START)}\n${endHeading(PAUSE)}\n\n${startHeading(RESUME)}`,
+    );
+    expect(applyTodoNote('- plain text', '', LATER_NOTE)).toBe('');
+  });
+
+  it('keeps an empty Start/End pair in place when later notes are added', () => {
+    const stored = `${startHeading(START)}\n- first\n${endHeading(PAUSE)}\n\n${startHeading(RESUME)}\n${endHeading(SECOND_PAUSE)}`;
+
+    const next = applyTodoNote(stored, '- first\n- later', LATER_NOTE);
+
+    expect(next).toBe(
+      [
+        startHeading(START),
+        '- first',
+        endHeading(PAUSE),
+        '',
+        startHeading(RESUME),
+        endHeading(SECOND_PAUSE),
+        '',
+        startHeading(LATER_NOTE),
+        '- later',
+      ].join('\n'),
+    );
+    expect(stripNoteStampsForEditor(next)).toBe('- first\n- later');
+  });
+
   it('opens a new time block for notes added after End', () => {
     const closed = `${startHeading(START)}\n- first\n${endHeading(PAUSE)}`;
     const next = applyTodoNote(closed, '- first\n- second', RESUME);
@@ -238,6 +271,27 @@ describe('timer-backed note time blocks', () => {
         '- second session',
         endHeading(SECOND_PAUSE),
       ].join('\n'),
+    );
+  });
+
+  // The burst baseline is captured before the burst starts; a Pause (or any
+  // other change to the stored note) in the middle of a burst must not be
+  // undone by the next keystroke re-applying against that stale baseline.
+  it('keeps the End written by a pause that lands in the middle of a typing burst', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Write the talk', START);
+    const todoId = state.todos[0].id;
+    state = startTodoTimer(state, todoId, START);
+    state = updateTodoNote(state, todoId, '- outline', START);
+    const pausedAt = new Date(START.getTime() + 1000);
+    state = pauseTodoTimer(state, todoId, pausedAt);
+    const resumedAt = new Date(START.getTime() + 2000);
+    state = startTodoTimer(state, todoId, resumedAt);
+
+    state = updateTodoNote(state, todoId, '- outline\n- more', new Date(START.getTime() + 3000));
+
+    expect(state.todos[0].note).toBe(
+      `${startHeading(START)}\n- outline\n${endHeading(pausedAt)}\n\n${startHeading(resumedAt)}\n- more`,
     );
   });
 
