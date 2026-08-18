@@ -1722,6 +1722,32 @@ describe('task search matching', () => {
     expect(todoMatchesSearchQuery(todo, 'capital')).toBe(true);
   });
 
+  it('requires every typed word to prefix some word of the task', () => {
+    const todo = { id: '1', title: 'Review action items', note: 'Ask Sam' };
+    expect(todoMatchesSearchQuery(todo, 'rev act')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'act rev')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'review sam')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'review sun')).toBe(false);
+    expect(todoMatchesSearchQuery(todo, '  rev   act  ')).toBe(true);
+  });
+
+  it('ignores punctuation in the query and the task text', () => {
+    const todo = { id: '1', title: 'Send e-mail (draft)', note: '' };
+    expect(todoMatchesSearchQuery(todo, 'e-mail')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'mail')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, '(dra')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'send!')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, '???')).toBe(true);
+  });
+
+  it('treats non-ASCII letters as part of a word', () => {
+    const todo = { id: '1', title: 'D\u00e9cor for the caf\u00e9', note: '' };
+    expect(todoMatchesSearchQuery(todo, 'd\u00e9c')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'D\u00c9C')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'caf')).toBe(true);
+    expect(todoMatchesSearchQuery(todo, 'cor')).toBe(false);
+  });
+
   it('drops empty date groups after filtering', () => {
     const sections = [
       { id: 'today', items: [{ id: '1', title: 'Action item' }] },
