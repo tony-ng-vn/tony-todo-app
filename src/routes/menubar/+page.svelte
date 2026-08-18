@@ -16,6 +16,7 @@
   import {
     addTodo,
     archivePriorDaySessions,
+    completeTodo,
     createInitialState,
     deleteTodo,
     findDuplicateTodo,
@@ -24,7 +25,6 @@
     getCompletedTodoSections,
     getProgressSessions,
     getSomedayTodos,
-    logProgressSession,
     pauseTodoTimer,
     partitionTaskFlowTodos,
     restoreTodoFromSomeday,
@@ -443,7 +443,7 @@
 
   async function handleComplete(todoId) {
     const beforeTodos = state.todos;
-    state = logProgressSession(state, todoId);
+    state = completeTodo(state, todoId);
     saveLocalState(state);
 
     if (expandedTaskId === todoId) {

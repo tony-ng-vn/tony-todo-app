@@ -23,6 +23,7 @@ import {
   normalizeTimeSegments,
   normalizeTodo,
   normalizedTrackedSeconds,
+  totalSegmentSeconds,
 } from './todoCommands.js';
 import { stripNoteStampsForEditor } from './noteEntries.js';
 
@@ -142,7 +143,7 @@ export function updateTodoTiming(state, todoId, startedAt, completedAt) {
         firstStartedAt: new Date(startTime).toISOString(),
         activeStartedAt: null,
         completedAt: new Date(endTime).toISOString(),
-        trackedSeconds: totalTimeSegmentSeconds(timeSegments),
+        trackedSeconds: totalSegmentSeconds(timeSegments),
         timeSegments,
       };
     }),
@@ -200,7 +201,7 @@ export function updateTodoTimeSegments(state, todoId, segments) {
         firstStartedAt,
         activeStartedAt: wasRunning ? latestEndedAt : null,
         completedAt: wasCompleted ? todo.completedAt : null,
-        trackedSeconds: totalTimeSegmentSeconds(timeSegments),
+        trackedSeconds: totalSegmentSeconds(timeSegments),
         timeSegments,
       };
     }),
@@ -788,38 +789,6 @@ export function getEditableTaskTimeSegments(todo, activeEndedAt = new Date()) {
   ];
 }
 
-export function setTodoProgressive(state, todoId, isProgressive) {
-  return {
-    ...state,
-    todos: state.todos.map((todo) =>
-      todo.id === todoId && !todo.isProgressSession
-        ? {
-            ...todo,
-            isProgressive: Boolean(isProgressive),
-          }
-        : todo,
-    ),
-  };
-}
-
-export function updateTodoProgress(state, todoId, progressLabel) {
-  return {
-    ...state,
-    todos: state.todos.map((todo) =>
-      todo.id === todoId
-        ? {
-            ...todo,
-            progressLabel: progressLabel ?? '',
-          }
-        : todo,
-    ),
-  };
-}
-
-export function logProgressSession(state, todoId, completedAt = new Date()) {
-  return completeTodo(state, todoId, completedAt);
-}
-
 export function getProgressSessions(state, parentTaskId) {
   return state.todos
     .filter((todo) => todo.parentTaskId === parentTaskId && todo.isProgressSession)
@@ -960,14 +929,6 @@ const dateGroupLabelFormat = new Intl.DateTimeFormat('en-US', {
 
 function formatDateGroupLabel(dayKey) {
   return dateGroupLabelFormat.format(new Date(`${dayKey}T00:00:00`));
-}
-
-function totalTimeSegmentSeconds(segments) {
-  return segments.reduce(
-    (total, segment) =>
-      total + getActiveSegmentSeconds(new Date(segment.startedAt), new Date(segment.endedAt)),
-    0,
-  );
 }
 
 function updateTimeSegmentBounds(segments, startTime, endTime) {

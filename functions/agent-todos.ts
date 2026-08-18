@@ -1394,7 +1394,6 @@ function archiveOpenTodoPriorDays(todo, now, todayKey, existingTodos) {
   return {
     parent: {
       ...todo,
-      isProgressive: false,
       firstStartedAt,
       activeStartedAt: liveRemainderStart ? liveRemainderStart.toISOString() : null,
       trackedSeconds,
@@ -1477,7 +1476,6 @@ function createDayProgressSession(parent, dayKey, segments) {
     source: 'progress-session',
     parentTaskId: parent.id,
     isProgressSession: true,
-    isProgressive: false,
     progressLabel: '',
     firstStartedAt: firstStart.toISOString(),
     activeStartedAt: null,

@@ -29,7 +29,6 @@ import {
   getDefaultTaskStartTimestamp,
   getEditableTaskTimeSegments,
   getOpenTodoSections,
-  logProgressSession,
   moveCompletedTodoToSummaryBucket,
   moveTodoToBoardColumn,
   pauseTodoTimer,
@@ -38,14 +37,12 @@ import {
   promoteTodoToTask,
   reorderCompletedTodosForDay,
   reopenTodo,
-  setTodoProgressive,
   startTodoTimer,
   deleteTodo,
   updateTodoTiming,
   updateTodoTimeSegments,
   updateCompletedTodoTiming,
   updateTodoCompletedAt,
-  updateTodoProgress,
   updateTodoTitle,
   updateTodoNote,
   resetNoteBurstBaselines,
@@ -786,7 +783,7 @@ describe('todo day summary', () => {
     state = startTodoTimer(state, parentId, new Date('2026-06-08T23:00:00.000Z'));
     state = pauseTodoTimer(state, parentId, new Date('2026-06-08T23:20:00.000Z'));
 
-    state = logProgressSession(state, parentId, new Date('2026-06-10T16:00:00.000Z'));
+    state = completeTodo(state, parentId, new Date('2026-06-10T16:00:00.000Z'));
 
     expect(getProgressSessions(state, parentId)[0]).toMatchObject({
       completedAt: '2026-06-08T23:20:00.000Z',
@@ -1459,22 +1456,12 @@ describe('todo day summary', () => {
     expect(getPendingTodos(state).map((todo) => todo.id)).not.toContain(todoId);
   });
 
-  it('preserves multiline progress indentation while editing', () => {
-    let state = createInitialState();
-    state = addTodo(state, 'Review distractions', new Date('2026-06-09T08:00:00'));
-    const todoId = state.todos[0].id;
-
-    state = updateTodoProgress(state, todoId, '\t- Twitter\n\t- LinkedIn\n');
-
-    expect(state.todos[0].progressLabel).toBe('\t- Twitter\n\t- LinkedIn\n');
-  });
-
   it('falls back to normal completion for single-day tasks', () => {
     let state = createInitialState();
     state = addTodo(state, 'Submit form', new Date('2026-06-09T08:00:00'));
     const doneAt = new Date('2026-06-09T09:00:00');
 
-    state = logProgressSession(state, state.todos[0].id, doneAt);
+    state = completeTodo(state, state.todos[0].id, doneAt);
 
     expect(state.todos).toHaveLength(1);
     expect(state.todos[0].completedAt).toBe(doneAt.toISOString());

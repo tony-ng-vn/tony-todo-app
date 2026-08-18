@@ -4,11 +4,9 @@ import {
   deleteRemoteTodo,
   fromRemoteRecord,
   loadRemoteTodos,
-  logRemoteProgressSession,
   toRemoteRecord,
   updateRemoteTodoDueDate,
   updateRemoteTodoPhoto,
-  updateRemoteTodoProgress,
   updateRemoteTodoTimer,
   updateRemoteTodoTitle,
   updateRemoteTodoWorkflow,
@@ -441,99 +439,6 @@ describe('todo remote mapping', () => {
           endedAt: '2026-06-08T08:20:00.000Z',
         },
       ],
-    });
-    expect(calls).toContainEqual(['eq', 'id', 'todo-1']);
-    expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);
-  });
-
-  it('logs a progressive session through one atomic remote operation', async () => {
-    const calls = [];
-    const client = {
-      database: {
-        rpc(name, values) {
-          calls.push(['rpc', name, values]);
-          return Promise.resolve({ error: null });
-        },
-      },
-    };
-    const parent = {
-      id: 'parent-1',
-      progressLabel: 'Chapter 3',
-    };
-    const session = {
-      id: 'session-1',
-      title: 'Read book',
-      createdAt: '2026-06-08T08:00:00.000Z',
-      completedAt: '2026-06-08T08:30:00.000Z',
-      note: 'Chapter 3',
-      firstStartedAt: '2026-06-08T08:00:00.000Z',
-      trackedSeconds: 30 * 60,
-      timeSegments: [
-        {
-          startedAt: '2026-06-08T08:00:00.000Z',
-          endedAt: '2026-06-08T08:30:00.000Z',
-        },
-      ],
-      progressLabel: 'Chapter 3',
-    };
-
-    await logRemoteProgressSession(client, parent, session);
-
-    expect(calls).toEqual([
-      [
-        'rpc',
-        'log_progress_session',
-        {
-          p_parent_id: 'parent-1',
-          p_session_id: 'session-1',
-          p_title: 'Read book',
-          p_created_at: '2026-06-08T08:00:00.000Z',
-          p_completed_at: '2026-06-08T08:30:00.000Z',
-          p_note: 'Chapter 3',
-          p_first_started_at: '2026-06-08T08:00:00.000Z',
-          p_tracked_seconds: 1800,
-          p_time_segments: session.timeSegments,
-          p_progress_label: 'Chapter 3',
-        },
-      ],
-    ]);
-  });
-
-  it('updates remote progress fields scoped by user id', async () => {
-    const calls = [];
-    const client = {
-      database: {
-        from(table) {
-          calls.push(['from', table]);
-          return {
-            update(values) {
-              calls.push(['update', values]);
-              return {
-                eq(column, value) {
-                  calls.push(['eq', column, value]);
-                  return this;
-                },
-                then(resolve) {
-                  resolve({ error: null });
-                },
-              };
-            },
-          };
-        },
-      },
-    };
-
-    await updateRemoteTodoProgress(client, 'user-123', {
-      id: 'todo-1',
-      isProgressive: true,
-      progressLabel: 'pages 41-52',
-    });
-
-    expect(calls[0]).toEqual(['from', 'todos']);
-    expect(calls[1][0]).toBe('update');
-    expect(calls[1][1]).toMatchObject({
-      is_progressive: true,
-      progress_label: 'pages 41-52',
     });
     expect(calls).toContainEqual(['eq', 'id', 'todo-1']);
     expect(calls).toContainEqual(['eq', 'user_id', 'user-123']);

@@ -25,6 +25,7 @@
   import {
     addTodo,
     archivePriorDaySessions,
+    completeTodo,
     createInitialState,
     deleteTodo,
     failTodo,
@@ -40,7 +41,6 @@
     getOpenTodoSections,
     getProgressSessions,
     getProjectTodos,
-    logProgressSession,
     moveCompletedTodoToSummaryBucket,
     moveTodoToBoardColumn,
     pauseTodoTimer,
@@ -308,7 +308,7 @@
 
   async function handleComplete(todoId) {
     const beforeTodos = state.todos;
-    state = logProgressSession(state, todoId);
+    state = completeTodo(state, todoId);
     const completedTodo = findTodo(todoId);
 
     triggerCompletionCue(completedTodo);
