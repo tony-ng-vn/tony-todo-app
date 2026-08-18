@@ -242,7 +242,7 @@ describe('applyTodoNote bullet matching', () => {
     expect(parseNoteEntries(next)).toEqual([{ at: first.toISOString(), text: '- Buy milk' }]);
   });
 
-  it('splits a legacy multi-dash chunk into per-bullet headers without minting new times', () => {
+  it('rewrites a legacy multi-dash chunk as one closed session without minting new times', () => {
     const legacyAt = dateAtSanFranciscoTime('2026-06-08', 8 * 60).toISOString();
     const legacyStored = '@ 2026-06-08 08:00\n- a\n- b\n- c';
 
@@ -253,7 +253,29 @@ describe('applyTodoNote bullet matching', () => {
       { at: legacyAt, text: '- b' },
       { at: legacyAt, text: '- c' },
     ]);
-    expect(next).toBe(`Start: ${formatNoteAtLocal(legacyAt)}\n- a\n- b\n- c`);
+    expect(next).toBe(`Start: ${formatNoteAtLocal(legacyAt)}\n- a\n- b\n- c\nEnd: ${formatNoteAtLocal(legacyAt)}`);
+  });
+
+  // Legacy notes carry one "@" header per bullet. Consecutive headers are one
+  // closed block: the first edit rewrites them as a single session running
+  // from the first stamp to the last, and new text opens a fresh session at
+  // now instead of being filed under the old stamps.
+  it('rewrites a run of per-bullet legacy stamps as one closed session and files new text under now', () => {
+    const firstStamp = dateAtSanFranciscoTime('2026-06-08', 10 * 60).toISOString();
+    const lastStamp = dateAtSanFranciscoTime('2026-06-08', 10 * 60 + 7).toISOString();
+    const legacyStored = '@ 2026-06-08 10:00\n- a\n\n@ 2026-06-08 10:03\n- b\n\n@ 2026-06-08 10:07\n- c';
+
+    const next = applyTodoNote(legacyStored, '- a\n- b\n- c\n- d', now);
+
+    expect(next).toBe(
+      `Start: ${formatNoteAtLocal(firstStamp)}\n- a\n- b\n- c\nEnd: ${formatNoteAtLocal(lastStamp)}\n\nStart: ${formatNoteAtLocal(now)}\n- d`,
+    );
+    expect(parseNoteEntries(next)).toEqual([
+      { at: firstStamp, text: '- a' },
+      { at: firstStamp, text: '- b' },
+      { at: firstStamp, text: '- c' },
+      { at: now.toISOString(), text: '- d' },
+    ]);
   });
 
   it('keeps already-correct per-bullet notes byte-identical on parse and reapply', () => {
@@ -337,6 +359,6 @@ describe('stripNoteStampsForEditor', () => {
   it('returns a tight list of bullet lines with no stamps or blank separators', () => {
     const stored = '@ 2026-06-08 08:00\n- Buy milk\n\n@ 2026-06-08 08:05\n- Walk the dog';
 
-    expect(stripNoteStampsForEditor(stored)).toBe('- Buy milk\n\n- Walk the dog');
+    expect(stripNoteStampsForEditor(stored)).toBe('- Buy milk\n- Walk the dog');
   });
 });

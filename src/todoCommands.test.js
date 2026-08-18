@@ -470,6 +470,38 @@ describe('runTodoCommand appendNote', () => {
       { at: UTC_EVENING.toISOString(), atLocal: formatNoteAtLocal(UTC_EVENING), text: '- b' },
     ]);
   });
+
+  it('files an appended note under the open session instead of a new block', () => {
+    const earlier = new Date(UTC_EVENING.getTime() - 20 * 60 * 1000);
+    const state = createInitialState([openTodo({ note: `Start: ${formatNoteAtLocal(earlier)}\n- a` })]);
+    const result = runTodoCommand(
+      state,
+      { kind: 'appendNote', target: { by: 'id', id: 'task-1' }, text: '- b' },
+      UTC_EVENING,
+    );
+
+    expect(result.persist.todo.note).toBe(`Start: ${formatNoteAtLocal(earlier)}\n- a\n- b`);
+    expect(result.view.task.notes.map((note) => note.at)).toEqual([earlier.toISOString(), earlier.toISOString()]);
+  });
+
+  // Legacy "@" stamps are closed history: an agent note appended today must
+  // report today's time, not the last legacy stamp.
+  it('opens a fresh session at now when appending to a legacy stamped note', () => {
+    const legacy = '@ 2026-06-01 09:00\n- a\n\n@ 2026-06-01 09:05\n- b';
+    const state = createInitialState([openTodo({ note: legacy })]);
+    const result = runTodoCommand(
+      state,
+      { kind: 'appendNote', target: { by: 'id', id: 'task-1' }, text: '- c' },
+      UTC_EVENING,
+    );
+
+    expect(result.persist.todo.note).toBe(`${legacy}\n\nStart: ${formatNoteAtLocal(UTC_EVENING)}\n- c`);
+    expect(result.view.task.notes.at(-1)).toEqual({
+      at: UTC_EVENING.toISOString(),
+      atLocal: formatNoteAtLocal(UTC_EVENING),
+      text: '- c',
+    });
+  });
 });
 
 describe('runTodoCommand daySummary', () => {

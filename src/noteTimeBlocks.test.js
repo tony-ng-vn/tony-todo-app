@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest';
+import { dateAtSanFranciscoTime } from './sanFranciscoTime.js';
 import {
   applyTodoNote,
   closeNoteTimeBlock,
@@ -89,6 +90,26 @@ describe('note time blocks', () => {
       { at: START.toISOString(), text: '- second' },
       { at: RESUME.toISOString(), text: '- third' },
     ]);
+  });
+
+  it('parses a run of legacy stamps as one closed block that keeps its lines verbatim', () => {
+    const legacy = '@ 2026-06-08 10:00\n- a\n\n@ 2026-06-08 10:03\n- b\n\n@ 2026-06-08 10:07\n- c\n\n';
+
+    expect(parseNoteTimeBlocks(legacy)).toEqual([
+      {
+        startedAt: dateAtSanFranciscoTime('2026-06-08', 10 * 60).toISOString(),
+        endedAt: dateAtSanFranciscoTime('2026-06-08', 10 * 60 + 7).toISOString(),
+        kind: 'stamp',
+        lines: ['- a', '', '@ 2026-06-08 10:03', '- b', '', '@ 2026-06-08 10:07', '- c'],
+      },
+    ]);
+  });
+
+  it('leaves a legacy note verbatim when the timer starts and stacks a fresh Start after it', () => {
+    const legacy = '@ 2026-06-08 10:00\n- a\n\n@ 2026-06-08 10:03\n- b';
+
+    expect(openNoteTimeBlock(legacy, START)).toBe(`${legacy}\n\n${startHeading(START)}`);
+    expect(closeNoteTimeBlock(legacy, PAUSE)).toBe(legacy);
   });
 
   it('hides Start/End headings in the editor draft', () => {
