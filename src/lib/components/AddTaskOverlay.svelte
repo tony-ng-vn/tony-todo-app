@@ -14,6 +14,7 @@
   let titleInput;
   let wasOpen = false;
   let previousFocus = null;
+  let pointerDownOnBackdrop = false;
 
   $: canAdd = title.trim().length > 0;
   $: heading = kind === 'project' ? 'New project' : 'New task';
@@ -30,8 +31,8 @@
   async function openDialog() {
     previousFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     await tick();
-    if (!dialogEl?.open) {
-      dialogEl?.showModal();
+    if (dialogEl && !dialogEl.open) {
+      dialogEl.showModal();
     }
     titleInput?.focus();
   }
@@ -40,7 +41,7 @@
     if (dialogEl?.open) {
       dialogEl.close();
     }
-    previousFocus?.focus?.();
+    previousFocus?.focus();
     previousFocus = null;
   }
 
@@ -58,10 +59,17 @@
     onClose?.();
   }
 
+  // A drag-select that starts inside the card and ends over the backdrop still
+  // fires click on the dialog, so only dismiss when the press began there too.
+  function handleBackdropPointerDown(event) {
+    pointerDownOnBackdrop = event.target === dialogEl;
+  }
+
   function handleBackdropClick(event) {
-    if (event.target === dialogEl) {
+    if (pointerDownOnBackdrop && event.target === dialogEl) {
       onClose?.();
     }
+    pointerDownOnBackdrop = false;
   }
 
   function handleSubmit() {
@@ -79,6 +87,7 @@
   aria-labelledby="composer-heading"
   on:cancel={handleCancel}
   on:keydown={handleDialogKeydown}
+  on:pointerdown={handleBackdropPointerDown}
   on:click={handleBackdropClick}
 >
   <form class="composer-card" on:submit|preventDefault={handleSubmit}>
@@ -147,7 +156,6 @@
 
 <style>
   .composer-overlay {
-    z-index: 35;
     inset: 0;
     width: 100vw;
     max-width: none;
