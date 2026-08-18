@@ -623,14 +623,14 @@ export function getCalendarMonth(state, { year, month, now = new Date() } = {}) 
 
 // Matching runs against a baseline captured before the current typing burst,
 // not the per-keystroke previous state - otherwise a gradual rewrite chains
-// through many similar intermediate pairs and never mints a new time even
-// though the final wording is unrecognizable from where it started. The
-// baseline is only valid while this function is the sole writer of the note:
-// a timer Start/Pause or a sync that rewrites the stored note ends the burst,
-// or the next keystroke would re-apply against text that no longer exists.
-// Module state, not part of `state`, so it never gets persisted;
-// resetNoteBurstBaselines and hasNoteBurstBaseline exist so tests can
-// isolate and inspect bursts.
+// through many similar intermediate pairs and stays filed under the old
+// session even though the final wording is unrecognizable from where it
+// started. The baseline is only valid while this function is the sole writer
+// of the note: a timer Start/Pause or a sync that rewrites the stored note
+// ends the burst, or the next keystroke would re-apply against text that no
+// longer exists. Module state, not part of `state`, so it never gets
+// persisted; resetNoteBurstBaselines and hasNoteBurstBaseline exist so tests
+// can isolate and inspect bursts.
 const NOTE_BURST_GAP_MS = 5000;
 const noteBurstBaselines = new Map();
 
