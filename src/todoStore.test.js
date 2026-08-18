@@ -1318,6 +1318,7 @@ describe('todo day summary', () => {
     expect(sessions).toHaveLength(1);
     expect(sessions[0].trackedSeconds).toBe(30 * 60);
     expect(parent.activeStartedAt).toBe(new Date('2026-06-09T00:00:00-07:00').toISOString());
+    expect(parent.trackedSeconds).toBe(0);
     expect(parent.completedAt).toBeNull();
   });
 

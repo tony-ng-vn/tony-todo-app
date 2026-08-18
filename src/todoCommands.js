@@ -962,7 +962,7 @@ function archiveOpenTodoPriorDays(todo, now, todayKey, existingTodos) {
     const existing = findProgressSessionForDay(existingTodos, todo.id, dayKey);
     if (existing) {
       const mergedSegments = mergeTimeSegments(existing.timeSegments, segments);
-      const updated = rebuildProgressSession(existing, mergedSegments);
+      const updated = rebuildProgressSession(existing, dayKey, mergedSegments);
       if (progressSessionChanged(existing, updated)) {
         updatedSessions.push(updated);
       }
@@ -976,9 +976,9 @@ function archiveOpenTodoPriorDays(todo, now, todayKey, existingTodos) {
     .filter((piece) => piece.dayKey >= todayKey)
     .map((piece) => ({ startedAt: piece.startedAt, endedAt: piece.endedAt }));
   const liveRemainderStart = liveRemainderStartedAt(todo, now, todayKey);
-  const trackedSeconds =
-    totalSegmentSeconds(remainingClosed) +
-    (liveRemainderStart ? getActiveSegmentSeconds(liveRemainderStart, now) : 0);
+  // Like closeActiveTimeSegment, trackedSeconds covers closed segments only;
+  // the live remainder is counted from activeStartedAt until it is closed.
+  const trackedSeconds = totalSegmentSeconds(remainingClosed);
   const firstStartedAt = remainingClosed[0]?.startedAt ?? liveRemainderStart?.toISOString() ?? null;
 
   return {
@@ -1050,15 +1050,26 @@ function nextSummaryDayKey(dayKey) {
   return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-${String(next.getUTCDate()).padStart(2, '0')}`;
 }
 
+// A piece that runs up to midnight ends at the first instant of the next day,
+// so the session's completedAt is pulled back inside its own day: the recap
+// and findProgressSessionForDay both key sessions by the completedAt day.
+function progressSessionEndedAt(dayKey, lastEnd) {
+  if (formatSummaryDayKey(lastEnd) === dayKey) {
+    return lastEnd;
+  }
+
+  return new Date(dateAtSanFranciscoTime(nextSummaryDayKey(dayKey), 0).getTime() - 1);
+}
+
 function createDayProgressSession(parent, dayKey, segments) {
   const firstStart = new Date(segments[0].startedAt);
-  const lastEnd = new Date(segments.at(-1).endedAt);
+  const endedAt = progressSessionEndedAt(dayKey, new Date(segments.at(-1).endedAt));
 
   return normalizeTodo({
-    id: createProgressSessionId(parent.id, lastEnd),
+    id: createProgressSessionId(parent.id, endedAt),
     title: parent.title,
     createdAt: firstStart.toISOString(),
-    completedAt: lastEnd.toISOString(),
+    completedAt: endedAt.toISOString(),
     note: '',
     source: 'progress-session',
     parentTaskId: parent.id,
@@ -1084,13 +1095,15 @@ function findProgressSessionForDay(existingTodos, parentId, dayKey) {
   );
 }
 
-function rebuildProgressSession(session, segments) {
+function rebuildProgressSession(session, dayKey, segments) {
   const firstStart = new Date(segments[0].startedAt);
-  const lastEnd = new Date(segments.at(-1).endedAt);
+  const lastEnd = new Date(
+    Math.max(new Date(segments.at(-1).endedAt).getTime(), new Date(session.completedAt).getTime()),
+  );
 
   return normalizeTodo({
     ...session,
-    completedAt: lastEnd.toISOString(),
+    completedAt: progressSessionEndedAt(dayKey, lastEnd).toISOString(),
     firstStartedAt: firstStart.toISOString(),
     activeStartedAt: null,
     trackedSeconds: totalSegmentSeconds(segments),
