@@ -1627,7 +1627,6 @@
       {ongoingTodos}
       {pausedTodos}
       {openTodoSections}
-      {openCount}
       bind:searchQuery={taskSearchQuery}
       {searchMatches}
       {editingTaskId}

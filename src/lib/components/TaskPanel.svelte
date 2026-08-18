@@ -16,7 +16,6 @@
   export let ongoingTodos = [];
   export let pausedTodos = [];
   export let openTodoSections = [];
-  export let openCount = 0;
   export let searchQuery = '';
   export let searchMatches = [];
   export let editingTaskId = null;

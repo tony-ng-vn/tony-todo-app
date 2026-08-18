@@ -1212,8 +1212,6 @@
       {/if}
     </div>
 
-    {/if}
-
     <AddTaskOverlay
       bind:open={composerOpen}
       bind:title={titleDraft}
