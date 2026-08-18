@@ -1,12 +1,10 @@
 **Web App**
 
-- Replaced the inline add-task row with a search field and a New task button. Search narrows titles and notes as you type. Cmd+N opens a centered overlay with Task/Project, a date that starts on today, and an Add button that stays off until there is a title.
-- Unmatched tasks fold up toward search as you type, and remaining rows close the gap. The add overlay arrives as a short glass sheet. Reduced-motion users get a fade instead of the fold.
-- Duplicate titles now fail next to the overlay field. An empty search offers New task. Search can be cleared from the field. Folding rows leave slightly faster than they arrive.
-- Search no longer nests a button inside the field label. Escape clears the query. Cmd+N refocuses the overlay if it is already open. Tap targets and 16px search type hold up on phones.
-- While searching, a match count sits in the field. Closing the overlay keeps an unfinished title so New task can pick it back up. The overlay has a Close control. Overflow hits are labeled Also found.
+- The Today list now has a search field instead of an always-visible add row: type a few letters and tasks, projects, and notes narrow to matching word prefixes as you go, with a live match count in the field and Escape or the clear control to reset it.
+- Matches that live outside the visible lists (finished, parked, or other days) appear under an "Also found" heading so a search can still reach them, and the recap explains when a search hides everything for that date.
+- New tasks and projects are captured in a centered glass overlay opened by the New task button or Cmd+N (Ctrl+N elsewhere). It starts on today's date, keeps Add off until there is a title, flags a duplicate next to the field, and remembers an unfinished title if you close it early.
+- Rows that stop matching fold up toward the search field and the rest close the gap; reduced-motion users get a plain fade instead.
 
 **Native App**
 
-- The menu bar uses the same overlay to add a task or project, and can search the open list from the top of the window.
-- Menu bar search uses the same fold-up motion as the web list. Empty sections no longer claim there is nothing ready while a search is active. A match count and live status stay with the field.
+- The menu bar list can be searched from the top of the window and adds tasks or projects through the same overlay as the web app, with the same fold-up motion, match count, and search-aware empty states.
