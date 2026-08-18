@@ -304,6 +304,23 @@ describe('menu bar app bundle', () => {
     expect(styles).toContain('padding-top: calc(18px + var(--native-titlebar-inset));');
   });
 
+  it('offers the native updater from the full app settings', () => {
+    const page = readFileSync(path.join(repoRoot, 'src/routes/+page.svelte'), 'utf8');
+    const settings = readFileSync(
+      path.join(repoRoot, 'src/lib/components/SettingsPanel.svelte'),
+      'utf8',
+    );
+
+    expect(page).toContain("import { requestNativeUpdate } from '../appUpdate.js';");
+    expect(page).toContain('window.__doneLogNativeUpdater');
+    expect(page).toContain('showNativeUpdate={hasNativeUpdater}');
+    expect(page).toContain('onCheckForUpdates={handleCheckForUpdates}');
+    expect(settings).toContain('export let showNativeUpdate = false;');
+    expect(settings).toContain('class="settings-update-button"');
+    expect(settings).toContain('on:click={onCheckForUpdates}');
+    expect(settings).toContain('Check for Updates');
+  });
+
   it('keeps native workspace status compact and removes redundant labels', () => {
     const styles = readFileSync(path.join(repoRoot, 'src/styles.css'), 'utf8');
     const summary = readFileSync(
