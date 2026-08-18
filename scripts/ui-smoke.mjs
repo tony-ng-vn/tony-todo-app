@@ -12,7 +12,7 @@ try {
   const mobile = await inspectViewport({ width: 390, height: 844 }, true);
   const mobileTaskDetail = await inspectMobileTaskDetail({ width: 390, height: 844 });
   const desktop = await inspectViewport({ width: 1366, height: 900 }, false);
-  const draftCue = await inspectDraftInsertionCue({ width: 1366, height: 900 });
+  const overlayAddedTask = await inspectOverlayAddedTask({ width: 1366, height: 900 });
   const boardCardLayout = await inspectBoardCardLayout({ width: 1366, height: 900 });
   const duplicateTask = await inspectDuplicateTask({ width: 1366, height: 900 });
   const navigation = await inspectWorkspaceNavigation({ width: 1366, height: 900 });
@@ -58,7 +58,7 @@ try {
     ...assertStartsWith(desktop.summaryTiming, 'Start ', 'summary start time'),
     ...assertIncludes(desktop.summaryTiming, 'End', 'summary end time'),
     ...assertStartsWith(desktop.taskTiming, 'Started ', 'running task start label'),
-    ...assertDraftInsertionCue(draftCue),
+    ...assertOverlayAddedTask(overlayAddedTask),
     ...assertWorkspaceNavigation(navigation),
     ...assertRunningTimingEdit(runningTimingEdit),
     ...assertRecapDayNavigation(recapDayNavigation),
@@ -786,10 +786,10 @@ function assertWorkspaceNavigation(navigation) {
   return failures;
 }
 
-async function inspectDraftInsertionCue(viewport) {
+async function inspectOverlayAddedTask(viewport) {
   const page = await browser.newPage({ viewport });
   await page.addInitScript(() => {
-    localStorage.setItem('done-log-client-id', 'ui-smoke-draft-cue');
+    localStorage.setItem('done-log-client-id', 'ui-smoke-overlay-add');
     localStorage.setItem('done-log-state', JSON.stringify({ todos: [] }));
   });
   await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
@@ -2051,7 +2051,7 @@ function assertProgressiveSession(result) {
     : [`progressive session failed: ${JSON.stringify(editChecks)}`];
 }
 
-function assertDraftInsertionCue(result) {
+function assertOverlayAddedTask(result) {
   const failures = [];
   if (result?.overlayOpen) {
     failures.push('new-task overlay stayed open after adding a task');
