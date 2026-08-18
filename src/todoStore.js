@@ -270,21 +270,30 @@ export function getSomedayTodos(state) {
   return getPendingTodos(state).filter((todo) => Boolean(todo.somedayAt));
 }
 
-export function normalizeSearchQuery(value) {
+// Anything that is not a letter or digit in any script separates search words.
+const SEARCH_WORD_SEPARATOR = /[^\p{L}\p{N}]+/u;
+
+function normalizeSearchQuery(value) {
   return String(value ?? '').trim().toLowerCase();
 }
 
+function toSearchWords(text) {
+  return String(text ?? '').toLowerCase().split(SEARCH_WORD_SEPARATOR).filter(Boolean);
+}
+
 export function todoMatchesSearchQuery(todo, query) {
-  const normalized = normalizeSearchQuery(query);
-  if (!normalized) {
+  const tokens = toSearchWords(query);
+  if (!tokens.length) {
     return true;
   }
 
-  return (
-    textHasSearchPrefix(todo?.title, normalized) ||
-    textHasSearchPrefix(todo?.note, normalized) ||
-    textHasSearchPrefix(todo?.progressLabel, normalized)
-  );
+  const words = [
+    ...toSearchWords(todo?.title),
+    ...toSearchWords(todo?.note),
+    ...toSearchWords(todo?.progressLabel),
+  ];
+
+  return tokens.every((token) => words.some((word) => word.startsWith(token)));
 }
 
 export function filterTodosBySearch(todos, query) {
@@ -319,19 +328,6 @@ export function filterSummaryBySearch(summary, query) {
       items: section.items.filter((item) => todoMatchesSearchQuery(item, query)),
     }))
     .filter((section) => section.items.length > 0);
-}
-
-function textHasSearchPrefix(text, query) {
-  const haystack = String(text ?? '').toLowerCase();
-  if (!haystack) {
-    return false;
-  }
-
-  if (haystack.startsWith(query)) {
-    return true;
-  }
-
-  return haystack.split(/[^a-z0-9]+/i).some((word) => word.startsWith(query));
 }
 
 export function partitionPendingTodos(todos) {
