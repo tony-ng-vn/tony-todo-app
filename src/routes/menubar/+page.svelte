@@ -1027,8 +1027,8 @@
                       <div
             class="menubar-task-motion"
             animate:flip={searchFlip(isSearching)}
-            in:rollUp|local={{ enabled: isSearching, duration: 280 }}
-            out:rollUp|local={{ enabled: isSearching, duration: 210 }}
+            in:rollUp|local={{ enabled: isSearching }}
+            out:rollUp|local={{ enabled: isSearching }}
           >
             {@render taskRow(todo)}
           </div>
@@ -1061,8 +1061,8 @@
                             <div
             class="menubar-task-motion"
             animate:flip={searchFlip(isSearching)}
-            in:rollUp|local={{ enabled: isSearching, duration: 280 }}
-            out:rollUp|local={{ enabled: isSearching, duration: 210 }}
+            in:rollUp|local={{ enabled: isSearching }}
+            out:rollUp|local={{ enabled: isSearching }}
           >
             {@render taskRow(todo)}
           </div>
@@ -1087,8 +1087,8 @@
                       <div
             class="menubar-task-motion"
             animate:flip={searchFlip(isSearching)}
-            in:rollUp|local={{ enabled: isSearching, duration: 280 }}
-            out:rollUp|local={{ enabled: isSearching, duration: 210 }}
+            in:rollUp|local={{ enabled: isSearching }}
+            out:rollUp|local={{ enabled: isSearching }}
           >
             {@render taskRow(todo)}
           </div>
@@ -1125,8 +1125,8 @@
                               <div
             class="menubar-task-motion"
             animate:flip={searchFlip(isSearching)}
-            in:rollUp|local={{ enabled: isSearching, duration: 280 }}
-            out:rollUp|local={{ enabled: isSearching, duration: 210 }}
+            in:rollUp|local={{ enabled: isSearching }}
+            out:rollUp|local={{ enabled: isSearching }}
           >
             {@render taskRow(todo)}
           </div>
@@ -1153,8 +1153,8 @@
                         <div
             class="menubar-task-motion"
             animate:flip={searchFlip(isSearching)}
-            in:rollUp|local={{ enabled: isSearching, duration: 280 }}
-            out:rollUp|local={{ enabled: isSearching, duration: 210 }}
+            in:rollUp|local={{ enabled: isSearching }}
+            out:rollUp|local={{ enabled: isSearching }}
           >
             {@render taskRow(todo)}
           </div>
@@ -1188,8 +1188,8 @@
                               <div
             class="menubar-task-motion"
             animate:flip={searchFlip(isSearching)}
-            in:rollUp|local={{ enabled: isSearching, duration: 280 }}
-            out:rollUp|local={{ enabled: isSearching, duration: 210 }}
+            in:rollUp|local={{ enabled: isSearching }}
+            out:rollUp|local={{ enabled: isSearching }}
           >
             {@render taskRow(todo)}
           </div>

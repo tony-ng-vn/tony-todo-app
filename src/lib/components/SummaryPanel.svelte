@@ -135,8 +135,8 @@
                   class:is-dragging={draggedSummaryId === item.id}
                   class:is-drop-target={dropTargetId === item.id}
                   animate:flip={searchFlip(searchActive)}
-                  in:rollUp|local={{ enabled: searchActive, duration: 280 }}
-                  out:rollUp|local={{ enabled: searchActive, duration: 210 }}
+                  in:rollUp|local={{ enabled: searchActive }}
+                  out:rollUp|local={{ enabled: searchActive }}
                   on:dragstart={(event) => onDragStart(event, item.id)}
                   on:dragend={onDragEnd}
                   on:dragover={(event) => onDragOver(event, item.id, section.label)}

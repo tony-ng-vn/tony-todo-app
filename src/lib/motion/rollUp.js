@@ -4,10 +4,16 @@ function prefersReducedMotion() {
   return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 }
 
-export function rollUp(_node, { enabled = true, duration = 280 } = {}) {
+// Rows leave a little faster than they arrive so a narrowing list feels light.
+const ENTER_DURATION = 280;
+const LEAVE_DURATION = 210;
+
+export function rollUp(_node, { enabled = true, duration } = {}, { direction = 'both' } = {}) {
   if (!enabled) {
     return { duration: 0 };
   }
+
+  const resolvedDuration = duration ?? (direction === 'out' ? LEAVE_DURATION : ENTER_DURATION);
 
   if (prefersReducedMotion()) {
     return {
@@ -17,7 +23,7 @@ export function rollUp(_node, { enabled = true, duration = 280 } = {}) {
   }
 
   return {
-    duration,
+    duration: resolvedDuration,
     easing: EASE_OUT_QUART,
     css: (t) => {
       const fold = (1 - t) * 100;

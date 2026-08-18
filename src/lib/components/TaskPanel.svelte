@@ -164,8 +164,8 @@
               class:is-new-block={newlyAddedTodoId === todo.id}
               class="todo-item"
               animate:flip={searchFlip(isSearching)}
-              in:rollUp|local={{ enabled: isSearching, duration: 280 }}
-              out:rollUp|local={{ enabled: isSearching, duration: 210 }}
+              in:rollUp|local={{ enabled: isSearching }}
+              out:rollUp|local={{ enabled: isSearching }}
             >
               {@render taskRow(todo)}
             </li>
@@ -198,8 +198,8 @@
               class:is-new-block={newlyAddedTodoId === todo.id}
               class="todo-item"
               animate:flip={searchFlip(isSearching)}
-              in:rollUp|local={{ enabled: isSearching, duration: 280 }}
-              out:rollUp|local={{ enabled: isSearching, duration: 210 }}
+              in:rollUp|local={{ enabled: isSearching }}
+              out:rollUp|local={{ enabled: isSearching }}
             >
               {@render taskRow(todo)}
             </li>
@@ -230,8 +230,8 @@
               class:is-new-block={newlyAddedTodoId === todo.id}
               class="todo-item"
               animate:flip={searchFlip(isSearching)}
-              in:rollUp|local={{ enabled: isSearching, duration: 280 }}
-              out:rollUp|local={{ enabled: isSearching, duration: 210 }}
+              in:rollUp|local={{ enabled: isSearching }}
+              out:rollUp|local={{ enabled: isSearching }}
             >
               {@render taskRow(todo)}
             </li>
@@ -264,8 +264,8 @@
               class:is-new-block={newlyAddedTodoId === todo.id}
               class="todo-item"
               animate:flip={searchFlip(isSearching)}
-              in:rollUp|local={{ enabled: isSearching, duration: 280 }}
-              out:rollUp|local={{ enabled: isSearching, duration: 210 }}
+              in:rollUp|local={{ enabled: isSearching }}
+              out:rollUp|local={{ enabled: isSearching }}
             >
               {@render taskRow(todo)}
             </li>
@@ -289,8 +289,8 @@
             <li
               class="todo-item search-match"
               animate:flip={searchFlip(isSearching)}
-              in:rollUp|local={{ enabled: isSearching, duration: 280 }}
-              out:rollUp|local={{ enabled: isSearching, duration: 210 }}
+              in:rollUp|local={{ enabled: isSearching }}
+              out:rollUp|local={{ enabled: isSearching }}
             >
               <span class="task-block-dot" aria-hidden="true"></span>
               <div class="task-content">
