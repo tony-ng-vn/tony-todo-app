@@ -108,6 +108,14 @@ async function inspectMobileTaskDetail(viewport) {
   await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
   await page.locator('[data-todo-id="ui-smoke-mobile-detail-task"] .open-task-button').tap();
   await page.waitForSelector('#task-detail');
+  await page.waitForFunction(() => {
+    const detail = document.querySelector('#task-detail');
+    if (!detail) {
+      return false;
+    }
+    const transform = getComputedStyle(detail).transform;
+    return transform === 'none' || transform === 'matrix(1, 0, 0, 1, 0, 0)';
+  });
 
   const layout = await page.evaluate(() => {
     const viewportHeight = window.innerHeight;
