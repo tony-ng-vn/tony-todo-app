@@ -7,6 +7,7 @@
     getElapsedSeconds,
   } from '../../todoStore.js';
   import { rollUp, searchFlip } from '../motion/rollUp.js';
+  import { isApplePlatform, newTaskShortcutLabel } from '../../newTaskShortcut.js';
   import { linkifyText } from '../../linkify.js';
   import { iconCheck, iconPage, iconPause, iconPlay, iconSearch, iconX } from './icons.js';
   import ThemeToggle from './ThemeToggle.svelte';
@@ -45,8 +46,6 @@
   $: todayOpenSection = openTodoSections.find((section) => section.isToday);
   $: datedOpenSections = openTodoSections.filter((section) => !section.isToday);
   $: isSearching = Boolean(searchQuery.trim());
-  $: shortcutLabel =
-    typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform) ? 'Cmd N' : 'Ctrl N';
   $: hasVisibleTasks =
     ongoingTodos.length > 0 ||
     pausedTodos.length > 0 ||
@@ -130,11 +129,11 @@
       class="new-task-button"
       aria-haspopup="dialog"
       aria-expanded={composerOpen}
-      aria-keyshortcuts="Meta+N Control+N"
+      aria-keyshortcuts={isApplePlatform() ? 'Meta+N' : 'Control+N'}
       on:click={() => onOpenComposer?.('task')}
     >
       New task
-      <kbd>{shortcutLabel}</kbd>
+      <kbd>{newTaskShortcutLabel()}</kbd>
     </button>
     <output id="task-search-status" class="sr-only" aria-live="polite">
       {isSearching ? `${visibleMatchCount} matching` : ''}

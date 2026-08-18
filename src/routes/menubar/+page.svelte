@@ -46,6 +46,7 @@
     updateTodoTitle,
     stripNoteStampsForEditor,
   } from '../../todoStore.js';
+  import { isNewTaskShortcut } from '../../newTaskShortcut.js';
   import { getCurrentUser, signInWithPassword, signOut, signUp } from '../../auth.js';
   import { insforge, isInsForgeConfigured } from '../../insforgeClient.js';
   import {
@@ -468,15 +469,7 @@
   }
 
   function handleWorkspaceKeydown(event) {
-    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) {
-      return;
-    }
-
-    if (event.key.toLowerCase() !== 'n') {
-      return;
-    }
-
-    if (shell !== 'app') {
+    if (!isNewTaskShortcut(event) || shell !== 'app') {
       return;
     }
 

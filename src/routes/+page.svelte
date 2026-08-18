@@ -65,6 +65,7 @@
     stripNoteStampsForEditor,
   } from '../todoStore.js';
   import { insforge, isInsForgeConfigured } from '../insforgeClient.js';
+  import { isNewTaskShortcut } from '../newTaskShortcut.js';
   import { getCurrentUser, signInWithPassword, signOut, signUp } from '../auth.js';
   import {
     completeRemoteTodo,
@@ -268,15 +269,7 @@
   }
 
   function handleWorkspaceKeydown(event) {
-    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) {
-      return;
-    }
-
-    if (event.key.toLowerCase() !== 'n') {
-      return;
-    }
-
-    if (useRemote && authChecked && !authUser) {
+    if (!isNewTaskShortcut(event) || (useRemote && authChecked && !authUser)) {
       return;
     }
 
