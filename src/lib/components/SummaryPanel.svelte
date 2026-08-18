@@ -3,6 +3,8 @@
   import CalendarPicker from './CalendarPicker.svelte';
   import { linkifyText } from '../../linkify.js';
   import { formatTaskTimestamp, shiftDayKey } from '../../todoStore.js';
+  import { rollUp, searchFlip } from '../motion/rollUp.js';
+  import { flip } from 'svelte/animate';
   import { iconChevronLeft, iconChevronRight, iconPage } from './icons.js';
 
   export let summary = [];
@@ -19,6 +21,7 @@
   export let onBucketDrop;
   export let onCompletedTimeChange;
   export let completedTime;
+  export let searchActive = false;
 
   let editingTimeId = null;
   let timeDraft = '';
@@ -120,6 +123,7 @@
           data-summary-bucket={section.label}
           on:dragover={(event) => onBucketDragOver(event, section.label)}
           on:drop={(event) => onBucketDrop(event, section.label)}
+          transition:rollUp={{ enabled: searchActive }}
         >
           <h3>{section.label}</h3>
           <ol>
@@ -130,6 +134,9 @@
                   data-summary-id={item.id}
                   class:is-dragging={draggedSummaryId === item.id}
                   class:is-drop-target={dropTargetId === item.id}
+                  animate:flip={searchFlip(searchActive)}
+                  in:rollUp|local={{ enabled: searchActive, duration: 280 }}
+                  out:rollUp|local={{ enabled: searchActive, duration: 210 }}
                   on:dragstart={(event) => onDragStart(event, item.id)}
                   on:dragend={onDragEnd}
                   on:dragover={(event) => onDragOver(event, item.id, section.label)}

@@ -3,6 +3,7 @@
   import '../styles.css';
   import FlowRail from '../lib/components/FlowRail.svelte';
   import LottieAnimation from '../lib/components/LottieAnimation.svelte';
+  import AddTaskOverlay from '../lib/components/AddTaskOverlay.svelte';
   import AuthGate from '../lib/components/AuthGate.svelte';
   import BoardPanel from '../lib/components/BoardPanel.svelte';
   import CalendarPanel from '../lib/components/CalendarPanel.svelte';
@@ -39,6 +40,10 @@
     getOpenTodoSections,
     getProgressSessions,
     getProjectTodos,
+    filterSummaryBySearch,
+    filterTodoSections,
+    filterTodosBySearch,
+    todoMatchesSearchQuery,
     logProgressSession,
     moveCompletedTodoToSummaryBucket,
     moveTodoToBoardColumn,
@@ -130,11 +135,13 @@
   let authPassword = '';
   let authError = '';
   let authLoading = false;
+  let composerOpen = false;
+  let composerError = '';
+  let taskSearchQuery = '';
   let titleDraft = '';
   let composerKind = 'task';
   let dueDateDraft = formatDayKey(new Date());
   let lastSelectedDayForDraft = dueDateDraft;
-  let draftTitle = '';
   let selectedTaskId = null;
   let photoBusy = false;
   let photoError = '';
@@ -177,14 +184,18 @@
     pendingViewTodos,
     new Date(`${currentDayKey}T00:00:00`),
   );
-  $: ongoingTodos = pendingTodoGroups.ongoing;
-  $: pausedTodos = pendingTodoGroups.paused;
-  $: openTodos = pendingTodoGroups.scheduled;
-  $: openTodoSections = getOpenTodoSections(openTodos, new Date(`${currentDayKey}T00:00:00`));
+  $: ongoingTodos = filterTodosBySearch(pendingTodoGroups.ongoing, taskSearchQuery);
+  $: pausedTodos = filterTodosBySearch(pendingTodoGroups.paused, taskSearchQuery);
+  $: openTodos = filterTodosBySearch(pendingTodoGroups.scheduled, taskSearchQuery);
+  $: openTodoSections = filterTodoSections(
+    getOpenTodoSections(openTodos, new Date(`${currentDayKey}T00:00:00`)),
+    taskSearchQuery,
+  );
   $: openCount = openTodos.length;
-  $: summary = getDaySummary(state, selectedDay);
+  $: summary = filterSummaryBySearch(getDaySummary(state, selectedDay), taskSearchQuery);
   $: boardColumns = getBoardColumns(state, { dayKey: selectedDay, dueFilter: boardDueFilter });
   $: projectTodos = getProjectTodos(state);
+  $: searchMatches = getOverflowSearchMatches();
   $: calendarMonthData = getCalendarMonth(state, { year: calendarYear, month: calendarMonth });
   $: completedToday = summary.reduce(
     (total, section) => total + section.items.filter((item) => item.outcome !== 'failed').length,
@@ -194,7 +205,7 @@
   $: selectedNoteSaveStatus = noteSaveStatuses[selectedTaskId] ?? 'saved';
   $: selectedTaskSessions = selectedTaskId ? getProgressSessions(state, selectedTaskId) : [];
 
-  $: if (selectedDay !== lastSelectedDayForDraft && dueDateDraft === lastSelectedDayForDraft) {
+  $: if (selectedDay !== lastSelectedDayForDraft && dueDateDraft === lastSelectedDayForDraft && !composerOpen) {
     dueDateDraft = selectedDay;
     lastSelectedDayForDraft = selectedDay;
   }
@@ -259,9 +270,62 @@
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
   }
 
+  function getOverflowSearchMatches() {
+    if (!taskSearchQuery.trim()) {
+      return [];
+    }
+
+    const visibleIds = new Set([
+      ...ongoingTodos.map((todo) => todo.id),
+      ...pausedTodos.map((todo) => todo.id),
+      ...openTodos.map((todo) => todo.id),
+      ...summary.flatMap((section) => section.items.map((item) => item.id)),
+    ]);
+
+    return state.todos.filter((todo) => {
+      if (todo.isProgressSession || visibleIds.has(todo.id)) {
+        return false;
+      }
+
+      return todoMatchesSearchQuery(todo, taskSearchQuery);
+    });
+  }
+
+  function openComposer(kind = 'task') {
+    composerKind = kind === 'project' ? 'project' : 'task';
+    if (!titleDraft.trim()) {
+      dueDateDraft = formatDayKey(new Date());
+      lastSelectedDayForDraft = dueDateDraft;
+    }
+    composerError = '';
+    composerOpen = true;
+  }
+
+  function closeComposer() {
+    composerOpen = false;
+  }
+
+  function handleWorkspaceKeydown(event) {
+    if (!(event.metaKey || event.ctrlKey) || event.altKey || event.shiftKey) {
+      return;
+    }
+
+    if (event.key.toLowerCase() !== 'n') {
+      return;
+    }
+
+    event.preventDefault();
+    if (composerOpen) {
+      document.getElementById('overlay-todo-title')?.focus();
+      return;
+    }
+    openComposer(viewMode === 'projects' ? 'project' : 'task');
+  }
+
   async function handleSubmit() {
     const duplicate = findDuplicateTodo(state, titleDraft);
     if (duplicate) {
+      composerError = `That is already open as "${duplicate.title}".`;
       syncMessage = `Duplicate task: "${duplicate.title}" is already open`;
       return;
     }
@@ -270,7 +334,7 @@
     const kind = composerKind === 'project' ? 'project' : 'task';
     state = addTodo(state, titleDraft, new Date(), {
       kind,
-      dueDate: kind === 'project' ? null : dueDateInputToIso(dueDateDraft || selectedDay),
+      dueDate: kind === 'project' ? null : dueDateInputToIso(dueDateDraft || formatDayKey(new Date())),
     });
     const createdTodo = state.todos.find((todo) => !existingIds.has(todo.id));
 
@@ -278,12 +342,13 @@
       return;
     }
 
+    composerError = '';
     newlyAddedTodoId = createdTodo.id;
-    draftTitle = '';
     titleDraft = '';
     composerKind = 'task';
-    dueDateDraft = selectedDay;
-    lastSelectedDayForDraft = selectedDay;
+    dueDateDraft = formatDayKey(new Date());
+    lastSelectedDayForDraft = dueDateDraft;
+    composerOpen = false;
     saveLocalState(state);
     window.setTimeout(() => {
       if (newlyAddedTodoId === createdTodo.id) {
@@ -296,10 +361,6 @@
     }
 
     await syncRemoteChange('Saving', () => persistNewTodo(createdTodo));
-  }
-
-  function handleDraftInput() {
-    draftTitle = titleDraft.trim();
   }
 
   function withLatestProgressSession(todos) {
@@ -989,11 +1050,6 @@
     });
   }
 
-  async function handleProjectSubmit() {
-    composerKind = 'project';
-    await handleSubmit();
-  }
-
   async function handlePromoteProject(todoId) {
     const before = findTodo(todoId);
     if (!before || before.kind !== 'project') {
@@ -1452,6 +1508,8 @@
   }
 </script>
 
+<svelte:window on:keydown={handleWorkspaceKeydown} />
+
 {#if useRemote && authChecked && !authUser}
   <AuthGate
     mode={authMode}
@@ -1474,9 +1532,7 @@
       projects={projectTodos}
       inboxCount={inboxLoops.length}
       waitingCount={waitingLoops.length}
-      bind:titleDraft
-      onSubmit={handleProjectSubmit}
-      onDraftInput={handleDraftInput}
+      onOpenComposer={openComposer}
       onOpenTask={openTask}
       onPromote={handlePromoteProject}
       onDelete={handleDeleteTask}
@@ -1575,10 +1631,8 @@
       {pausedTodos}
       {openTodoSections}
       {openCount}
-      bind:titleDraft
-      bind:dueDateDraft
-      bind:composerKind
-      {draftTitle}
+      bind:searchQuery={taskSearchQuery}
+      {searchMatches}
       {editingTaskId}
       {newlyAddedTodoId}
       {draggedSummaryId}
@@ -1587,8 +1641,8 @@
       {viewMode}
       inboxCount={inboxLoops.length}
       waitingCount={waitingLoops.length}
-      onSubmit={handleSubmit}
-      onDraftInput={handleDraftInput}
+      onOpenComposer={openComposer}
+      composerOpen={composerOpen}
       onStartTitleEdit={startTitleEdit}
       onTitleKeydown={handleTitleKeydown}
       onCommitTitleEdit={commitTitleEdit}
@@ -1621,6 +1675,7 @@
       onBucketDrop={handleBucketDrop}
       onCompletedTimeChange={handleSummaryCompletedTimeChange}
       {completedTime}
+      searchActive={Boolean(taskSearchQuery.trim())}
     />
   {/if}
 
@@ -1655,6 +1710,16 @@
       <span>Done</span>
     </aside>
   {/if}
+
+  <AddTaskOverlay
+    bind:open={composerOpen}
+    bind:title={titleDraft}
+    bind:kind={composerKind}
+    bind:dueDate={dueDateDraft}
+    bind:error={composerError}
+    onClose={closeComposer}
+    onSubmit={handleSubmit}
+  />
 
   <div class="workspace-feedback">
     <FeedbackSdkWidget theme={themeMode === 'dark' ? 'dark' : 'light'} />
