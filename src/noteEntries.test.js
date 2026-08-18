@@ -257,7 +257,7 @@ describe('applyTodoNote bullet matching', () => {
   });
 
   it('keeps already-correct per-bullet notes byte-identical on parse and reapply', () => {
-    const stored = `Start: ${formatNoteAtLocal(first)}\n- Buy milk\nStart: ${formatNoteAtLocal(later)}\n- Walk the dog`;
+    const stored = `Start: ${formatNoteAtLocal(first)}\n- Buy milk\n\nStart: ${formatNoteAtLocal(later)}\n- Walk the dog`;
 
     expect(applyTodoNote(stored, stored, now)).toBe(stored);
   });
@@ -337,6 +337,6 @@ describe('stripNoteStampsForEditor', () => {
   it('returns a tight list of bullet lines with no stamps or blank separators', () => {
     const stored = '@ 2026-06-08 08:00\n- Buy milk\n\n@ 2026-06-08 08:05\n- Walk the dog';
 
-    expect(stripNoteStampsForEditor(stored)).toBe('- Buy milk\n- Walk the dog');
+    expect(stripNoteStampsForEditor(stored)).toBe('- Buy milk\n\n- Walk the dog');
   });
 });

@@ -129,6 +129,10 @@ function parseNoteTimeBlocks(note) {
       continue;
     }
 
+    if (!line.trim() && !current) {
+      continue;
+    }
+
     if (!current) {
       current = { startedAt: null, endedAt: null, kind: 'plain', lines: [] };
     }
@@ -192,7 +196,7 @@ function serializeNoteTimeBlocks(blocks) {
       return parts.join('\n');
     })
     .filter(Boolean)
-    .join('\n');
+    .join('\n\n');
 }
 
 // True for a unit with no visible content once its marker/checkbox is
@@ -277,12 +281,13 @@ function applyTodoNote(previousNote, nextNote, now = new Date()) {
   return serializeResolvedTimeBlocks(resolved);
 }
 
-// Editor draft with no "@ " headers and no blank separators between bullets,
-// so applyTodoNote can re-match this text against the stored note by identity.
+// Editor draft with no "@ " / Start / End headers. Blank lines remain between
+// time blocks so sessions stay visually separated while editing.
 function stripNoteStampsForEditor(storedNote) {
-  return parseNoteEntries(storedNote)
-    .map((entry) => entry.text)
-    .join('\n');
+  return parseNoteTimeBlocks(storedNote)
+    .map((block) => flattenNoteTimeBlocks([block]).map((entry) => entry.text).join('\n'))
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 // A next entry that already carries a header (parsed straight from an

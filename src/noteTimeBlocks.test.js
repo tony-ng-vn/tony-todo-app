@@ -55,7 +55,7 @@ describe('note time blocks', () => {
     const resumed = openNoteTimeBlock(first, RESUME);
 
     expect(resumed).toBe(
-      `${startHeading(START)}\n${endHeading(PAUSE)}\n${startHeading(RESUME)}`,
+      `${startHeading(START)}\n${endHeading(PAUSE)}\n\n${startHeading(RESUME)}`,
     );
   });
 
@@ -65,6 +65,7 @@ describe('note time blocks', () => {
       '- first',
       '- second',
       endHeading(PAUSE),
+      '',
       startHeading(RESUME),
       '- third',
     ].join('\n');
@@ -96,11 +97,12 @@ describe('note time blocks', () => {
       '- first',
       '- second',
       endHeading(PAUSE),
+      '',
       startHeading(RESUME),
       '- third',
     ].join('\n');
 
-    expect(stripNoteStampsForEditor(stored)).toBe('- first\n- second\n- third');
+    expect(stripNoteStampsForEditor(stored)).toBe('- first\n- second\n\n- third');
   });
 
   it('keeps new bullets in the open time block instead of minting a new stamp', () => {
@@ -119,7 +121,7 @@ describe('note time blocks', () => {
     const next = applyTodoNote(closed, '- first\n- second', RESUME);
 
     expect(next).toBe(
-      `${startHeading(START)}\n- first\n${endHeading(PAUSE)}\n${startHeading(RESUME)}\n- second`,
+      `${startHeading(START)}\n- first\n${endHeading(PAUSE)}\n\n${startHeading(RESUME)}\n- second`,
     );
   });
 });
@@ -190,7 +192,7 @@ describe('timer-backed note time blocks', () => {
 
     expect(state.todos[0].activeStartedAt).toBe(RESUME.toISOString());
     expect(state.todos[0].note).toBe(
-      `${startHeading(START)}\n- outline\n${endHeading(PAUSE)}\n${startHeading(RESUME)}\n- next session`,
+      `${startHeading(START)}\n- outline\n${endHeading(PAUSE)}\n\n${startHeading(RESUME)}\n- next session`,
     );
   });
 
@@ -210,6 +212,7 @@ describe('timer-backed note time blocks', () => {
         startHeading(START),
         '- first session',
         endHeading(PAUSE),
+        '',
         startHeading(RESUME),
         '- second session',
         endHeading(SECOND_PAUSE),
