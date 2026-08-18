@@ -47,6 +47,18 @@ export function iconPlay() {
   `;
 }
 
+export function iconTrash() {
+  return `
+    <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M3.5 4.5h9" />
+      <path d="M6.25 4.5V3.25h3.5V4.5" />
+      <path d="M5.25 4.5l.6 8h4.3l.6-8" />
+      <path d="M7 6.75v4" />
+      <path d="M9 6.75v4" />
+    </svg>
+  `;
+}
+
 export function iconPause() {
   return `
     <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">
