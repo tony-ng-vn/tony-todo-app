@@ -2,7 +2,7 @@
   import { tick } from 'svelte';
   import CalendarPicker from './CalendarPicker.svelte';
   import { linkifyText } from '../../linkify.js';
-  import { formatTaskTimestamp, shiftDayKey } from '../../todoStore.js';
+  import { shiftDayKey } from '../../todoStore.js';
   import { iconChevronLeft, iconChevronRight, iconPage } from './icons.js';
 
   export let summary = [];
@@ -176,7 +176,7 @@
                     <span class="summary-timing" aria-label="Task start time">
                       Start
                       {#if item.startedAt}
-                        <time datetime={item.startedAt}>{formatTaskTimestamp(item.startedAt)}</time>
+                        <time datetime={item.startedAt}>{completedTime(item.startedAt)}</time>
                       {:else}
                         not recorded
                       {/if}

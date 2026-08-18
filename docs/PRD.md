@@ -151,7 +151,7 @@ The open-loop object extends the existing `todos` table rather than replacing it
 
 **Learned rule:** trigger (sender | domain | calendar | keyword), effect (suppress | boost | VIP | never-task), created-from (which correction), revocable.
 
-Existing fields are kept and become signals: `trackedSeconds` and timer history feed effort estimates; `completedAt` time-of-day buckets feed the recap; progressive tasks continue to work as manual loops.
+Existing fields are kept and become signals: `trackedSeconds` and timer history feed effort estimates; `completedAt` time-of-day buckets feed the recap; multi-day work is archived into per-day recap sessions automatically.
 
 ---
 

@@ -487,9 +487,11 @@ function findDuplicateTodo(state, title, { excludeTodoId = null } = {}) {
 }
 
 function completeTodo(state, todoId, completedAt = new Date()) {
+  const archived = archivePriorDaySessions(state, completedAt);
+
   return {
-    ...state,
-    todos: state.todos.map((todo) => {
+    ...archived,
+    todos: archived.todos.map((todo) => {
       if (todo.id !== todoId) {
         return todo;
       }
@@ -504,6 +506,45 @@ function completeTodo(state, todoId, completedAt = new Date()) {
         activeStartedAt: null,
       };
     }),
+  };
+}
+
+function archivePriorDaySessions(state, now = new Date()) {
+  const todayKey = formatSummaryDayKey(now);
+  if (!todayKey) {
+    return state;
+  }
+
+  const sessions = [];
+  const updatedSessions = [];
+  const todos = state.todos.map((todo) => {
+    if (todo.completedAt || todo.isProgressSession || parseTodoKind(todo.kind) !== 'task') {
+      return todo;
+    }
+
+    const archived = archiveOpenTodoPriorDays(todo, now, todayKey, state.todos);
+    if (!archived) {
+      return todo;
+    }
+
+    sessions.push(...archived.sessions);
+    updatedSessions.push(...archived.updatedSessions);
+    return archived.parent;
+  });
+
+  if (
+    sessions.length === 0 &&
+    updatedSessions.length === 0 &&
+    todos.every((todo, index) => todo === state.todos[index])
+  ) {
+    return state;
+  }
+
+  const updatedById = new Map(updatedSessions.map((session) => [session.id, session]));
+
+  return {
+    ...state,
+    todos: [...todos.map((todo) => updatedById.get(todo.id) ?? todo), ...sessions],
   };
 }
 
@@ -581,7 +622,7 @@ function getDaySummary(state, dayKey) {
 
   return Array.from(sections, ([label, items]) => ({
     label,
-    items: items.toSorted(compareSummaryItemsByStart),
+    items: items.toSorted(compareSummaryItemsByEnd),
   }));
 }
 
@@ -1029,13 +1070,6 @@ function runCompleteCommand(state, target, now) {
   }
 
   const todo = resolved.todo;
-  if (todo.isProgressive) {
-    return {
-      ok: false,
-      error: { code: 'progressive_unsupported', message: 'Progressive tasks cannot be completed this way' },
-    };
-  }
-
   if (todo.completedAt) {
     return {
       ok: true,
@@ -1044,13 +1078,21 @@ function runCompleteCommand(state, target, now) {
     };
   }
 
+  // completeTodo archives every open task's prior-day work, so persist all of
+  // it: new session rows plus any other row whose timing changed.
   const next = completeTodo(state, todo.id, now);
+  const beforeById = new Map(state.todos.map((item) => [item.id, item]));
   const updated = next.todos.find((item) => item.id === todo.id);
+  const sessions = next.todos.filter((item) => !beforeById.has(item.id));
+  const updates = next.todos.filter((item) => {
+    const before = beforeById.get(item.id);
+    return Boolean(before && item.id !== todo.id && todoTimingChanged(before, item));
+  });
 
   return {
     ok: true,
     view: { kind: 'complete', task: toCompletedTaskView(updated) },
-    persist: { kind: 'update', todo: updated },
+    persist: { kind: 'update', todo: updated, sessions, updates },
   };
 }
 
@@ -1138,7 +1180,7 @@ function toOpenTaskView(todo) {
     createdAt: todo.createdAt,
     source: todo.source ?? 'app',
     status: status === 'done' ? 'not_started' : status,
-    completable: !todo.isProgressive,
+    completable: true,
     note: todo.note ?? '',
     notes: toNoteViews(todo),
   };
@@ -1287,14 +1329,235 @@ function isPausedTodo(todo) {
   return Boolean(todo && !todo.completedAt && todo.firstStartedAt && !todo.activeStartedAt);
 }
 
-function compareSummaryItemsByStart(first, second) {
-  const firstStart = validTimestamp(first.startedAt);
-  const secondStart = validTimestamp(second.startedAt);
+function archiveOpenTodoPriorDays(todo, now, todayKey, existingTodos) {
+  const closedSegments = normalizeTimeSegments(todo.timeSegments);
+  const closedPieces = closedSegments.flatMap(splitSegmentBySummaryDays);
+  const livePieces = todo.activeStartedAt
+    ? splitSegmentBySummaryDays({
+        startedAt: todo.activeStartedAt,
+        endedAt: now.toISOString(),
+      })
+    : [];
+  const priorClosed = [...closedPieces, ...livePieces].filter((piece) => piece.dayKey < todayKey);
+  if (priorClosed.length === 0) {
+    return null;
+  }
 
-  if (firstStart === null && secondStart === null) return 0;
-  if (firstStart === null) return 1;
-  if (secondStart === null) return -1;
-  return firstStart - secondStart;
+  const sessionsByDay = new Map();
+  for (const piece of priorClosed) {
+    const current = sessionsByDay.get(piece.dayKey) ?? [];
+    current.push({ startedAt: piece.startedAt, endedAt: piece.endedAt });
+    sessionsByDay.set(piece.dayKey, current);
+  }
+
+  const sessions = [];
+  const updatedSessions = [];
+  for (const [dayKey, segments] of [...sessionsByDay.entries()].toSorted(([firstDay], [secondDay]) =>
+    firstDay.localeCompare(secondDay),
+  )) {
+    const existing = findProgressSessionForDay(existingTodos, todo.id, dayKey);
+    if (existing) {
+      const mergedSegments = mergeTimeSegments(existing.timeSegments, segments);
+      const updated = rebuildProgressSession(existing, dayKey, mergedSegments);
+      if (todoTimingChanged(existing, updated)) {
+        updatedSessions.push(updated);
+      }
+      continue;
+    }
+
+    sessions.push(createDayProgressSession(todo, dayKey, segments));
+  }
+
+  const remainingClosed = closedPieces
+    .filter((piece) => piece.dayKey >= todayKey)
+    .map((piece) => ({ startedAt: piece.startedAt, endedAt: piece.endedAt }));
+  const liveRemainderStart = liveRemainderStartedAt(todo, now, todayKey);
+  // Like closeActiveTimeSegment, trackedSeconds covers closed segments only;
+  // the live remainder is counted from activeStartedAt until it is closed.
+  const trackedSeconds =
+    totalSegmentSeconds(remainingClosed) + unsegmentedTrackedSeconds(todo, closedSegments);
+  const firstStartedAt = remainingClosed[0]?.startedAt ?? liveRemainderStart?.toISOString() ?? null;
+
+  return {
+    parent: {
+      ...todo,
+      firstStartedAt,
+      activeStartedAt: liveRemainderStart ? liveRemainderStart.toISOString() : null,
+      trackedSeconds,
+      timeSegments: remainingClosed,
+    },
+    sessions,
+    updatedSessions,
+  };
+}
+
+function liveRemainderStartedAt(todo, now, todayKey) {
+  if (!todo.activeStartedAt) {
+    return null;
+  }
+
+  const liveStart = new Date(todo.activeStartedAt);
+  if (Number.isNaN(liveStart.getTime())) {
+    return null;
+  }
+
+  // A timer started before today keeps running from today's midnight (which
+  // may equal now when the day rollover fires); anything else runs untouched.
+  const liveDayKey = formatSummaryDayKey(liveStart);
+  return liveDayKey < todayKey ? dateAtSanFranciscoTime(todayKey, 0) : liveStart;
+}
+
+function splitSegmentBySummaryDays(segment) {
+  const start = new Date(segment.startedAt);
+  const end = new Date(segment.endedAt);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime()) || start >= end) {
+    return [];
+  }
+
+  const pieces = [];
+  let cursor = start;
+  while (cursor < end) {
+    const dayKey = formatSummaryDayKey(cursor);
+    const nextDayStart = dateAtSanFranciscoTime(nextSummaryDayKey(dayKey), 0);
+    const pieceEnd = nextDayStart < end ? nextDayStart : end;
+    if (getActiveSegmentSeconds(cursor, pieceEnd) > 0) {
+      pieces.push({
+        dayKey,
+        startedAt: cursor.toISOString(),
+        endedAt: pieceEnd.toISOString(),
+      });
+    }
+    cursor = pieceEnd;
+  }
+
+  return pieces;
+}
+
+function nextSummaryDayKey(dayKey) {
+  const [year, month, day] = dayKey.split('-').map(Number);
+  const next = new Date(Date.UTC(year, month - 1, day + 1));
+  return `${next.getUTCFullYear()}-${String(next.getUTCMonth() + 1).padStart(2, '0')}-${String(next.getUTCDate()).padStart(2, '0')}`;
+}
+
+// A piece that runs up to midnight ends at the first instant of the next day,
+// so the session's completedAt is pulled back inside its own day: the recap
+// and findProgressSessionForDay both key sessions by the completedAt day.
+function progressSessionEndedAt(dayKey, lastEnd) {
+  if (formatSummaryDayKey(lastEnd) === dayKey) {
+    return lastEnd;
+  }
+
+  return new Date(dateAtSanFranciscoTime(nextSummaryDayKey(dayKey), 0).getTime() - 1);
+}
+
+function createDayProgressSession(parent, dayKey, segments) {
+  const firstStart = new Date(segments[0].startedAt);
+  const endedAt = progressSessionEndedAt(dayKey, new Date(segments.at(-1).endedAt));
+
+  return normalizeTodo({
+    id: createProgressSessionId(parent.id, endedAt),
+    title: parent.title,
+    createdAt: firstStart.toISOString(),
+    completedAt: endedAt.toISOString(),
+    note: '',
+    source: 'progress-session',
+    parentTaskId: parent.id,
+    isProgressSession: true,
+    progressLabel: '',
+    firstStartedAt: firstStart.toISOString(),
+    activeStartedAt: null,
+    trackedSeconds: totalSegmentSeconds(segments),
+    timeSegments: segments,
+  });
+}
+
+function findProgressSessionForDay(existingTodos, parentId, dayKey) {
+  return (
+    existingTodos.find((item) => {
+      if (!item.isProgressSession || item.parentTaskId !== parentId || !item.completedAt) {
+        return false;
+      }
+
+      return formatSummaryDayKey(new Date(item.completedAt)) === dayKey;
+    }) ?? null
+  );
+}
+
+function rebuildProgressSession(session, dayKey, segments) {
+  const firstStart = new Date(segments[0].startedAt);
+  const lastEnd = new Date(
+    Math.max(new Date(segments.at(-1).endedAt).getTime(), new Date(session.completedAt).getTime()),
+  );
+
+  return normalizeTodo({
+    ...session,
+    completedAt: progressSessionEndedAt(dayKey, lastEnd).toISOString(),
+    firstStartedAt: firstStart.toISOString(),
+    activeStartedAt: null,
+    trackedSeconds:
+      totalSegmentSeconds(segments) +
+      unsegmentedTrackedSeconds(session, normalizeTimeSegments(session.timeSegments)),
+    timeSegments: segments,
+  });
+}
+
+// Time tracked before time_segments existed (no backfill) is not covered by
+// any segment; keep it when trackedSeconds is rebuilt from segments.
+function unsegmentedTrackedSeconds(todo, segments) {
+  return Math.max(0, normalizedTrackedSeconds(todo) - totalSegmentSeconds(segments));
+}
+
+function todoTimingChanged(before, after) {
+  return (
+    before.completedAt !== after.completedAt ||
+    before.trackedSeconds !== after.trackedSeconds ||
+    before.firstStartedAt !== after.firstStartedAt ||
+    before.activeStartedAt !== after.activeStartedAt ||
+    JSON.stringify(normalizeTimeSegments(before.timeSegments)) !==
+      JSON.stringify(normalizeTimeSegments(after.timeSegments))
+  );
+}
+
+function mergeTimeSegments(first, second) {
+  const merged = [];
+
+  for (const segment of [...normalizeTimeSegments(first), ...normalizeTimeSegments(second)].toSorted(
+    (left, right) => new Date(left.startedAt) - new Date(right.startedAt),
+  )) {
+    const last = merged.at(-1);
+    if (last && new Date(segment.startedAt) <= new Date(last.endedAt)) {
+      if (new Date(segment.endedAt) > new Date(last.endedAt)) {
+        last.endedAt = segment.endedAt;
+      }
+      continue;
+    }
+
+    merged.push({ startedAt: segment.startedAt, endedAt: segment.endedAt });
+  }
+
+  return merged;
+}
+
+function createProgressSessionId(parentId, completedAt) {
+  return `${completedAt.getTime()}-${parentId.slice(0, 24)}-session`;
+}
+
+function totalSegmentSeconds(segments) {
+  return segments.reduce(
+    (total, segment) =>
+      total + getActiveSegmentSeconds(new Date(segment.startedAt), new Date(segment.endedAt)),
+    0,
+  );
+}
+
+function compareSummaryItemsByEnd(first, second) {
+  const firstEnd = validTimestamp(first.completedAt);
+  const secondEnd = validTimestamp(second.completedAt);
+
+  if (firstEnd === null && secondEnd === null) return 0;
+  if (firstEnd === null) return 1;
+  if (secondEnd === null) return -1;
+  return firstEnd - secondEnd;
 }
 
 function validTimestamp(value) {
@@ -1470,6 +1733,38 @@ async function persistTodoCommand(client, ownerUserId, persist) {
     return;
   }
 
+  // Session ids are deterministic and web/menubar clients archive the same
+  // work, so an existing row is left alone instead of failing the command.
+  for (const session of persist.sessions ?? []) {
+    const { error: insertError } = await client.database.from('todos').upsert(
+      [
+        {
+          ...toRemoteRecord(session, ownerUserId),
+          due_date: session.dueDate,
+          loop_status: 'accepted',
+        },
+      ],
+      { onConflict: 'id', ignoreDuplicates: true },
+    );
+    if (insertError) {
+      throw insertError;
+    }
+  }
+
+  for (const archived of persist.updates ?? []) {
+    const { error: updateError } = await client.database
+      .from('todos')
+      .update({
+        ...toRemoteCompletionFields(archived),
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', archived.id)
+      .eq('user_id', ownerUserId);
+    if (updateError) {
+      throw updateError;
+    }
+  }
+
   const { error } = await client.database
     .from('todos')
     .update({
@@ -1494,7 +1789,6 @@ function statusFor(code) {
     case 'not_found':
       return 404;
     case 'ambiguous_title':
-    case 'progressive_unsupported':
       return 409;
     default:
       return 500;

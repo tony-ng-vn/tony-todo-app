@@ -26,8 +26,6 @@
   export let onNoteInput;
   export let onOpenNote;
   export let noteSaveStatus = 'saved';
-  export let onProgressiveChange;
-  export let onProgressCommit;
   export let onDueDateChange;
   export let onSomedayChange;
   export let onTimingChange;
@@ -39,23 +37,18 @@
 
   let draftTodoId = null;
   let noteDraft = '';
-  let progressDraft = '';
   let sourceNote = '';
-  let sourceProgress = '';
   let timingBlocksDraft = [];
   let sourceTimingBlocks = '';
   let timingError = '';
 
   $: {
     const nextNote = todo.note ?? '';
-    const nextProgress = todo.progressLabel ?? '';
 
     if (todo.id !== draftTodoId) {
       draftTodoId = todo.id;
       sourceNote = nextNote;
-      sourceProgress = nextProgress;
       noteDraft = stripNoteStampsForEditor(nextNote);
-      progressDraft = nextProgress;
       sourceTimingBlocks = timingBlocksSource(todo);
       timingBlocksDraft = timingBlocksForTodo(todo);
       timingError = '';
@@ -63,11 +56,6 @@
       if (nextNote !== sourceNote) {
         sourceNote = nextNote;
         noteDraft = stripNoteStampsForEditor(nextNote);
-      }
-
-      if (nextProgress !== sourceProgress) {
-        sourceProgress = nextProgress;
-        progressDraft = nextProgress;
       }
 
       const nextTimingBlocks = timingBlocksSource(todo);
@@ -344,8 +332,8 @@
         <button
           type="button"
           class="menubar-icon-button menubar-finish"
-          aria-label={`${todo.isProgressive ? 'Log progress for' : 'Finish'} ${todo.title}`}
-          title={todo.isProgressive ? 'Log progress' : 'Finish'}
+          aria-label={`Finish ${todo.title}`}
+          title="Finish"
           on:click={() => onComplete(todo.id)}
         >
           {@html iconCheck()}
@@ -402,28 +390,6 @@
             ? 'Saved locally - sync failed'
             : 'Note saved automatically'}
       </span>
-
-      <label class="menubar-progressive-toggle">
-        <input
-          type="checkbox"
-          checked={todo.isProgressive}
-          on:change={(event) => onProgressiveChange(todo.id, event.currentTarget.checked)}
-        />
-        <span>Progressive task</span>
-      </label>
-
-      {#if todo.isProgressive}
-        <label>
-          <span>Current progress</span>
-          <textarea
-            class="menubar-progress-input"
-            bind:value={progressDraft}
-            rows="2"
-            on:keydown={(event) => handleTextareaKeydown(event, (value) => (progressDraft = value))}
-            on:focusout={() => onProgressCommit(todo.id, progressDraft)}
-          ></textarea>
-        </label>
-      {/if}
 
       <label>
         <span>Due date</span>
@@ -704,7 +670,7 @@
   }
 
   .menubar-task-details input[type='text'],
-  .menubar-task-details textarea {
+  .menubar-task-details :global(textarea) {
     width: 100%;
     min-width: 0;
     border: 1px solid var(--border);
@@ -729,13 +695,13 @@
     line-height: 1.4;
   }
 
-  .menubar-task-details textarea {
+  .menubar-task-details :global(textarea) {
     resize: vertical;
   }
 
   .menubar-task-details input:focus-visible,
   .menubar-task-details :global(.menubar-calendar-trigger:focus-visible),
-  .menubar-task-details textarea:focus-visible,
+  .menubar-task-details :global(textarea:focus-visible),
   .note-todo-item:focus-visible,
   .menubar-details-toggle:focus-visible,
   .menubar-icon-button:focus-visible,
@@ -892,17 +858,6 @@
     color: var(--subtle);
     font-size: 11px;
     font-weight: 500;
-  }
-
-  .menubar-progressive-toggle {
-    grid-template-columns: auto 1fr;
-    align-items: center;
-  }
-
-  .menubar-progressive-toggle input {
-    width: 16px;
-    height: 16px;
-    accent-color: var(--strong);
   }
 
   .menubar-detail-footer {
