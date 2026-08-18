@@ -44,6 +44,7 @@ import {
   setTodoProgressive,
   startTodoTimer,
   deleteTodo,
+  dueDateInputToIso,
   updateTodoTiming,
   updateTodoTimeSegments,
   updateCompletedTodoTiming,
@@ -1629,6 +1630,13 @@ describe('board view columns', () => {
 });
 
 describe('task due dates', () => {
+  it('anchors a picked calendar day to local midnight and rejects bad input', () => {
+    expect(dueDateInputToIso('2026-06-12')).toBe(new Date(2026, 5, 12).toISOString());
+    expect(dueDateInputToIso('')).toBeNull();
+    expect(dueDateInputToIso(null)).toBeNull();
+    expect(dueDateInputToIso('not-a-date')).toBeNull();
+  });
+
   it('assigns a new todo to its creation date when no date is chosen', () => {
     let state = createInitialState();
     state = addTodo(state, 'No deadline', new Date('2026-06-08T08:00:00'));
