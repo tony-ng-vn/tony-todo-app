@@ -24,13 +24,14 @@ try {
     ...assertNoOverflow(mobile),
     ...assertNoOverflow(desktop),
     ...assertMobileTaskDetail(mobileTaskDetail),
-    ...assertMinimumTarget(mobile, '#todo-title', 44, 'mobile task input'),
+    ...assertMinimumTarget(mobile, '#task-search', 44, 'mobile task search'),
+    ...assertMinimumTarget(mobile, '.new-task-button', 44, 'mobile new-task button'),
     ...assertMinimumTarget(mobile, '#summary-date', 44, 'mobile date picker'),
     ...assertMinimumTarget(mobile, '#summary-previous-day', 44, 'mobile previous-day button'),
     ...assertMinimumTarget(mobile, '#summary-next-day', 44, 'mobile next-day button'),
     ...assertMinimumTarget(mobile, '.theme-toggle', 34, 'mobile theme toggle'),
     ...assertMinimumContrast(mobile, '.todo-item button', 4.5, 'Done button'),
-    ...assertHasMotion(mobile, '.input-row button', 'Add button'),
+    ...assertHasMotion(mobile, '.new-task-button', 'New task button'),
     ...assertHasMotion(mobile, '.todo-item button', 'Done button'),
     ...assertHasMotion(mobile, '.theme-toggle', 'Theme toggle'),
     ...assertTimerControlLabel(desktop),
@@ -371,11 +372,11 @@ async function captureNativeLayout(page) {
       taskTitle: measure('#task-heading'),
       taskPanelNote: measure('.task-panel > .panel-note'),
       workspaceTabs: measure('.task-panel > .view-toggle'),
-      newTaskForm: measure('.new-task-form'),
-      quickAddTitle: measure('#todo-title'),
+      taskToolbar: measure('.task-toolbar'),
+      taskSearch: measure('#task-search'),
       taskContent: measure('[data-todo-id="ui-smoke-native-paused"] .task-content'),
       taskActions: measure('[data-todo-id="ui-smoke-native-paused"] .task-actions'),
-      quickAddControls: measureGroup('.input-row', '#todo-title, .new-task-calendar, :scope > button'),
+      quickAddControls: measureGroup('.task-toolbar', '.task-search, .new-task-button'),
       taskCardControls: measureGroup(
         '[data-todo-id="ui-smoke-native-paused"]',
         ':scope > .task-content, :scope > .task-actions',
@@ -411,9 +412,9 @@ function assertNativeWorkspaceLayout(result) {
       }
     }
   }
-  if (result.defaultLayout.quickAddTitle.width < 220) {
+  if (result.defaultLayout.taskSearch.width < 180) {
     failures.push(
-      `native quick-add title is too narrow at ${result.defaultLayout.quickAddTitle.width}px`,
+      `native task search is too narrow at ${result.defaultLayout.taskSearch.width}px`,
     );
   }
   if (result.defaultLayout.flowRailDisplay !== 'none') {
@@ -431,8 +432,8 @@ function assertNativeWorkspaceLayout(result) {
     failures.push('native panel headings do not share a horizontal baseline');
   }
   if (
-    Math.abs(result.defaultLayout.workspaceTabs.left - result.defaultLayout.newTaskForm.left) > 1 ||
-    Math.abs(result.defaultLayout.workspaceTabs.right - result.defaultLayout.newTaskForm.right) > 1
+    Math.abs(result.defaultLayout.workspaceTabs.left - result.defaultLayout.taskToolbar.left) > 1 ||
+    Math.abs(result.defaultLayout.workspaceTabs.right - result.defaultLayout.taskToolbar.right) > 1
   ) {
     failures.push('native task blocks do not share horizontal edges');
   }
@@ -557,8 +558,9 @@ async function inspectDuplicateTask(viewport) {
     );
   });
   await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
-  await page.fill('#todo-title', 'Review launch checklst');
-  await page.click('.input-row button[type="submit"]');
+  await page.locator('.new-task-button').click();
+  await page.fill('#overlay-todo-title', 'Review launch checklst');
+  await page.click('.composer-add');
   await page.waitForFunction(() =>
     document.querySelector('#sync-status')?.textContent.includes('Duplicate task'),
   );
@@ -567,10 +569,11 @@ async function inspectDuplicateTask(viewport) {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     return {
       taskCount: state.todos.length,
-      draft: document.querySelector('#todo-title')?.value,
+      draft: document.querySelector('#overlay-todo-title')?.value,
       message: document.querySelector('#sync-status')?.textContent.trim(),
     };
   });
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Board', exact: true }).click();
   await page.waitForSelector('.board-panel');
   await page.click('[data-column="not_started"] .board-new-task');
@@ -722,26 +725,9 @@ async function inspectDraftInsertionCue(viewport) {
     localStorage.setItem('done-log-state', JSON.stringify({ todos: [] }));
   });
   await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
-  await page.fill('#todo-title', 'Fix');
-  await page.waitForSelector('.block-insertion-cue');
-
-  const draftMetrics = await page.evaluate(() => {
-    const cue = document.querySelector('.block-insertion-cue');
-    const line = document.querySelector('.block-insertion-line');
-    const label = document.querySelector('.block-insertion-label');
-    const cueRect = cue?.getBoundingClientRect();
-    const lineRect = line?.getBoundingClientRect();
-    const labelRect = label?.getBoundingClientRect();
-
-    return {
-      visible: Boolean(cue),
-      cueHeight: Math.round(cueRect?.height ?? 0),
-      lineLabelGap: Math.round((labelRect?.top ?? 0) - (lineRect?.bottom ?? 0)),
-      alignContent: getComputedStyle(document.querySelector('.todo-list')).alignContent,
-    };
-  });
-
-  await page.click('.input-row button[type="submit"]');
+  await page.locator('.new-task-button').click();
+  await page.fill('#overlay-todo-title', 'Fix');
+  await page.click('.composer-add');
   await page.waitForSelector('.todo-item');
   await page.waitForTimeout(750);
 
@@ -751,11 +737,13 @@ async function inspectDraftInsertionCue(viewport) {
     return {
       itemHeight: Math.round(itemRect?.height ?? 0),
       itemAlignSelf: item ? getComputedStyle(item).alignSelf : null,
+      alignContent: getComputedStyle(document.querySelector('.todo-list')).alignContent,
+      overlayOpen: Boolean(document.querySelector('.composer-overlay[open]')),
     };
   });
 
   await page.close();
-  return { ...draftMetrics, ...taskMetrics };
+  return taskMetrics;
 }
 
 async function inspectBoardCardLayout(viewport) {
@@ -973,7 +961,7 @@ async function inspectViewport(viewport, isMobile) {
       },
       calendarPresentation: {
         nativeInputCount: document.querySelectorAll('input[type="date"], input[type="datetime-local"]').length,
-        hasNewTaskPicker: Boolean(document.querySelector('#todo-due-date.calendar-trigger')),
+        hasNewTaskPicker: Boolean(document.querySelector('.new-task-button[aria-haspopup="dialog"]')),
         hasSummaryPicker: Boolean(document.querySelector('#summary-date.calendar-trigger')),
       },
       summaryBuckets: Array.from(document.querySelectorAll('.summary-section h3')).map((element) => element.textContent.trim()),
@@ -1014,7 +1002,8 @@ async function inspectViewport(viewport, isMobile) {
         summaryScrollbarWidth: getComputedStyle(document.querySelector('.summary-list')).scrollbarWidth,
       },
       rects: {
-        '#todo-title': rectFor('#todo-title'),
+        '#task-search': rectFor('#task-search'),
+        '.new-task-button': rectFor('.new-task-button'),
         '#summary-date': rectFor('#summary-date'),
         '#summary-previous-day': rectFor('#summary-previous-day'),
         '#summary-next-day': rectFor('#summary-next-day'),
@@ -1030,7 +1019,7 @@ async function inspectViewport(viewport, isMobile) {
         '.todo-item button': contrastFor('.todo-item button'),
       },
       transitions: {
-        '.input-row button': transitionFor('.input-row button'),
+        '.new-task-button': transitionFor('.new-task-button'),
         '.todo-item button': transitionFor('.todo-item button'),
         '.theme-toggle': transitionFor('.theme-toggle'),
       },
@@ -1081,16 +1070,25 @@ async function inspectViewport(viewport, isMobile) {
 }
 
 async function exerciseNewTaskCalendarClear(page) {
-  await page.locator('#todo-due-date').click();
-  await page.locator('.calendar-footer button', { hasText: 'Today' }).click();
-  await page.locator('#todo-due-date').click();
+  await page.locator('.new-task-button').click();
+  await page.waitForSelector('#overlay-todo-due-date');
+  await page.locator('#overlay-todo-due-date').click();
+  await page.waitForSelector('.calendar-popover');
   const clearAvailable = Boolean(
     await page.locator('.calendar-footer button', { hasText: 'Clear' }).count(),
   );
-  await page.locator('.calendar-footer button', { hasText: 'Clear' }).click();
+  const triggerText = (await page.locator('#overlay-todo-due-date').textContent())?.trim() ?? '';
+  const nativeInputCount = await page.locator('input[type="date"], input[type="datetime-local"]').count();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (!(await page.locator('.composer-overlay[open]').count())) {
+      break;
+    }
+    await page.keyboard.press('Escape');
+  }
   return {
     clearAvailable,
-    triggerText: (await page.locator('#todo-due-date').textContent())?.trim() ?? '',
+    triggerText,
+    nativeInputCount,
   };
 }
 
@@ -1666,10 +1664,13 @@ function assertCalendarConsistency(result) {
 }
 
 function assertNewTaskCalendarClear(result) {
-  return result.newTaskCalendarClear?.clearAvailable &&
-    result.newTaskCalendarClear.triggerText === 'Select date'
+  return result.newTaskCalendarClear &&
+    result.newTaskCalendarClear.clearAvailable === false &&
+    result.newTaskCalendarClear.triggerText &&
+    result.newTaskCalendarClear.triggerText !== 'Select date' &&
+    result.newTaskCalendarClear.nativeInputCount === 0
     ? []
-    : [`new-task assigned date could not be cleared: ${JSON.stringify(result.newTaskCalendarClear)}`];
+    : [`new-task assigned date did not open with today prefilled: ${JSON.stringify(result.newTaskCalendarClear)}`];
 }
 
 function assertPausedTimeline(result) {
@@ -1939,14 +1940,8 @@ function assertProgressiveSession(result) {
 
 function assertDraftInsertionCue(result) {
   const failures = [];
-  if (!result?.visible) {
-    failures.push(`draft insertion cue missing while typing a new task: ${JSON.stringify(result)}`);
-  }
-  if (result?.cueHeight > 48) {
-    failures.push(`draft insertion cue stretched while typing: height ${result.cueHeight}`);
-  }
-  if (result?.lineLabelGap > 12) {
-    failures.push(`draft insertion cue line and label separated: gap ${result.lineLabelGap}`);
+  if (result?.overlayOpen) {
+    failures.push('new-task overlay stayed open after adding a task');
   }
   if (result?.alignContent !== 'start') {
     failures.push(`todo list align-content is ${result?.alignContent}; expected start`);
