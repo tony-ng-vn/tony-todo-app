@@ -370,12 +370,12 @@
   }
 
   .composer-title.is-invalid {
-    border-color: color-mix(in srgb, var(--strong) 45%, var(--danger));
+    border-color: color-mix(in srgb, var(--strong) 45%, var(--composer-danger));
   }
 
   .composer-error {
     margin: 0;
-    color: color-mix(in srgb, var(--strong) 55%, var(--danger));
+    color: color-mix(in srgb, var(--strong) 55%, var(--composer-danger));
     font-size: 12px;
     font-weight: 500;
     text-wrap: pretty;
