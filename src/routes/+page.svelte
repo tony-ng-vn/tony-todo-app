@@ -40,10 +40,9 @@
     getOpenTodoSections,
     getProgressSessions,
     getProjectTodos,
-    filterSummaryBySearch,
     filterTodoSections,
     filterTodosBySearch,
-    todoMatchesSearchQuery,
+    findOverflowSearchMatches,
     logProgressSession,
     moveCompletedTodoToSummaryBucket,
     moveTodoToBoardColumn,
@@ -190,10 +189,14 @@
     getOpenTodoSections(openTodos, new Date(`${currentDayKey}T00:00:00`)),
     taskSearchQuery,
   );
-  $: summary = filterSummaryBySearch(getDaySummary(state, selectedDay), taskSearchQuery);
+  $: summary = filterTodoSections(getDaySummary(state, selectedDay), taskSearchQuery);
   $: boardColumns = getBoardColumns(state, { dayKey: selectedDay, dueFilter: boardDueFilter });
   $: projectTodos = getProjectTodos(state);
-  $: searchMatches = getOverflowSearchMatches();
+  $: searchMatches = findOverflowSearchMatches(
+    state.todos,
+    [...ongoingTodos, ...pausedTodos, ...openTodos, ...summary.flatMap((section) => section.items)],
+    taskSearchQuery,
+  );
   $: calendarMonthData = getCalendarMonth(state, { year: calendarYear, month: calendarMonth });
   $: completedToday = summary.reduce(
     (total, section) => total + section.items.filter((item) => item.outcome !== 'failed').length,
@@ -262,27 +265,6 @@
 
     const date = new Date(`${value}T00:00:00`);
     return Number.isNaN(date.getTime()) ? null : date.toISOString();
-  }
-
-  function getOverflowSearchMatches() {
-    if (!taskSearchQuery.trim()) {
-      return [];
-    }
-
-    const visibleIds = new Set([
-      ...ongoingTodos.map((todo) => todo.id),
-      ...pausedTodos.map((todo) => todo.id),
-      ...openTodos.map((todo) => todo.id),
-      ...summary.flatMap((section) => section.items.map((item) => item.id)),
-    ]);
-
-    return state.todos.filter((todo) => {
-      if (todo.isProgressSession || visibleIds.has(todo.id)) {
-        return false;
-      }
-
-      return todoMatchesSearchQuery(todo, taskSearchQuery);
-    });
   }
 
   function openComposer(kind = 'task') {

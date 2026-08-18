@@ -317,17 +317,17 @@ export function filterTodoSections(sections, query) {
     .filter((section) => section.items.length > 0);
 }
 
-export function filterSummaryBySearch(summary, query) {
+// Matches outside the rendered lists (done, parked, other days) so a search can still surface them.
+export function findOverflowSearchMatches(todos, visibleTodos, query) {
   if (!normalizeSearchQuery(query)) {
-    return summary;
+    return [];
   }
 
-  return summary
-    .map((section) => ({
-      ...section,
-      items: section.items.filter((item) => todoMatchesSearchQuery(item, query)),
-    }))
-    .filter((section) => section.items.length > 0);
+  const visibleIds = new Set(visibleTodos.map((todo) => todo.id));
+  return todos.filter(
+    (todo) =>
+      !todo.isProgressSession && !visibleIds.has(todo.id) && todoMatchesSearchQuery(todo, query),
+  );
 }
 
 export function partitionPendingTodos(todos) {
