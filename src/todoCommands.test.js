@@ -303,7 +303,7 @@ describe('runTodoCommand complete', () => {
     expect(result.ok).toBe(true);
     expect(result.persist.todo.completedAt).toBe(UTC_EVENING.toISOString());
     expect(result.persist.sessions).toEqual([]);
-    expect(result.persist.sessionUpdates).toEqual([]);
+    expect(result.persist.updates).toEqual([]);
   });
 
   it('persists merged leftover recap time on complete', () => {
@@ -339,9 +339,9 @@ describe('runTodoCommand complete', () => {
 
     expect(result.ok).toBe(true);
     expect(result.persist.sessions).toEqual([]);
-    expect(result.persist.sessionUpdates).toHaveLength(1);
-    expect(result.persist.sessionUpdates[0].id).toBe('session-1');
-    expect(result.persist.sessionUpdates[0].trackedSeconds).toBe(60 * 60);
+    expect(result.persist.updates).toHaveLength(1);
+    expect(result.persist.updates[0].id).toBe('session-1');
+    expect(result.persist.updates[0].trackedSeconds).toBe(60 * 60);
     expect(result.persist.todo.timeSegments).toEqual([]);
     expect(result.persist.todo.completedAt).toBe('2026-06-10T17:30:00.000Z');
   });

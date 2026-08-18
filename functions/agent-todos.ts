@@ -1078,34 +1078,21 @@ function runCompleteCommand(state, target, now) {
     };
   }
 
+  // completeTodo archives every open task's prior-day work, so persist all of
+  // it: new session rows plus any other row whose timing changed.
   const next = completeTodo(state, todo.id, now);
+  const beforeById = new Map(state.todos.map((item) => [item.id, item]));
   const updated = next.todos.find((item) => item.id === todo.id);
-  const sessions = next.todos.filter(
-    (item) =>
-      item.isProgressSession &&
-      item.parentTaskId === todo.id &&
-      !state.todos.some((before) => before.id === item.id),
-  );
-  const sessionUpdates = next.todos.filter((item) => {
-    if (!item.isProgressSession || item.parentTaskId !== todo.id) {
-      return false;
-    }
-
-    const before = state.todos.find((existing) => existing.id === item.id);
-    return Boolean(
-      before &&
-        (before.completedAt !== item.completedAt ||
-          before.trackedSeconds !== item.trackedSeconds ||
-          before.firstStartedAt !== item.firstStartedAt ||
-          JSON.stringify(normalizeTimeSegments(before.timeSegments)) !==
-            JSON.stringify(normalizeTimeSegments(item.timeSegments))),
-    );
+  const sessions = next.todos.filter((item) => !beforeById.has(item.id));
+  const updates = next.todos.filter((item) => {
+    const before = beforeById.get(item.id);
+    return Boolean(before && item.id !== todo.id && todoTimingChanged(before, item));
   });
 
   return {
     ok: true,
     view: { kind: 'complete', task: toCompletedTaskView(updated) },
-    persist: { kind: 'update', todo: updated, sessions, sessionUpdates },
+    persist: { kind: 'update', todo: updated, sessions, updates },
   };
 }
 
@@ -1372,7 +1359,7 @@ function archiveOpenTodoPriorDays(todo, now, todayKey, existingTodos) {
     if (existing) {
       const mergedSegments = mergeTimeSegments(existing.timeSegments, segments);
       const updated = rebuildProgressSession(existing, dayKey, mergedSegments);
-      if (progressSessionChanged(existing, updated)) {
+      if (todoTimingChanged(existing, updated)) {
         updatedSessions.push(updated);
       }
       continue;
@@ -1520,11 +1507,12 @@ function unsegmentedTrackedSeconds(todo, segments) {
   return Math.max(0, normalizedTrackedSeconds(todo) - totalSegmentSeconds(segments));
 }
 
-function progressSessionChanged(before, after) {
+function todoTimingChanged(before, after) {
   return (
     before.completedAt !== after.completedAt ||
     before.trackedSeconds !== after.trackedSeconds ||
     before.firstStartedAt !== after.firstStartedAt ||
+    before.activeStartedAt !== after.activeStartedAt ||
     JSON.stringify(normalizeTimeSegments(before.timeSegments)) !==
       JSON.stringify(normalizeTimeSegments(after.timeSegments))
   );
@@ -1758,15 +1746,14 @@ async function persistTodoCommand(client, ownerUserId, persist) {
     }
   }
 
-  for (const session of persist.sessionUpdates ?? []) {
+  for (const archived of persist.updates ?? []) {
     const { error: updateError } = await client.database
       .from('todos')
       .update({
-        ...toRemoteCompletionFields(session),
-        note: session.note ?? '',
+        ...toRemoteCompletionFields(archived),
         updated_at: new Date().toISOString(),
       })
-      .eq('id', session.id)
+      .eq('id', archived.id)
       .eq('user_id', ownerUserId);
     if (updateError) {
       throw updateError;
