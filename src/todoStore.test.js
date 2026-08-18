@@ -51,7 +51,7 @@ import {
   resetNoteBurstBaselines,
   hasNoteBurstBaseline,
 } from './todoStore.js';
-import { formatNoteAtLocal } from './todoCommands.js';
+import { formatNoteAtLocal, formatSummaryDayKey } from './todoCommands.js';
 import { parseNoteEntries } from './noteEntries.js';
 
 beforeEach(() => {
@@ -1319,6 +1319,68 @@ describe('todo day summary', () => {
     expect(sessions[0].trackedSeconds).toBe(30 * 60);
     expect(parent.activeStartedAt).toBe(new Date('2026-06-09T00:00:00-07:00').toISOString());
     expect(parent.completedAt).toBeNull();
+  });
+
+  it('keeps an overnight split session in the day it was worked', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Late night write', new Date('2026-06-08T20:00:00-07:00'));
+    const todoId = state.todos[0].id;
+    state = startTodoTimer(state, todoId, new Date('2026-06-08T23:30:00-07:00'));
+    state = completeTodo(state, todoId, new Date('2026-06-09T01:10:00-07:00'));
+
+    const mondayItems = getDaySummary(state, '2026-06-08').flatMap((section) => section.items);
+    const tuesdayItems = getDaySummary(state, '2026-06-09').flatMap((section) => section.items);
+    expect(mondayItems).toHaveLength(1);
+    expect(mondayItems[0]).toMatchObject({
+      parentTaskId: todoId,
+      isProgressSession: true,
+      durationSeconds: 30 * 60,
+    });
+    expect(tuesdayItems).toHaveLength(1);
+    expect(tuesdayItems[0]).toMatchObject({ id: todoId, durationSeconds: 70 * 60 });
+  });
+
+  it('reuses the overnight session when a stale client archives the same night again', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Late night write', new Date('2026-06-08T20:00:00-07:00'));
+    const todoId = state.todos[0].id;
+    state = startTodoTimer(state, todoId, new Date('2026-06-08T23:30:00-07:00'));
+    const running = state;
+    state = archivePriorDaySessions(state, new Date('2026-06-09T01:10:00-07:00'));
+    const [session] = getProgressSessions(state, todoId);
+
+    // Another client still holds the pre-archive timer but has loaded the session row.
+    const stale = createInitialState([...running.todos, session]);
+    const rearchived = archivePriorDaySessions(stale, new Date('2026-06-09T01:20:00-07:00'));
+
+    const sessions = getProgressSessions(rearchived, todoId);
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].id).toBe(session.id);
+    expect(sessions[0].trackedSeconds).toBe(30 * 60);
+  });
+
+  it('archives the pre-midnight part when pausing after midnight', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Late night write', new Date('2026-06-08T20:00:00-07:00'));
+    const todoId = state.todos[0].id;
+    state = startTodoTimer(state, todoId, new Date('2026-06-08T23:30:00-07:00'));
+    state = pauseTodoTimer(state, todoId, new Date('2026-06-09T00:30:00-07:00'));
+
+    const parent = state.todos.find((todo) => todo.id === todoId);
+    const sessions = getProgressSessions(state, todoId);
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0].trackedSeconds).toBe(30 * 60);
+    expect(formatSummaryDayKey(new Date(sessions[0].completedAt))).toBe('2026-06-08');
+    expect(parent).toMatchObject({
+      activeStartedAt: null,
+      trackedSeconds: 30 * 60,
+      timeSegments: [
+        {
+          startedAt: new Date('2026-06-09T00:00:00-07:00').toISOString(),
+          endedAt: new Date('2026-06-09T00:30:00-07:00').toISOString(),
+        },
+      ],
+    });
   });
 
   it('archives prior-day work when completing without a pre-archive call', () => {
