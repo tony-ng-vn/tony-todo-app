@@ -793,17 +793,17 @@
     noteDraft = nextNote;
     const beforeTodos = state.todos;
     state = updateTodoNoteFromEditor(state, selectedTaskId, nextNote);
-    // The first typed note can start the timer; the note autosave only
-    // carries the note text, so the timer fields need their own sync.
-    const timerChangedTodos = getTimerChangedTodos(beforeTodos, state.todos);
+    // The first typed note can start the timer (and archive prior days); the
+    // note autosave only carries the note text, so those rows need their own sync.
+    const timerChanged =
+      getCreatedTodos(beforeTodos, state.todos).length > 0 ||
+      getTodosWithChangedFields(beforeTodos, state.todos, ARCHIVE_SYNC_FIELDS).length > 0;
     saveLocalState(state);
     const edit = recordNoteEdit(selectedTaskId, nextNote);
     setNoteSaveStatus(selectedTaskId, 'saving');
     noteAutosave.schedule(selectedTaskId, edit);
-    if (timerChangedTodos.length) {
-      void syncRemoteChange('Saving time', () =>
-        Promise.all(timerChangedTodos.map((todo) => persistTodoTimer(todo))),
-      );
+    if (timerChanged) {
+      void syncRemoteChange('Saving time', () => persistArchivedTodos(beforeTodos, state.todos));
     }
   }
 
