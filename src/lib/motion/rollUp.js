@@ -13,8 +13,6 @@ export function rollUp(_node, { enabled = true, duration } = {}, { direction = '
     return { duration: 0 };
   }
 
-  const resolvedDuration = duration ?? (direction === 'out' ? LEAVE_DURATION : ENTER_DURATION);
-
   if (prefersReducedMotion()) {
     return {
       duration: 140,
@@ -23,7 +21,7 @@ export function rollUp(_node, { enabled = true, duration } = {}, { direction = '
   }
 
   return {
-    duration: resolvedDuration,
+    duration: duration ?? (direction === 'out' ? LEAVE_DURATION : ENTER_DURATION),
     easing: EASE_OUT_QUART,
     css: (t) => {
       const fold = (1 - t) * 100;
