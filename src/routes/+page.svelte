@@ -784,11 +784,20 @@
     }
 
     noteDraft = nextNote;
+    const beforeTodos = state.todos;
     state = updateTodoNoteFromEditor(state, selectedTaskId, nextNote);
+    // The first typed note can start the timer; the note autosave only
+    // carries the note text, so the timer fields need their own sync.
+    const timerChangedTodos = getTimerChangedTodos(beforeTodos, state.todos);
     saveLocalState(state);
     const edit = recordNoteEdit(selectedTaskId, nextNote);
     setNoteSaveStatus(selectedTaskId, 'saving');
     noteAutosave.schedule(selectedTaskId, edit);
+    if (timerChangedTodos.length) {
+      void syncRemoteChange('Saving time', () =>
+        Promise.all(timerChangedTodos.map((todo) => persistTodoTimer(todo))),
+      );
+    }
   }
 
   async function saveNoteToRemote(todoId, edit) {

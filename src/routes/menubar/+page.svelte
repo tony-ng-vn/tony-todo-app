@@ -486,10 +486,19 @@
 
   function handleNoteInput(todoId, note) {
     const edit = recordNoteEdit(todoId, note);
-    state = updateTodoNoteFromEditor(loadLocalState(), todoId, note);
+    const beforeState = loadLocalState();
+    state = updateTodoNoteFromEditor(beforeState, todoId, note);
+    // The first typed note can start the timer; the note autosave only
+    // carries the note text, so the timer fields need their own sync.
+    const timerChangedTodos = getChangedTodos(beforeState.todos, state.todos, TIMER_FIELDS);
     saveLocalState(state);
     setNoteSaveStatus(todoId, 'saving');
     noteAutosave.schedule(todoId, edit);
+    if (timerChangedTodos.length) {
+      void syncRemoteChange('Saving time', () =>
+        Promise.all(timerChangedTodos.map((todo) => persistTodoTimer(todo))),
+      );
+    }
   }
 
   async function saveNoteToRemote(todoId, edit) {
