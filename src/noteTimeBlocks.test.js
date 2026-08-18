@@ -137,7 +137,7 @@ describe('note time blocks', () => {
     expect(stripNoteStampsForEditor(tight)).toBe('- old\n- n');
 
     const spaced = applyTodoNote(closed, '- old\n\n- n', RESUME);
-    expect(spaced).toBe(`${startHeading(START)}\n- old\n\n${endHeading(PAUSE)}\n\n${startHeading(RESUME)}\n- n`);
+    expect(spaced).toBe(`${closed}\n\n${startHeading(RESUME)}\n\n- n`);
     expect(stripNoteStampsForEditor(spaced)).toBe('- old\n\n- n');
   });
 
