@@ -47,23 +47,43 @@ function dateAtSanFranciscoTime(dayKey, minutesAfterMidnight) {
   return result;
 }
 
-// Notes are stored as text with "@ YYYY-MM-DD HH:mm" stamp headers, one per
-// bullet (list item) or free-text line. Every stampable unit keeps its own
-// time, tracked by matching text identity rather than array position, so
-// reordering or editing bullets does not steal or smear timestamps.
+// Notes are stored as timer session blocks:
+//   Start: YYYY-MM-DD HH:mm
+//   - bullet
+//   End: YYYY-MM-DD HH:mm
+// Session headings mirror the task timer: Start/Pause/complete write them,
+// every line typed in between belongs to the open session, and an edit never
+// removes a session heading (an emptied session keeps its Start/End pair).
+// The editor shows exactly the stored note minus its heading lines - blank
+// lines inside a session are the user's and round-trip verbatim; the blank
+// line between two stored blocks is cosmetic and never reaches the editor.
+// Legacy "@ YYYY-MM-DD HH:mm" notes: one run of consecutive "@" chunks parses
+// as a single closed block, kept verbatim by timer operations and rewritten
+// as one Start/End pair (first stamp to last stamp) by the first edit.
 
-const NOTE_STAMP_PATTERN = /^@ (\d{4}-\d{2}-\d{2}) (\d{2}):(\d{2})\s*$/;
+const LOCAL_TIME_PATTERN = '(\\d{4}-\\d{2}-\\d{2}) (\\d{2}):(\\d{2})';
+const NOTE_STAMP_PATTERN = new RegExp(`^@ ${LOCAL_TIME_PATTERN}\\s*$`);
+const START_HEADING_PATTERN = new RegExp(`^Start:\\s+${LOCAL_TIME_PATTERN}\\s*$`);
+const END_HEADING_PATTERN = new RegExp(`^End:\\s+${LOCAL_TIME_PATTERN}\\s*$`);
 const LIST_MARKER_PATTERN = /^(?:[-*+]|\d+[.)])(?:[\t ]+([\s\S]*))?$/;
 const CHECKBOX_PATTERN = /^\[[ xX]\](?:[\t ]+([\s\S]*))?$/;
 const SIMILARITY_THRESHOLD = 0.5;
 const TOKEN_MATCH_RATIO = 0.75;
+const NEW_BLOCK_INDEX = -1;
 
 function formatNoteAtLocal(date) {
   const parts = getSanFranciscoDateTimeParts(new Date(date));
   return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`;
 }
 
+// Visible note lines only: blank lines are structure for the editor, not notes.
 function parseNoteEntries(note) {
+  return flattenNoteTimeBlocks(parseNoteTimeBlocks(note))
+    .filter((entry) => entry.text.trim())
+    .map((entry) => ({ at: entry.at, text: entry.text }));
+}
+
+function parseNoteTimeBlocks(note) {
   // Trim trailing newlines only, not all trailing whitespace: a note that
   // ends in an empty structural line ("- ") must keep that line's trailing
   // space intact, or the reseeded editor draft would no longer match what
@@ -73,28 +93,157 @@ function parseNoteEntries(note) {
     return [];
   }
 
-  return splitIntoStampedChunks(raw).flatMap((chunk) => splitChunkIntoUnits(chunk.text, chunk.at));
+  const blocks = [];
+  let current = null;
+
+  function finishBlock() {
+    if (!current) {
+      return;
+    }
+    // Empty lines at the end of a block only separate it from the next one;
+    // a user's blank line at a session boundary is stored after the next
+    // Start heading instead (see placeEmptyUnits). Whitespace-only lines are
+    // content: an auto-indented "\t" line is where the caret sits.
+    while (current.lines.at(-1) === '') {
+      current.lines.pop();
+    }
+    blocks.push(current);
+    current = null;
+  }
+
+  for (const line of raw.split('\n')) {
+    const startAt = matchLocalHeading(line, START_HEADING_PATTERN);
+    if (startAt) {
+      finishBlock();
+      current = { startedAt: startAt, endedAt: null, kind: 'session', lines: [] };
+      continue;
+    }
+
+    const stampAt = matchLocalHeading(line, NOTE_STAMP_PATTERN);
+    if (stampAt) {
+      if (current?.kind === 'stamp') {
+        // A run of "@" chunks is one legacy block; the inner header lines
+        // stay in `lines` so the run serializes back verbatim.
+        current.lines.push(line);
+        current.endedAt = stampAt;
+        continue;
+      }
+      finishBlock();
+      current = { startedAt: stampAt, endedAt: stampAt, kind: 'stamp', lines: [] };
+      continue;
+    }
+
+    const endAt = matchLocalHeading(line, END_HEADING_PATTERN);
+    if (endAt) {
+      if (!current) {
+        current = { startedAt: endAt, endedAt: endAt, kind: 'session', lines: [] };
+      } else {
+        current.endedAt = endAt;
+        current.kind = 'session';
+      }
+      finishBlock();
+      continue;
+    }
+
+    if (line === '' && !current) {
+      continue;
+    }
+
+    if (!current) {
+      current = { startedAt: null, endedAt: null, kind: 'plain', lines: [] };
+    }
+    current.lines.push(line);
+  }
+
+  finishBlock();
+  return blocks;
+}
+
+function openNoteTimeBlock(note, startedAt) {
+  const startedAtIso = new Date(startedAt).toISOString();
+  const blocks = parseNoteTimeBlocks(note);
+  const open = findOpenBlock(blocks);
+  if (open) {
+    if (!open.startedAt) {
+      open.startedAt = startedAtIso;
+      open.kind = 'session';
+    }
+    return serializeNoteTimeBlocks(blocks);
+  }
+
+  blocks.push({ startedAt: startedAtIso, endedAt: null, kind: 'session', lines: [] });
+  return serializeNoteTimeBlocks(blocks);
+}
+
+function closeNoteTimeBlock(note, endedAt) {
+  const endedAtIso = new Date(endedAt).toISOString();
+  const blocks = parseNoteTimeBlocks(note);
+  const open = findOpenBlock(blocks);
+  if (!open) {
+    return serializeNoteTimeBlocks(blocks);
+  }
+
+  if (!open.startedAt) {
+    open.startedAt = endedAtIso;
+  }
+  open.endedAt = endedAtIso;
+  open.kind = 'session';
+  return serializeNoteTimeBlocks(blocks);
+}
+
+// Agent path: text lands under the open session, or opens one at `now`.
+function appendNoteText(note, text, now = new Date()) {
+  const blocks = parseNoteTimeBlocks(note);
+  const lines = String(text).split('\n');
+  const open = findOpenBlock(blocks);
+  if (open) {
+    if (!open.startedAt) {
+      open.startedAt = now.toISOString();
+      open.kind = 'session';
+    }
+    open.lines.push(...lines);
+  } else {
+    blocks.push({ startedAt: now.toISOString(), endedAt: null, kind: 'session', lines });
+  }
+  return serializeNoteTimeBlocks(blocks);
+}
+
+function serializeNoteTimeBlocks(blocks) {
+  return blocks
+    .map((block) => {
+      const parts = [];
+      if (block.kind === 'stamp') {
+        parts.push(`@ ${formatNoteAtLocal(block.startedAt)}`);
+      } else if (block.startedAt) {
+        parts.push(`Start: ${formatNoteAtLocal(block.startedAt)}`);
+      }
+      parts.push(...block.lines);
+      if (block.kind !== 'stamp' && block.endedAt) {
+        parts.push(`End: ${formatNoteAtLocal(block.endedAt)}`);
+      }
+      return parts.join('\n');
+    })
+    .filter(Boolean)
+    .join('\n\n');
 }
 
 // True for a unit with no visible content once its marker/checkbox is
-// stripped ("- ", "-", "- [ ]"). These are real structural units - kept in
-// parseNoteEntries's output and in storage - but they are never stamped and
-// must stay invisible to anything that only wants real note content.
+// stripped ("- ", "-", "- [ ]", or a blank line). These are real structural
+// units - kept in storage and in the editor - but they are never matched
+// and never carry a time of their own.
 function isEmptyNoteUnitText(text) {
   return normalizeUnitText(text) === '';
 }
 
-// nextNote is normally plain editor text (no "@ " headers), but existing
-// callers build it by appending fresh text onto the previous stored note, so
-// units that already carry a header from parsing pass through unchanged;
-// only unstamped units go through identity matching against previousNote.
+// nextNote is normally plain editor text (no headings), but a caller may
+// also pass stored text, so units that already carry a heading from parsing
+// pass through unchanged; only unstamped units go through identity matching
+// against previousNote.
 function applyTodoNote(previousNote, nextNote, now = new Date()) {
-  const nextEntries = parseNoteEntries(nextNote);
-  if (nextEntries.length === 0) {
-    return '';
-  }
+  const previousBlocks = parseNoteTimeBlocks(previousNote);
+  const nextEntries = flattenNoteTimeBlocks(parseNoteTimeBlocks(nextNote));
 
-  const previousUnits = parseNoteEntries(previousNote).map((entry, index) => ({
+  const previousUnits = flattenNoteTimeBlocks(previousBlocks).map((entry, index) => ({
     entry,
     index,
     normalized: normalizeUnitText(entry.text),
@@ -118,8 +267,8 @@ function applyTodoNote(previousNote, nextNote, now = new Date()) {
     }
     const normalized = normalizeUnitText(entry.text);
     if (!normalized) {
-      // Marker-only unit ("- "): stays a bare unstamped line, never matched.
-      resolved[index] = { at: null, text: entry.text };
+      // Empty structural unit: placed next to its neighbors once every
+      // real unit knows its block.
       return;
     }
     pending.push({ entry, index, normalized });
@@ -134,35 +283,42 @@ function applyTodoNote(previousNote, nextNote, now = new Date()) {
     if (resolved[item.index]) {
       continue;
     }
-    resolved[item.index] = { at: now.toISOString(), text: item.entry.text };
+    resolved[item.index] = assignToOpenBlock(item.entry.text, previousBlocks, now);
   }
 
-  // A unit can match a previous unit that itself has no stamp (a legacy
-  // chunk only stamps its first paragraph; a later paragraph parses as
-  // at: null). A non-empty unit must not stay unstamped forever, so it gets
-  // backfilled with now here - empty structural units are exempt, they are
-  // never stamped.
+  // A unit can match a previous unit that itself has no time: a legacy "@"
+  // chunk only stamps its first paragraph, and a plain (never stamped) note
+  // has none at all. A non-empty unit must not stay unstamped forever, so it
+  // takes its block's start when it has one and the open block (or now)
+  // otherwise.
   for (let index = 0; index < resolved.length; index += 1) {
     const entry = resolved[index];
-    if (!entry.at && !isEmptyNoteUnitText(entry.text)) {
-      resolved[index] = { at: now.toISOString(), text: entry.text };
+    if (!entry || entry.at || isEmptyNoteUnitText(entry.text)) {
+      continue;
     }
+    resolved[index] = entry.startedAt
+      ? { ...entry, at: entry.startedAt }
+      : assignToOpenBlock(entry.text, previousBlocks, now);
   }
 
-  return serializeNoteEntries(resolved);
+  placeEmptyUnits(nextEntries, resolved, previousBlocks);
+
+  return serializeResolvedTimeBlocks(resolved, previousBlocks);
 }
 
-// Editor draft with no "@ " headers and no blank separators between bullets,
-// so applyTodoNote can re-match this text against the stored note by identity.
+// Editor draft: the stored note with every heading line removed. Blank
+// lines inside a session survive; blank lines between blocks do not exist
+// once parsed, so sessions read as one continuous list unless the user
+// separated them.
 function stripNoteStampsForEditor(storedNote) {
-  return parseNoteEntries(storedNote)
+  return flattenNoteTimeBlocks(parseNoteTimeBlocks(storedNote))
     .map((entry) => entry.text)
     .join('\n');
 }
 
-// A next entry that already carries a header (parsed straight from an
-// explicit "@ " line, e.g. the untouched part of an appendNote flow) skips
-// matching entirely and keeps its own stamp - but its previous-side
+// A next entry that already carries a heading (parsed straight from stored
+// text, e.g. the untouched part of a note passed back in whole) skips
+// matching entirely and keeps its own time - but its previous-side
 // counterpart must still be marked used, or a later similar bullet in the
 // same note could steal that still-present bullet's time in passes A-D.
 function reservePassThroughUnits(nextEntries, previousUnits) {
@@ -199,7 +355,7 @@ function matchUniquePairs(pending, previousUnits, resolved) {
       continue;
     }
     match.used = true;
-    resolved[item.index] = { at: match.entry.at, text: item.entry.text };
+    resolved[item.index] = copyResolvedUnit(match.entry, item.entry.text);
   }
 }
 
@@ -214,7 +370,7 @@ function matchFirstAvailableByText(pending, previousUnits, resolved) {
       continue;
     }
     match.used = true;
-    resolved[item.index] = { at: match.entry.at, text: item.entry.text };
+    resolved[item.index] = copyResolvedUnit(match.entry, item.entry.text);
   }
 }
 
@@ -254,7 +410,7 @@ function matchBySimilarity(pending, previousUnits, resolved) {
       continue;
     }
     best.used = true;
-    resolved[item.index] = { at: best.entry.at, text: item.entry.text };
+    resolved[item.index] = copyResolvedUnit(best.entry, item.entry.text);
   }
 }
 
@@ -351,42 +507,158 @@ function normalizeUnitText(rawLine) {
   return text.replace(/\s+/g, ' ').toLowerCase();
 }
 
-// Groups lines by "@ " header, same shape as the pre-bullet-granularity
-// parser: a header flushes the current chunk and starts a new one, so a
-// header line can never itself become unit text.
-function splitIntoStampedChunks(raw) {
-  const chunks = [];
-  let current = { at: null, lines: [] };
-
-  function flush() {
-    const text = current.lines.join('\n').replace(/^\n+|\n+$/g, '');
-    if (current.at || text.trim()) {
-      chunks.push({ at: current.at, text });
-    }
-    current = { at: null, lines: [] };
+function matchLocalHeading(line, pattern) {
+  const match = line.match(pattern);
+  if (!match) {
+    return null;
   }
-
-  for (const line of raw.split('\n')) {
-    const match = line.match(NOTE_STAMP_PATTERN);
-    if (match) {
-      flush();
-      current.at = dateAtSanFranciscoTime(match[1], Number(match[2]) * 60 + Number(match[3])).toISOString();
-      continue;
-    }
-    current.lines.push(line);
-  }
-
-  flush();
-  return chunks;
+  return dateAtSanFranciscoTime(match[1], Number(match[2]) * 60 + Number(match[3])).toISOString();
 }
 
-// Within one chunk, blank lines still delimit paragraphs; only the first
-// paragraph inherits the chunk's header stamp (matches legacy behavior for
-// free text). Every non-blank line in a paragraph is its own unit - the fix
-// for bullets that used to share one stamp per chunk. A marker-only line
-// ("- ") is still a real unit (kept in document order, e.g. between two
-// stamped bullets) - it just never carries a stamp, regardless of which
-// paragraph it falls in.
+// One unit per line. Session and plain blocks keep every line verbatim
+// (blank lines included, with no time of their own); a legacy stamp block
+// is re-split into its "@" chunks so each bullet reports the time of the
+// header it sat under.
+function flattenNoteTimeBlocks(blocks) {
+  return blocks.flatMap((block, blockIndex) => {
+    const meta = {
+      blockIndex,
+      kind: block.kind,
+      startedAt: block.startedAt,
+      endedAt: block.endedAt,
+    };
+
+    if (block.kind === 'stamp') {
+      return splitLegacyChunks(block).flatMap((chunk) =>
+        splitChunkIntoUnits(chunk.text, chunk.at).map((unit) => ({ ...unit, ...meta })),
+      );
+    }
+
+    return block.lines.map((line) => ({
+      at: block.startedAt && !isEmptyNoteUnitText(line) ? block.startedAt : null,
+      text: line,
+      ...meta,
+    }));
+  });
+}
+
+function splitLegacyChunks(block) {
+  const chunks = [{ at: block.startedAt, lines: [] }];
+  for (const line of block.lines) {
+    const stampAt = matchLocalHeading(line, NOTE_STAMP_PATTERN);
+    if (stampAt) {
+      chunks.push({ at: stampAt, lines: [] });
+      continue;
+    }
+    chunks.at(-1).lines.push(line);
+  }
+  return chunks.map((chunk) => ({ at: chunk.at, text: chunk.lines.join('\n') }));
+}
+
+// The block a timer operation acts on: the last one that is still open
+// (a session without End, or plain text that never had a heading). Legacy
+// stamp blocks are always closed history.
+function findOpenBlock(blocks) {
+  const index = findOpenBlockIndex(blocks);
+  return index === NEW_BLOCK_INDEX ? null : blocks[index];
+}
+
+function findOpenBlockIndex(blocks) {
+  for (let index = blocks.length - 1; index >= 0; index -= 1) {
+    if (blocks[index].kind !== 'stamp' && !blocks[index].endedAt) {
+      return index;
+    }
+  }
+  return NEW_BLOCK_INDEX;
+}
+
+function copyResolvedUnit(source, text) {
+  return { ...source, text };
+}
+
+function assignToOpenBlock(text, previousBlocks, now) {
+  const openIndex = findOpenBlockIndex(previousBlocks);
+  const openBlock = openIndex === NEW_BLOCK_INDEX ? null : previousBlocks[openIndex];
+  const startedAt = openBlock?.startedAt ?? now.toISOString();
+  return {
+    at: startedAt,
+    text,
+    blockIndex: openBlock ? openIndex : NEW_BLOCK_INDEX,
+    kind: 'session',
+    startedAt,
+    endedAt: null,
+  };
+}
+
+// An empty unit sits in the block of the unit right below it (a blank line
+// separating two sessions belongs to the session it introduces), else the
+// last real unit above it, else the open block. A draft made only of empty
+// units stays a bare plain note - it never opens a session on its own.
+function placeEmptyUnits(nextEntries, resolved, previousBlocks) {
+  const openIndex = findOpenBlockIndex(previousBlocks);
+  const openBlock = openIndex === NEW_BLOCK_INDEX ? null : previousBlocks[openIndex];
+
+  for (let index = resolved.length - 1; index >= 0; index -= 1) {
+    if (resolved[index]) {
+      continue;
+    }
+    const neighbor = resolved[index + 1] ?? resolved.slice(0, index).findLast(Boolean) ?? null;
+    const source = neighbor ?? {
+      blockIndex: openBlock ? openIndex : NEW_BLOCK_INDEX,
+      kind: openBlock?.kind ?? 'plain',
+      startedAt: openBlock?.startedAt ?? null,
+      endedAt: null,
+    };
+    resolved[index] = {
+      at: null,
+      text: nextEntries[index].text,
+      blockIndex: source.blockIndex,
+      kind: source.kind,
+      startedAt: source.startedAt,
+      endedAt: source.endedAt,
+    };
+  }
+}
+
+// Consecutive units of the same block form one run; a session block that
+// received no units at all still keeps its Start/End pair, in place, so the
+// note's headings keep matching the timer history.
+function serializeResolvedTimeBlocks(resolved, previousBlocks) {
+  const runs = [];
+  for (const entry of resolved) {
+    const last = runs.at(-1);
+    if (last && last.blockIndex === entry.blockIndex && last.startedAt === entry.startedAt) {
+      last.lines.push(entry.text);
+      continue;
+    }
+    runs.push({
+      blockIndex: entry.blockIndex,
+      // A legacy run rewrites as one closed session, first stamp to last.
+      kind: entry.kind === 'plain' ? 'plain' : 'session',
+      startedAt: entry.startedAt,
+      endedAt: entry.endedAt,
+      lines: [entry.text],
+    });
+  }
+
+  previousBlocks.forEach((block, blockIndex) => {
+    if (block.kind !== 'session' || runs.some((run) => run.blockIndex === blockIndex)) {
+      return;
+    }
+    const empty = { blockIndex, kind: 'session', startedAt: block.startedAt, endedAt: block.endedAt, lines: [] };
+    const nextRun = runs.findIndex((run) => run.blockIndex === NEW_BLOCK_INDEX || run.blockIndex > blockIndex);
+    runs.splice(nextRun === -1 ? runs.length : nextRun, 0, empty);
+  });
+
+  return serializeNoteTimeBlocks(runs);
+}
+
+// Within one legacy chunk, blank lines still delimit paragraphs; only the
+// first paragraph inherits the chunk's header stamp (matches how free text
+// was stamped). Every non-blank line in a paragraph is its own unit; blank
+// lines are dropped, as the legacy editor never showed them either. A
+// marker-only line ("- ") is still a real unit (kept in document order,
+// e.g. between two stamped bullets) - it just never carries a stamp.
 function splitChunkIntoUnits(text, at) {
   const paragraphs = text.split(/\n{2,}/).map((paragraph) => paragraph.replace(/^\n+|\n+$/g, ''));
 
@@ -403,13 +675,6 @@ function splitChunkIntoUnits(text, at) {
   });
 
   return units;
-}
-
-function serializeNoteEntries(entries) {
-  return entries
-    .filter((entry) => entry && entry.text.trim())
-    .map((entry) => (entry.at ? `@ ${formatNoteAtLocal(entry.at)}\n${entry.text}` : entry.text))
-    .join('\n\n');
 }
 
 const SAN_FRANCISCO = { latitude: 37.774929, longitude: -122.419418 };
@@ -669,6 +934,7 @@ function closeActiveTimeSegment(todo, stoppedAt) {
     return {
       trackedSeconds: normalizedTrackedSeconds(todo),
       timeSegments,
+      note: todo.note ?? '',
     };
   }
 
@@ -678,6 +944,7 @@ function closeActiveTimeSegment(todo, stoppedAt) {
     return {
       trackedSeconds: normalizedTrackedSeconds(todo),
       timeSegments,
+      note: todo.note ?? '',
     };
   }
 
@@ -693,6 +960,7 @@ function closeActiveTimeSegment(todo, stoppedAt) {
         endedAt: normalizedEnd.toISOString(),
       },
     ],
+    note: closeNoteTimeBlock(todo.note ?? '', normalizedEnd),
   };
 }
 
@@ -1103,10 +1371,9 @@ function runAppendNoteCommand(state, target, text, now) {
   }
 
   const todo = resolved.todo;
-  const nextNote = todo.note?.trim() ? `${todo.note.trimEnd()}\n\n${text}` : text;
   const updated = {
     ...todo,
-    note: applyTodoNote(todo.note ?? '', nextNote, now),
+    note: appendNoteText(todo.note ?? '', text, now),
   };
 
   return {

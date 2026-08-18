@@ -82,14 +82,14 @@ describe('applyTodoNote bullet matching', () => {
   const later = new Date('2026-06-08T15:05:00.000Z');
   const now = new Date('2026-06-08T16:00:00.000Z');
 
-  it('stamps only the newly added bullet when one is appended after an existing bullet', () => {
+  it('keeps a newly appended bullet in the open session of the existing bullet', () => {
     const stored = applyTodoNote('', '- Call the vet', first);
 
     const next = applyTodoNote(stored, '- Call the vet\n- Buy dog food', now);
 
     expect(parseNoteEntries(next)).toEqual([
       { at: first.toISOString(), text: '- Call the vet' },
-      { at: now.toISOString(), text: '- Buy dog food' },
+      { at: first.toISOString(), text: '- Buy dog food' },
     ]);
   });
 
@@ -126,7 +126,7 @@ describe('applyTodoNote bullet matching', () => {
     const next = applyTodoNote(stored, '- Walk the dog\n- Buy milk', now);
 
     expect(parseNoteEntries(next)).toEqual([
-      { at: later.toISOString(), text: '- Walk the dog' },
+      { at: first.toISOString(), text: '- Walk the dog' },
       { at: first.toISOString(), text: '- Buy milk' },
     ]);
   });
@@ -147,31 +147,31 @@ describe('applyTodoNote bullet matching', () => {
     expect(parseNoteEntries(next)).toEqual([{ at: first.toISOString(), text: '- [x] Pack snacks' }]);
   });
 
-  it('gives the first half of a split bullet the old time and the second half now, by document order', () => {
+  it('keeps both halves of a split bullet in the open session', () => {
     const stored = applyTodoNote('', '- hello world', first);
 
     const next = applyTodoNote(stored, '- hello\n- world', now);
 
     expect(parseNoteEntries(next)).toEqual([
       { at: first.toISOString(), text: '- hello' },
-      { at: now.toISOString(), text: '- world' },
+      { at: first.toISOString(), text: '- world' },
     ]);
   });
 
-  it('mints a new time when similarity is below threshold', () => {
+  it('keeps a rewritten bullet in the open session when similarity is below threshold', () => {
     const stored = applyTodoNote('', '- a note', first);
 
     const next = applyTodoNote(stored, '- b note', now);
 
-    expect(parseNoteEntries(next)).toEqual([{ at: now.toISOString(), text: '- b note' }]);
+    expect(parseNoteEntries(next)).toEqual([{ at: first.toISOString(), text: '- b note' }]);
   });
 
-  it('mints a new time when the replacement bullet reads too differently', () => {
+  it('keeps a replacement bullet in the open session even when it reads too differently', () => {
     const stored = applyTodoNote('', '- Getting lunch now', first);
 
     const next = applyTodoNote(stored, '- Not getting lunch yet', now);
 
-    expect(parseNoteEntries(next)).toEqual([{ at: now.toISOString(), text: '- Not getting lunch yet' }]);
+    expect(parseNoteEntries(next)).toEqual([{ at: first.toISOString(), text: '- Not getting lunch yet' }]);
   });
 
   // Enter-on-dash creates a fresh "- " line under the caret; the surviving
@@ -186,7 +186,7 @@ describe('applyTodoNote bullet matching', () => {
       { at: first.toISOString(), text: '- a' },
       { at: null, text: '- ' },
     ]);
-    expect(next).toBe(`@ ${formatNoteAtLocal(first)}\n- a\n\n- `);
+    expect(next).toBe(`Start: ${formatNoteAtLocal(first)}\n- a\n- `);
     expect(stripNoteStampsForEditor(next)).toBe('- a\n- ');
   });
 
@@ -242,7 +242,7 @@ describe('applyTodoNote bullet matching', () => {
     expect(parseNoteEntries(next)).toEqual([{ at: first.toISOString(), text: '- Buy milk' }]);
   });
 
-  it('splits a legacy multi-dash chunk into per-bullet headers without minting new times', () => {
+  it('rewrites a legacy multi-dash chunk as one closed session without minting new times', () => {
     const legacyAt = dateAtSanFranciscoTime('2026-06-08', 8 * 60).toISOString();
     const legacyStored = '@ 2026-06-08 08:00\n- a\n- b\n- c';
 
@@ -253,13 +253,33 @@ describe('applyTodoNote bullet matching', () => {
       { at: legacyAt, text: '- b' },
       { at: legacyAt, text: '- c' },
     ]);
+    expect(next).toBe(`Start: ${formatNoteAtLocal(legacyAt)}\n- a\n- b\n- c\nEnd: ${formatNoteAtLocal(legacyAt)}`);
+  });
+
+  // Legacy notes carry one "@" header per bullet. Consecutive headers are one
+  // closed block: the first edit rewrites them as a single session running
+  // from the first stamp to the last, and new text opens a fresh session at
+  // now instead of being filed under the old stamps.
+  it('rewrites a run of per-bullet legacy stamps as one closed session and files new text under now', () => {
+    const firstStamp = dateAtSanFranciscoTime('2026-06-08', 10 * 60).toISOString();
+    const lastStamp = dateAtSanFranciscoTime('2026-06-08', 10 * 60 + 7).toISOString();
+    const legacyStored = '@ 2026-06-08 10:00\n- a\n\n@ 2026-06-08 10:03\n- b\n\n@ 2026-06-08 10:07\n- c';
+
+    const next = applyTodoNote(legacyStored, '- a\n- b\n- c\n- d', now);
+
     expect(next).toBe(
-      `@ ${formatNoteAtLocal(legacyAt)}\n- a\n\n@ ${formatNoteAtLocal(legacyAt)}\n- b\n\n@ ${formatNoteAtLocal(legacyAt)}\n- c`,
+      `Start: ${formatNoteAtLocal(firstStamp)}\n- a\n- b\n- c\nEnd: ${formatNoteAtLocal(lastStamp)}\n\nStart: ${formatNoteAtLocal(now)}\n- d`,
     );
+    expect(parseNoteEntries(next)).toEqual([
+      { at: firstStamp, text: '- a' },
+      { at: firstStamp, text: '- b' },
+      { at: firstStamp, text: '- c' },
+      { at: now.toISOString(), text: '- d' },
+    ]);
   });
 
   it('keeps already-correct per-bullet notes byte-identical on parse and reapply', () => {
-    const stored = `@ ${formatNoteAtLocal(first)}\n- Buy milk\n\n@ ${formatNoteAtLocal(later)}\n- Walk the dog`;
+    const stored = `Start: ${formatNoteAtLocal(first)}\n- Buy milk\n\nStart: ${formatNoteAtLocal(later)}\n- Walk the dog`;
 
     expect(applyTodoNote(stored, stored, now)).toBe(stored);
   });
@@ -286,7 +306,7 @@ describe('applyTodoNote bullet matching', () => {
 
     expect(parseNoteEntries(next)).toEqual([
       { at: first.toISOString(), text: '- call mom' },
-      { at: now.toISOString(), text: '- call mom later tonight' },
+      { at: first.toISOString(), text: '- call mom later tonight' },
     ]);
   });
 
@@ -297,7 +317,7 @@ describe('applyTodoNote bullet matching', () => {
 
     expect(parseNoteEntries(next)).toEqual([
       { at: first.toISOString(), text: '- call bank' },
-      { at: now.toISOString(), text: '- call bank' },
+      { at: first.toISOString(), text: '- call bank' },
     ]);
   });
 
@@ -317,9 +337,9 @@ describe('applyTodoNote bullet matching', () => {
 
     expect(parseNoteEntries(next)).toEqual([
       { at: first.toISOString(), text: '- a' },
-      { at: now.toISOString(), text: '- b' },
+      { at: first.toISOString(), text: '- b' },
     ]);
-    expect(next).toBe(`@ ${formatNoteAtLocal(first)}\n- a\n\n@ ${formatNoteAtLocal(now)}\n- b`);
+    expect(next).toBe(`Start: ${formatNoteAtLocal(first)}\n- a\n- b\nEnd: ${formatNoteAtLocal(first)}`);
   });
 
   it('still serializes an empty structural bullet bare while backfilling a legacy-unstamped unit', () => {
@@ -329,7 +349,7 @@ describe('applyTodoNote bullet matching', () => {
 
     expect(parseNoteEntries(next)).toEqual([
       { at: first.toISOString(), text: '- a' },
-      { at: now.toISOString(), text: '- b' },
+      { at: first.toISOString(), text: '- b' },
       { at: null, text: '- ' },
     ]);
   });

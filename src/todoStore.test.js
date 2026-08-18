@@ -50,6 +50,7 @@ import {
   updateTodoCompletedAt,
   updateTodoTitle,
   updateTodoNote,
+  updateTodoNoteFromEditor,
   resetNoteBurstBaselines,
   hasNoteBurstBaseline,
 } from './todoStore.js';
@@ -566,7 +567,7 @@ describe('todo day summary', () => {
 
     expect(state.todos[0]).toEqual({
       ...todo,
-      note: `@ ${formatNoteAtLocal(now)}\nAsk about the scholarship deadline.`,
+      note: `Start: ${formatNoteAtLocal(now)}\nAsk about the scholarship deadline.`,
     });
   });
 
@@ -1476,41 +1477,38 @@ describe('todo day summary', () => {
 describe('note editing bursts', () => {
   const NOTE_BURST_GAP_MS = 5000;
 
-  it('mints a new time for a gradual rewrite within one typing burst, even though each step looks similar', () => {
-    // Save the first bullet, then let the burst gap elapse before the
-    // rewrite starts: this is what makes the test meaningful. If the burst
-    // baseline were captured right after an empty note (the old version of
-    // this test), matching would never see "- Getting lunch now" as a
-    // candidate and a fresh stamp would be inevitable regardless of whether
-    // the anti-chaining logic works at all. Starting the burst a full gap
-    // later forces the baseline captured at burst start to actually contain
-    // "- Getting lunch now", so a real similarity comparison is exercised.
-    //
-    // The stamp format only has minute precision, so timestamps are chosen
-    // to straddle a minute boundary: every gap inside the burst stays under
-    // the 5s window, but the final call lands on a whole minute distinct
-    // from savedAt's, making "kept the original stamp" and "minted a fresh
-    // one" distinguishable by exact equality.
+  it('moves a gradual rewrite within one typing burst to the new session, even though each step looks similar', () => {
+    // A bullet lives in a closed session. The rewrite starts a burst after
+    // the burst gap, so the baseline captured at burst start still contains
+    // "- Getting lunch now" and a real similarity comparison is exercised.
+    // Per-keystroke matching would chain through the similar intermediate
+    // steps and keep the unrecognizable final wording filed under the old
+    // session; matching against the burst baseline moves it to the session
+    // that the first keystroke opened.
     const savedAt = new Date('2026-07-01T09:59:00.000Z');
     let state = createInitialState();
     state = addTodo(state, 'Lunch plan', savedAt);
     const todoId = state.todos[0].id;
-    state = updateTodoNote(state, todoId, '- Getting lunch now', savedAt);
+    state = updateTodoNoteFromEditor(state, todoId, '- Getting lunch now', savedAt);
+    const pausedAt = new Date(savedAt.getTime() + 60000);
+    state = pauseTodoTimer(state, todoId, pausedAt);
 
-    const burstStart = new Date(savedAt.getTime() + NOTE_BURST_GAP_MS + 53000);
+    // Whole minutes: headings only keep minute precision.
+    const burstStart = new Date(pausedAt.getTime() + 60000);
     const steps = ['- Not getting lunch now', '- Not getting lunch soon', '- Not getting lunch yet'];
     let callAt = burstStart;
-    let lastCallAt;
     for (const draft of steps) {
-      lastCallAt = callAt;
-      state = updateTodoNote(state, todoId, draft, callAt);
+      state = updateTodoNoteFromEditor(state, todoId, draft, callAt);
       callAt = new Date(callAt.getTime() + 1000);
     }
 
-    expect(lastCallAt.toISOString()).not.toBe(savedAt.toISOString());
+    expect(state.todos[0].activeStartedAt).toBe(burstStart.toISOString());
     expect(parseNoteEntries(state.todos[0].note)).toEqual([
-      { at: lastCallAt.toISOString(), text: '- Not getting lunch yet' },
+      { at: burstStart.toISOString(), text: '- Not getting lunch yet' },
     ]);
+    expect(state.todos[0].note).toBe(
+      `Start: ${formatNoteAtLocal(savedAt)}\nEnd: ${formatNoteAtLocal(pausedAt)}\n\nStart: ${formatNoteAtLocal(burstStart)}\n- Not getting lunch yet`,
+    );
   });
 
   it('keeps the original time for a typo fix made in a later burst', () => {
@@ -1542,7 +1540,7 @@ describe('note editing bursts', () => {
     state = updateTodoNote(state, todoId, '- Walk the dog\n- Buy milk', laterBurstAt);
 
     expect(parseNoteEntries(state.todos[0].note)).toEqual([
-      { at: laterStamp.toISOString(), text: '- Walk the dog' },
+      { at: first.toISOString(), text: '- Walk the dog' },
       { at: first.toISOString(), text: '- Buy milk' },
     ]);
   });

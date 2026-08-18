@@ -2,6 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { transformWithOxc } from 'vite';
 import { afterEach, describe, expect, it } from 'vitest';
 import { bundleDomainSource, inlineAgentTodos } from '../scripts/inline-agent-todos.mjs';
 
@@ -33,6 +34,15 @@ describe('agent-todos bundle', () => {
 
   it('keeps functions/agent-todos.ts generated from the domain module', () => {
     expect(() => inlineAgentTodos({ check: true })).not.toThrow();
+  });
+
+  // The generated file deploys straight to Deno after merge, so a splice
+  // that produces unparseable TypeScript (e.g. a "$`" in the domain source
+  // being read as a String.replace pattern) must fail here, not in prod.
+  it('generates a syntactically valid TypeScript module', async () => {
+    const generated = readFileSync(join(ROOT, 'functions/agent-todos.ts'), 'utf8');
+
+    await expect(transformWithOxc(generated, 'agent-todos.ts')).resolves.toBeDefined();
   });
 });
 

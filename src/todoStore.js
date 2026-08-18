@@ -25,7 +25,12 @@ import {
   normalizedTrackedSeconds,
   totalSegmentSeconds,
 } from './todoCommands.js';
-import { stripNoteStampsForEditor } from './noteEntries.js';
+import {
+  isEmptyNoteUnitText,
+  openNoteTimeBlock,
+  parseNoteEntries,
+  stripNoteStampsForEditor,
+} from './noteEntries.js';
 
 export {
   addTodo,
@@ -230,6 +235,7 @@ export function startTodoTimer(state, todoId, startedAt = new Date()) {
         activeStartedAt: startedAtIso,
         trackedSeconds: normalizedTrackedSeconds(todo),
         timeSegments: normalizeTimeSegments(todo.timeSegments),
+        note: openNoteTimeBlock(todo.note ?? '', startedAt),
       };
     }),
   };
@@ -684,10 +690,14 @@ export function getCalendarMonth(state, { year, month, now = new Date() } = {}) 
 
 // Matching runs against a baseline captured before the current typing burst,
 // not the per-keystroke previous state - otherwise a gradual rewrite chains
-// through many similar intermediate pairs and never mints a new time even
-// though the final wording is unrecognizable from where it started. Module
-// state, not part of `state`, so it never gets persisted; resetNoteBurstBaselines
-// and hasNoteBurstBaseline exist so tests can isolate and inspect bursts.
+// through many similar intermediate pairs and stays filed under the old
+// session even though the final wording is unrecognizable from where it
+// started. The baseline is only valid while this function is the sole writer
+// of the note: a timer Start/Pause or a sync that rewrites the stored note
+// ends the burst, or the next keystroke would re-apply against text that no
+// longer exists. Module state, not part of `state`, so it never gets
+// persisted; resetNoteBurstBaselines and hasNoteBurstBaseline exist so tests
+// can isolate and inspect bursts.
 const NOTE_BURST_GAP_MS = 5000;
 const noteBurstBaselines = new Map();
 
@@ -697,6 +707,22 @@ export function resetNoteBurstBaselines() {
 
 export function hasNoteBurstBaseline(todoId) {
   return noteBurstBaselines.has(todoId);
+}
+
+// The editor's own input path: typing the first note into an idle task starts
+// its timer, so the Start heading and the tracked time begin together.
+// Replaying a pending edit on load or merging a synced note must not, so
+// those callers use updateTodoNote directly.
+export function updateTodoNoteFromEditor(state, todoId, note, now = new Date()) {
+  const todo = state.todos.find((item) => item.id === todoId);
+  const shouldAutoStart =
+    todo &&
+    !todo.completedAt &&
+    !todo.somedayAt &&
+    !todo.activeStartedAt &&
+    parseNoteEntries(note).some((entry) => !isEmptyNoteUnitText(entry.text));
+  const nextState = shouldAutoStart ? startTodoTimer(state, todoId, now) : state;
+  return updateTodoNote(nextState, todoId, note, now);
 }
 
 export function updateTodoNote(state, todoId, note, now = new Date()) {
@@ -716,15 +742,21 @@ export function updateTodoNote(state, todoId, note, now = new Date()) {
   }
 
   const tracked = noteBurstBaselines.get(todoId);
-  const withinBurst = Boolean(tracked) && nowMs - tracked.updatedAt < NOTE_BURST_GAP_MS;
+  const elapsed = tracked ? nowMs - tracked.updatedAt : Number.POSITIVE_INFINITY;
+  // elapsed < 0 means the clock went backwards (or a replay carries an older
+  // timestamp): that is not a continuation of the burst, so start a fresh one.
+  const withinBurst =
+    Boolean(tracked) &&
+    elapsed >= 0 &&
+    elapsed < NOTE_BURST_GAP_MS &&
+    tracked.written === (todo.note ?? '');
   const baseline = withinBurst ? tracked.note : (todo.note ?? '');
-  noteBurstBaselines.set(todoId, { note: baseline, updatedAt: nowMs });
+  const nextNote = applyTodoNote(baseline, note, now);
+  noteBurstBaselines.set(todoId, { note: baseline, written: nextNote, updatedAt: nowMs });
 
   return {
     ...state,
-    todos: state.todos.map((item) =>
-      item.id === todoId ? { ...item, note: applyTodoNote(baseline, note, now) } : item,
-    ),
+    todos: state.todos.map((item) => (item.id === todoId ? { ...item, note: nextNote } : item)),
   };
 }
 

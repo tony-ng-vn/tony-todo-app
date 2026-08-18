@@ -1,4 +1,5 @@
 import { chromium } from 'playwright';
+import { noteBody, waitForStoredNoteBody } from './note-body-smoke.mjs';
 
 const targetUrl = new URL(process.env.UI_SMOKE_URL ?? 'http://127.0.0.1:5174/');
 targetUrl.searchParams.set('local', '1');
@@ -1430,22 +1431,13 @@ async function exerciseDetailEditing(page) {
       statusText: document.querySelector('.detail-note-row span')?.textContent.trim(),
     };
   });
-  await page.waitForFunction(() => {
-    const state = JSON.parse(localStorage.getItem('done-log-state'));
-    return state.todos.find((item) => item.id === 'ui-smoke-local-task')?.note === 'Smoke note';
-  });
+  await waitForStoredNoteBody(page, 'ui-smoke-local-task', 'Smoke note');
   await page.fill('#detail-note', '/todo Follow up with USCIS');
   await page.waitForFunction(() => document.querySelector('#detail-note')?.value === '- [ ] Follow up with USCIS');
   const slashTodoValue = await page.locator('#detail-note').inputValue();
-  await page.waitForFunction(() => {
-    const state = JSON.parse(localStorage.getItem('done-log-state'));
-    return state.todos.find((item) => item.id === 'ui-smoke-local-task')?.note === '- [ ] Follow up with USCIS';
-  });
+  await waitForStoredNoteBody(page, 'ui-smoke-local-task', '- [ ] Follow up with USCIS');
   await page.click('.note-todo-checkbox');
-  await page.waitForFunction(() => {
-    const state = JSON.parse(localStorage.getItem('done-log-state'));
-    return state.todos.find((item) => item.id === 'ui-smoke-local-task')?.note === '- [x] Follow up with USCIS';
-  });
+  await waitForStoredNoteBody(page, 'ui-smoke-local-task', '- [x] Follow up with USCIS');
   const clickedTodoValue = await page.locator('#detail-note').inputValue();
   await page.focus('#detail-note');
   await page.locator('#detail-note').evaluate((textarea) => textarea.setSelectionRange(0, 0));
@@ -1459,10 +1451,7 @@ async function exerciseDetailEditing(page) {
     textarea.setSelectionRange(textarea.value.length, textarea.value.length);
   });
   await page.keyboard.press('Enter');
-  await page.waitForFunction(() => {
-    const state = JSON.parse(localStorage.getItem('done-log-state'));
-    return state.todos.find((item) => item.id === 'ui-smoke-local-task')?.note === '\t- [x] Follow up with USCIS\n\t- [ ] ';
-  });
+  await waitForStoredNoteBody(page, 'ui-smoke-local-task', '\t- [x] Follow up with USCIS\n\t- [ ] ');
   const enterIndentCheck = await page.evaluate(() => ({
     noteValue: document.querySelector('#detail-note')?.value,
     selectionStart: document.querySelector('#detail-note')?.selectionStart,
@@ -1890,7 +1879,7 @@ function assertDetailEditing(result) {
     failures.push(`missing start time does not default to creation time: ${JSON.stringify(summaryTimeEdit)}`);
   }
 
-  if (editChecks.storedNote !== '\t- [x] Follow up with USCIS\n\t- [ ] ' || editChecks.storedTitle !== 'Smoke renamed task') {
+  if (noteBody(editChecks.storedNote) !== '\t- [x] Follow up with USCIS\n\t- [ ] ' || editChecks.storedTitle !== 'Smoke renamed task') {
     failures.push(`detail editing failed: ${JSON.stringify(editChecks)}`);
   }
 
@@ -1919,7 +1908,7 @@ function assertDetailEditing(result) {
   }
 
   if (
-    editChecks.noteAfterInput?.storedNote !== 'Smoke note' ||
+    noteBody(editChecks.noteAfterInput?.storedNote) !== 'Smoke note' ||
     editChecks.noteAfterInput?.saveVisible ||
     editChecks.noteAfterInput?.statusText !== 'Saving details...'
   ) {

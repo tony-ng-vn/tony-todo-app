@@ -42,6 +42,7 @@
     startTodoTimer,
     updateTodoTimeSegments,
     updateTodoNote,
+    updateTodoNoteFromEditor,
     updateTodoTitle,
     stripNoteStampsForEditor,
   } from '../../todoStore.js';
@@ -534,10 +535,19 @@
 
   function handleNoteInput(todoId, note) {
     const edit = recordNoteEdit(todoId, note);
-    state = updateTodoNote(loadLocalState(), todoId, note);
+    const beforeState = loadLocalState();
+    state = updateTodoNoteFromEditor(beforeState, todoId, note);
+    // The first typed note can start the timer (and archive prior days); the
+    // note autosave only carries the note text, so those rows need their own sync.
+    const timerChanged =
+      getCreatedTodos(beforeState.todos, state.todos).length > 0 ||
+      getChangedTodos(beforeState.todos, state.todos, TIMING_FIELDS).length > 0;
     saveLocalState(state);
     setNoteSaveStatus(todoId, 'saving');
     noteAutosave.schedule(todoId, edit);
+    if (timerChanged) {
+      void syncRemoteChange('Saving time', () => persistArchivedTodos(beforeState.todos, state.todos));
+    }
   }
 
   async function saveNoteToRemote(todoId, edit) {
