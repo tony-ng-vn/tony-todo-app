@@ -233,6 +233,17 @@ describe('timer-backed note time blocks', () => {
     expect(stripNoteStampsForEditor(state.todos[0].note)).toBe('');
   });
 
+  it('keeps the Start time from the click when the first note is typed later', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Write the talk', START);
+    const todoId = state.todos[0].id;
+    state = startTodoTimer(state, todoId, START);
+
+    state = updateTodoNoteFromEditor(state, todoId, '- outline', RESUME);
+
+    expect(state.todos[0].note).toBe(`${startHeading(START)}\n- outline`);
+  });
+
   it('writes End into the note when the timer pauses', () => {
     let state = createInitialState();
     state = addTodo(state, 'Write the talk', START);
