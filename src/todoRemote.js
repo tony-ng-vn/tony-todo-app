@@ -24,6 +24,16 @@ export async function insertRemoteTodo(client, userId, todo) {
   throwIfError(error);
 }
 
+// Session ids are deterministic and every client archives on load, focus and
+// rollover, so a plain insert races between the web app and the menubar.
+export async function insertRemoteProgressSession(client, userId, session) {
+  const { error } = await client.database
+    .from('todos')
+    .upsert([toRemoteRecord(session, userId)], { onConflict: 'id', ignoreDuplicates: true });
+
+  throwIfError(error);
+}
+
 export async function completeRemoteTodo(client, userId, todo) {
   await updateRemoteTodo(client, userId, todo, completionFields(todo));
 }
@@ -51,33 +61,12 @@ export async function updateRemoteTodoTimer(client, userId, todo) {
   await updateRemoteTodo(client, userId, todo, timerFields(todo));
 }
 
-export async function updateRemoteTodoProgress(client, userId, todo) {
-  await updateRemoteTodo(client, userId, todo, progressFields(todo));
-}
-
 export async function updateRemoteTodoCompletion(client, userId, todo) {
   await updateRemoteTodo(client, userId, todo, completionFields(todo));
 }
 
 export async function updateRemoteTodoWorkflow(client, userId, todo) {
   await updateRemoteTodo(client, userId, todo, completionFields(todo));
-}
-
-export async function logRemoteProgressSession(client, parent, session) {
-  const { error } = await client.database.rpc('log_progress_session', {
-    p_parent_id: parent.id,
-    p_session_id: session.id,
-    p_title: session.title,
-    p_created_at: session.createdAt,
-    p_completed_at: session.completedAt,
-    p_note: session.note ?? '',
-    p_first_started_at: session.firstStartedAt ?? null,
-    p_tracked_seconds: normalizeTrackedSeconds(session.trackedSeconds),
-    p_time_segments: normalizeTimeSegments(session.timeSegments),
-    p_progress_label: session.progressLabel ?? '',
-  });
-
-  throwIfError(error);
 }
 
 export async function deleteRemoteTodo(client, userId, todoId) {
@@ -115,13 +104,6 @@ function timerFields(todo) {
     active_started_at: todo.activeStartedAt ?? null,
     tracked_seconds: normalizeTrackedSeconds(todo.trackedSeconds),
     time_segments: normalizeTimeSegments(todo.timeSegments),
-  };
-}
-
-function progressFields(todo) {
-  return {
-    is_progressive: Boolean(todo.isProgressive),
-    progress_label: todo.progressLabel ?? '',
   };
 }
 

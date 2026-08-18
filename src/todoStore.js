@@ -5,6 +5,7 @@ import {
   closeActiveTimeSegment,
   compareTodosNewestFirst,
   completeTodo,
+  archivePriorDaySessions,
   createInitialState,
   createTodoId,
   findDuplicateTodo,
@@ -22,6 +23,7 @@ import {
   normalizeTimeSegments,
   normalizeTodo,
   normalizedTrackedSeconds,
+  totalSegmentSeconds,
 } from './todoCommands.js';
 import { stripNoteStampsForEditor } from './noteEntries.js';
 
@@ -29,6 +31,7 @@ export {
   addTodo,
   closeActiveTimeSegment,
   completeTodo,
+  archivePriorDaySessions,
   createInitialState,
   createTodoId,
   findDuplicateTodo,
@@ -53,9 +56,11 @@ export const BOARD_COLUMNS = [
 ];
 
 export function failTodo(state, todoId, failedAt = new Date()) {
+  const archived = archivePriorDaySessions(state, failedAt);
+
   return {
-    ...state,
-    todos: state.todos.map((todo) => {
+    ...archived,
+    todos: archived.todos.map((todo) => {
       if (todo.id !== todoId) {
         return todo;
       }
@@ -138,7 +143,7 @@ export function updateTodoTiming(state, todoId, startedAt, completedAt) {
         firstStartedAt: new Date(startTime).toISOString(),
         activeStartedAt: null,
         completedAt: new Date(endTime).toISOString(),
-        trackedSeconds: totalTimeSegmentSeconds(timeSegments),
+        trackedSeconds: totalSegmentSeconds(timeSegments),
         timeSegments,
       };
     }),
@@ -196,7 +201,7 @@ export function updateTodoTimeSegments(state, todoId, segments) {
         firstStartedAt,
         activeStartedAt: wasRunning ? latestEndedAt : null,
         completedAt: wasCompleted ? todo.completedAt : null,
-        trackedSeconds: totalTimeSegmentSeconds(timeSegments),
+        trackedSeconds: totalSegmentSeconds(timeSegments),
         timeSegments,
       };
     }),
@@ -205,6 +210,7 @@ export function updateTodoTimeSegments(state, todoId, segments) {
 
 export function startTodoTimer(state, todoId, startedAt = new Date()) {
   const startedAtIso = startedAt.toISOString();
+  state = archivePriorDaySessions(state, startedAt);
 
   return {
     ...state,
@@ -230,7 +236,7 @@ export function startTodoTimer(state, todoId, startedAt = new Date()) {
 }
 
 export function pauseTodoTimer(state, todoId, pausedAt = new Date()) {
-  return {
+  const paused = {
     ...state,
     todos: state.todos.map((todo) =>
       todo.id === todoId && todo.activeStartedAt
@@ -242,6 +248,8 @@ export function pauseTodoTimer(state, todoId, pausedAt = new Date()) {
         : todo,
     ),
   };
+
+  return archivePriorDaySessions(paused, pausedAt);
 }
 
 export function reopenTodo(state, todoId) {
@@ -511,7 +519,7 @@ export function moveTodoToBoardColumn(state, todoId, columnId, at = new Date()) 
   }
 
   if (columnId === 'done') {
-    return logProgressSession(state, todoId, at);
+    return completeTodo(state, todoId, at);
   }
 
   return state;
@@ -841,62 +849,6 @@ export function getEditableTaskTimeSegments(todo, activeEndedAt = new Date()) {
   ];
 }
 
-export function setTodoProgressive(state, todoId, isProgressive) {
-  return {
-    ...state,
-    todos: state.todos.map((todo) =>
-      todo.id === todoId && !todo.isProgressSession
-        ? {
-            ...todo,
-            isProgressive: Boolean(isProgressive),
-          }
-        : todo,
-    ),
-  };
-}
-
-export function updateTodoProgress(state, todoId, progressLabel) {
-  return {
-    ...state,
-    todos: state.todos.map((todo) =>
-      todo.id === todoId
-        ? {
-            ...todo,
-            progressLabel: progressLabel ?? '',
-          }
-        : todo,
-    ),
-  };
-}
-
-export function logProgressSession(state, todoId, completedAt = new Date()) {
-  const parent = state.todos.find((todo) => todo.id === todoId);
-
-  if (!parent?.isProgressive) {
-    return completeTodo(state, todoId, completedAt);
-  }
-
-  const session = createProgressSession(parent, getCompletionTimestamp(parent, completedAt));
-
-  return {
-    ...state,
-    todos: [
-      ...state.todos.map((todo) =>
-        todo.id === todoId
-          ? {
-              ...todo,
-              firstStartedAt: null,
-              activeStartedAt: null,
-              trackedSeconds: 0,
-              timeSegments: [],
-            }
-          : todo,
-      ),
-      session,
-    ],
-  };
-}
-
 export function getProgressSessions(state, parentTaskId) {
   return state.todos
     .filter((todo) => todo.parentTaskId === parentTaskId && todo.isProgressSession)
@@ -909,9 +861,9 @@ export function getTaskTimeSegments(state, taskId) {
     return [];
   }
 
-  const sessionSegments = task.isProgressive
-    ? getProgressSessions(state, taskId).flatMap((session) => normalizeTimeSegments(session.timeSegments))
-    : [];
+  const sessionSegments = getProgressSessions(state, taskId).flatMap((session) =>
+    normalizeTimeSegments(session.timeSegments),
+  );
 
   return [...sessionSegments, ...normalizeTimeSegments(task.timeSegments)]
     .toSorted((first, second) => new Date(first.startedAt) - new Date(second.startedAt))
@@ -938,7 +890,7 @@ export function reorderCompletedTodosForDay(state, dayKey, orderedIds) {
   const nextCompletedAtById = new Map(
     orderedForDay.map((todo, index) => [
       todo.id,
-      new Date(latestCompletion.getTime() - index * 60_000).toISOString(),
+      new Date(latestCompletion.getTime() - (orderedForDay.length - 1 - index) * 60_000).toISOString(),
     ]),
   );
 
@@ -972,7 +924,7 @@ export function moveCompletedTodoToSummaryBucket(state, dayKey, todoId, bucketLa
   const completedAtById = new Map(
     orderedTargetIds.map((id, index) => [
       id,
-      completedAtForBucketPosition(dayKey, bucketLabel, index, orderedTargetIds.length),
+      completedAtForBucketPosition(dayKey, bucketLabel, index),
     ]),
   );
 
@@ -1050,14 +1002,6 @@ function formatDateGroupLabel(dayKey) {
   return dateGroupLabelFormat.format(new Date(`${dayKey}T00:00:00`));
 }
 
-function totalTimeSegmentSeconds(segments) {
-  return segments.reduce(
-    (total, segment) =>
-      total + getActiveSegmentSeconds(new Date(segment.startedAt), new Date(segment.endedAt)),
-    0,
-  );
-}
-
 function updateTimeSegmentBounds(segments, startTime, endTime) {
   const startIso = new Date(startTime).toISOString();
   const endIso = new Date(endTime).toISOString();
@@ -1078,34 +1022,7 @@ function updateTimeSegmentBounds(segments, startTime, endTime) {
   }));
 }
 
-function createProgressSession(parent, completedAt) {
-  const doneAt = completedAt.toISOString();
-  const stoppedTimer = closeActiveTimeSegment(parent, completedAt);
-
-  return {
-    ...normalizeTodo({
-      id: createProgressSessionId(parent.id, completedAt),
-      title: parent.title,
-      createdAt: parent.activeStartedAt ?? completedAt.toISOString(),
-      completedAt: doneAt,
-      note: parent.progressLabel ?? '',
-      source: 'progress-session',
-      parentTaskId: parent.id,
-      isProgressSession: true,
-      progressLabel: parent.progressLabel ?? '',
-      firstStartedAt: parent.firstStartedAt ?? null,
-      activeStartedAt: null,
-      trackedSeconds: stoppedTimer.trackedSeconds,
-      timeSegments: stoppedTimer.timeSegments,
-    }),
-  };
-}
-
-function createProgressSessionId(parentId, completedAt) {
-  return `${completedAt.getTime()}-${parentId.slice(0, 24)}-session`;
-}
-
-function completedAtForBucketPosition(dayKey, bucketLabel, index, itemCount) {
+function completedAtForBucketPosition(dayKey, bucketLabel, index) {
   const bucket = SUMMARY_BUCKETS.find((candidate) => candidate.label === bucketLabel);
-  return new Date(bucket.startAt(dayKey).getTime() + (itemCount - index - 1) * 60_000).toISOString();
+  return new Date(bucket.startAt(dayKey).getTime() + index * 60_000).toISOString();
 }
