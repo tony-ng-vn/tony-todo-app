@@ -109,6 +109,14 @@ async function inspectMobileTaskDetail(viewport) {
   await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
   await page.locator('[data-todo-id="ui-smoke-mobile-detail-task"] .open-task-button').tap();
   await page.waitForSelector('#task-detail');
+  await page.waitForFunction(() => {
+    const detail = document.querySelector('#task-detail');
+    if (!detail) {
+      return false;
+    }
+    const transform = getComputedStyle(detail).transform;
+    return transform === 'none' || transform === 'matrix(1, 0, 0, 1, 0, 0)';
+  });
 
   const layout = await page.evaluate(() => {
     const viewportHeight = window.innerHeight;
@@ -130,10 +138,18 @@ async function inspectMobileTaskDetail(viewport) {
         inViewport: visibleHeight > 24 && visibleWidth > 24,
       };
     }
+    const detailEl = document.querySelector('#task-detail');
+    const closeEl = document.querySelector('#detail-close');
+    const closeRect = closeEl?.getBoundingClientRect();
     return {
       viewportHeight,
+      viewportWidth,
       detail: box('#task-detail'),
       note: box('#detail-note'),
+      close: box('#detail-close'),
+      detailPosition: detailEl ? getComputedStyle(detailEl).position : null,
+      closeTop: closeRect ? Math.round(closeRect.top) : null,
+      closeRight: closeRect ? Math.round(closeRect.right) : null,
     };
   });
 
@@ -184,6 +200,22 @@ async function inspectMobileTaskDetail(viewport) {
   }
 
   await page.locator('.detail-start-picker').scrollIntoViewIfNeeded();
+  const closeAfterScroll = await page.evaluate(() => {
+    const closeEl = document.querySelector('#detail-close');
+    if (!closeEl) {
+      return null;
+    }
+    const rect = closeEl.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const visibleHeight = Math.max(0, Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0));
+    const visibleWidth = Math.max(0, Math.min(rect.right, viewportWidth) - Math.max(rect.left, 0));
+    return {
+      top: Math.round(rect.top),
+      right: Math.round(rect.right),
+      inViewport: visibleHeight > 24 && visibleWidth > 24,
+    };
+  });
   await page.locator('.detail-start-picker').tap();
   await page.waitForSelector('.calendar-popover');
   const calendar = await page.evaluate(() => {
@@ -207,16 +239,51 @@ async function inspectMobileTaskDetail(viewport) {
     };
   });
 
+  await page.keyboard.press('Escape');
+  await page.locator('#detail-close').tap();
+  await page.waitForSelector('#task-detail', { state: 'detached' });
+  const detailClosed = await page.evaluate(() => !document.querySelector('#task-detail'));
+
   await page.close();
-  return { layout, noteValue, noteFillError, noteLinkPresentation, calendar };
+  return { layout, noteValue, noteFillError, noteLinkPresentation, calendar, closeAfterScroll, detailClosed };
 }
 
 function assertMobileTaskDetail(result) {
   const failures = [];
-  if (!result.layout.detail || result.layout.detail.viewportCoverage < 0.85) {
+  if (
+    result.layout.detailPosition !== 'fixed' ||
+    !result.layout.detail ||
+    result.layout.detail.viewportCoverage < 0.98 ||
+    result.layout.detail.top > 2 ||
+    result.layout.detail.width < (result.layout.viewportWidth ?? 0) - 2
+  ) {
     failures.push(
-      `iPhone task details are not on screen after Open: ${JSON.stringify(result.layout.detail)}`,
+      `iPhone task details are not a full-screen overlay after Open: ${JSON.stringify(result.layout)}`,
     );
+  }
+  if (
+    !result.layout.close?.inViewport ||
+    result.layout.closeTop == null ||
+    result.layout.closeTop > 96 ||
+    result.layout.closeRight == null ||
+    (result.layout.viewportWidth ?? 0) - result.layout.closeRight > 80
+  ) {
+    failures.push(
+      `iPhone task detail close is not pinned to the top right: ${JSON.stringify({
+        close: result.layout.close,
+        closeTop: result.layout.closeTop,
+        closeRight: result.layout.closeRight,
+        viewportWidth: result.layout.viewportWidth,
+      })}`,
+    );
+  }
+  if (!result.closeAfterScroll?.inViewport || result.closeAfterScroll.top > 96) {
+    failures.push(
+      `iPhone task detail close scrolled away with the note: ${JSON.stringify(result.closeAfterScroll)}`,
+    );
+  }
+  if (!result.detailClosed) {
+    failures.push('iPhone task details could not be closed from the overlay');
   }
   if (!result.layout.note?.inViewport) {
     failures.push(`iPhone task note is not on screen after Open: ${JSON.stringify(result.layout.note)}`);

@@ -21,6 +21,7 @@
   export let onProgressiveChange;
   export let onProgressInput;
   export let onTimeSegmentsChange;
+  export let onCompletedAtChange;
   export let onDueDateChange;
   export let onSomedayChange;
   export let onDeleteTask;
@@ -111,21 +112,17 @@
       return;
     }
 
-    const latestBlockIndex = timingDraftBlocks.reduce((latestIndex, block, index, blocks) => {
-      if (!block.endedAt) {
-        return latestIndex;
-      }
-      return !blocks[latestIndex]?.endedAt || new Date(block.endedAt) > new Date(blocks[latestIndex].endedAt)
-        ? index
-        : latestIndex;
-    }, 0);
-    const latestBlock = timingDraftBlocks[latestBlockIndex];
-    const endTime = latestBlock?.endedAt?.split('T')[1];
-    if (!endTime) {
+    const completedAt = new Date(selectedTask.completedAt);
+    if (Number.isNaN(completedAt.getTime())) {
       return;
     }
 
-    await handleTimingChange(latestBlockIndex, 'endedAt', `${value}T${endTime}`);
+    const timeValue = `${String(completedAt.getHours()).padStart(2, '0')}:${String(completedAt.getMinutes()).padStart(2, '0')}`;
+    timingError = '';
+    const result = await onCompletedAtChange?.(selectedTask.id, value, timeValue, { allowBeforeStart: true });
+    if (result?.ok === false) {
+      timingError = result.error ?? 'The done date could not be updated.';
+    }
   }
 
   async function handleTimingChange(index, field, value) {
@@ -280,6 +277,7 @@
       <button type="button" class="detail-close" id="detail-close" aria-label="Close task details" on:click={onClose}>Close</button>
     </div>
   </div>
+  <div class="detail-body">
     <label class="detail-title-label" for={editingDetailTitle ? 'detail-title-input' : undefined}>Task name</label>
     {#if editingDetailTitle}
       <input
@@ -527,5 +525,6 @@
         {/if}
       </div>
     {/if}
+  </div>
 </aside>
 {/if}
