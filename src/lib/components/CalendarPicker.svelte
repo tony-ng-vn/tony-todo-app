@@ -105,6 +105,8 @@
 
   function handleKeydown(event) {
     if (isOpen && event.key === 'Escape') {
+      event.preventDefault();
+      event.stopPropagation();
       closeCalendar();
     }
   }
@@ -251,7 +253,7 @@
   }
 </script>
 
-<svelte:window on:keydown={handleKeydown} on:resize={handleViewportChange} on:scroll={handleViewportChange} />
+<svelte:window on:keydown|capture={handleKeydown} on:resize={handleViewportChange} on:scroll={handleViewportChange} />
 
 <div class="calendar-picker">
   <button

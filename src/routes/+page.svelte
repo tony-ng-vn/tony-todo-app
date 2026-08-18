@@ -141,7 +141,6 @@
   let titleDraft = '';
   let composerKind = 'task';
   let dueDateDraft = formatDayKey(new Date());
-  let lastSelectedDayForDraft = dueDateDraft;
   let selectedTaskId = null;
   let photoBusy = false;
   let photoError = '';
@@ -205,10 +204,6 @@
   $: selectedNoteSaveStatus = noteSaveStatuses[selectedTaskId] ?? 'saved';
   $: selectedTaskSessions = selectedTaskId ? getProgressSessions(state, selectedTaskId) : [];
 
-  $: if (selectedDay !== lastSelectedDayForDraft && dueDateDraft === lastSelectedDayForDraft && !composerOpen) {
-    dueDateDraft = selectedDay;
-    lastSelectedDayForDraft = selectedDay;
-  }
 
   onMount(() => {
     useRemote = isInsForgeConfigured && !new URLSearchParams(window.location.search).has('local');
@@ -295,7 +290,6 @@
     composerKind = kind === 'project' ? 'project' : 'task';
     if (!titleDraft.trim()) {
       dueDateDraft = formatDayKey(new Date());
-      lastSelectedDayForDraft = dueDateDraft;
     }
     composerError = '';
     composerOpen = true;
@@ -311,6 +305,10 @@
     }
 
     if (event.key.toLowerCase() !== 'n') {
+      return;
+    }
+
+    if (useRemote && authChecked && !authUser) {
       return;
     }
 
@@ -347,7 +345,6 @@
     titleDraft = '';
     composerKind = 'task';
     dueDateDraft = formatDayKey(new Date());
-    lastSelectedDayForDraft = dueDateDraft;
     composerOpen = false;
     saveLocalState(state);
     window.setTimeout(() => {

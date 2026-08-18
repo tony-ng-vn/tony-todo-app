@@ -477,6 +477,10 @@
       return;
     }
 
+    if (shell !== 'app') {
+      return;
+    }
+
     event.preventDefault();
     if (composerOpen) {
       document.getElementById('overlay-todo-title')?.focus();

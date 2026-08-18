@@ -44,8 +44,17 @@
     previousFocus = null;
   }
 
+  function handleDialogKeydown(event) {
+    if (event.key === 'Escape' && dialogEl?.querySelector('.calendar-popover')) {
+      event.preventDefault();
+    }
+  }
+
   function handleCancel(event) {
     event.preventDefault();
+    if (dialogEl?.querySelector('.calendar-popover')) {
+      return;
+    }
     onClose?.();
   }
 
@@ -69,6 +78,7 @@
   class="composer-overlay"
   aria-labelledby="composer-heading"
   on:cancel={handleCancel}
+  on:keydown={handleDialogKeydown}
   on:click={handleBackdropClick}
 >
   <form class="composer-card" on:submit|preventDefault={handleSubmit}>
