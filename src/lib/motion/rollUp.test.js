@@ -38,6 +38,14 @@ describe('rollUp', () => {
     expect(motion.css(1)).toBe('opacity:1;transform:translateY(0px);clip-path:inset(0 0 0% 0)');
   });
 
+  it('leaves a little faster than it arrives by default', () => {
+    stubReducedMotion(false);
+    expect(rollUp(fakeNode(), { enabled: true }, { direction: 'in' }).duration).toBe(280);
+    expect(rollUp(fakeNode(), { enabled: true }, { direction: 'out' }).duration).toBe(210);
+    expect(rollUp(fakeNode(), { enabled: true }, { direction: 'both' }).duration).toBe(280);
+    expect(rollUp(fakeNode(), { enabled: true, duration: 90 }, { direction: 'out' }).duration).toBe(90);
+  });
+
   it('leaves no inline styles behind on the node', () => {
     stubReducedMotion(false);
     const node = fakeNode();
