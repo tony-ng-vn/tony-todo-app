@@ -900,15 +900,7 @@ async function inspectFloatingNote() {
   await notePage.goto(request.url, { waitUntil: 'networkidle' });
   await notePage.waitForSelector('.floating-note-shell:not(.is-overlay)');
   await notePage.fill('.floating-note-input', 'Note from floating window');
-  await notePage.waitForFunction(() => {
-    const todo = JSON.parse(localStorage.getItem('done-log-state')).todos[0];
-    const pattern = /^(?:Start:|End:|@) \d{4}-\d{2}-\d{2} \d{2}:\d{2}\s*$/;
-    const body = String(todo?.note ?? '')
-      .split('\n')
-      .filter((line) => !pattern.test(line))
-      .join('\n');
-    return body === 'Note from floating window';
-  });
+  await waitForStoredNoteBody(notePage, null, 'Note from floating window');
   await notePage.waitForFunction(
     () =>
       document.querySelector('.floating-note-save-status')?.textContent.trim()
@@ -936,15 +928,12 @@ async function inspectFloatingNote() {
   await page.click('.menubar-pause');
   await page.waitForSelector('.menubar-start');
   await page.click('.menubar-start');
-  const noteSurvivedTimerChanges = await page.evaluate(() => {
+  const restartedTodo = await page.evaluate(() => {
     const todo = JSON.parse(localStorage.getItem('done-log-state')).todos[0];
-    const pattern = /^(?:Start:|End:|@) \d{4}-\d{2}-\d{2} \d{2}:\d{2}\s*$/;
-    const body = String(todo?.note ?? '')
-      .split('\n')
-      .filter((line) => !pattern.test(line))
-      .join('\n');
-    return Boolean(todo?.activeStartedAt) && body === 'Note from floating window';
+    return { activeStartedAt: todo?.activeStartedAt ?? null, note: todo?.note ?? '' };
   });
+  const noteSurvivedTimerChanges =
+    Boolean(restartedTodo.activeStartedAt) && noteBody(restartedTodo.note) === 'Note from floating window';
   await context.close();
 
   return {
