@@ -3,6 +3,7 @@
   import '../styles.css';
   import FlowRail from '../lib/components/FlowRail.svelte';
   import LottieAnimation from '../lib/components/LottieAnimation.svelte';
+  import AddTaskOverlay from '../lib/components/AddTaskOverlay.svelte';
   import AuthGate from '../lib/components/AuthGate.svelte';
   import BoardPanel from '../lib/components/BoardPanel.svelte';
   import CalendarPanel from '../lib/components/CalendarPanel.svelte';
@@ -24,8 +25,11 @@
   import FeedbackSdkWidget from '$lib/components/FeedbackSdkWidget.svelte';
   import {
     addTodo,
+    archivePriorDaySessions,
+    completeTodo,
     createInitialState,
     deleteTodo,
+    dueDateInputToIso,
     failTodo,
     findDuplicateTodo,
     formatDayKey,
@@ -39,7 +43,9 @@
     getOpenTodoSections,
     getProgressSessions,
     getProjectTodos,
-    logProgressSession,
+    filterTodoSections,
+    filterTodosBySearch,
+    findOverflowSearchMatches,
     moveCompletedTodoToSummaryBucket,
     moveTodoToBoardColumn,
     pauseTodoTimer,
@@ -49,30 +55,28 @@
     restoreTodoFromSomeday,
     setTodoDueDate,
     setTodoPhoto,
-    setTodoProgressive,
     setTodoSomeday,
     startTodoTimer,
     updateTodoTimeSegments,
     updateTodoCompletedAt,
     updateTodoNote,
     updateTodoNoteFromEditor,
-    updateTodoProgress,
     updateTodoTitle,
     stripNoteStampsForEditor,
   } from '../todoStore.js';
   import { insforge, isInsForgeConfigured } from '../insforgeClient.js';
+  import { isNewTaskShortcut } from '../newTaskShortcut.js';
   import { getCurrentUser, signInWithPassword, signOut, signUp } from '../auth.js';
   import {
     completeRemoteTodo,
     deleteRemoteTodo,
+    insertRemoteProgressSession,
     insertRemoteTodo,
     loadRemoteTodos,
-    logRemoteProgressSession,
     updateRemoteTodoCompletion,
     updateRemoteTodoDueDate,
     updateRemoteTodoNote,
     updateRemoteTodoPhoto,
-    updateRemoteTodoProgress,
     updateRemoteTodoTimer,
     updateRemoteTodoTitle,
     updateRemoteTodoWorkflow,
@@ -115,6 +119,7 @@
 
   const TIMER_SYNC_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds', 'timeSegments'];
   const COMPLETION_SYNC_FIELDS = ['completedAt'];
+  const ARCHIVE_SYNC_FIELDS = [...TIMER_SYNC_FIELDS, ...COMPLETION_SYNC_FIELDS];
   const VIEW_STORAGE_KEY = 'done-log-view';
 
   let state = createInitialState();
@@ -131,11 +136,12 @@
   let authPassword = '';
   let authError = '';
   let authLoading = false;
+  let composerOpen = false;
+  let composerError = '';
+  let taskSearchQuery = '';
   let titleDraft = '';
   let composerKind = 'task';
   let dueDateDraft = formatDayKey(new Date());
-  let lastSelectedDayForDraft = dueDateDraft;
-  let draftTitle = '';
   let selectedTaskId = null;
   let photoBusy = false;
   let photoError = '';
@@ -145,7 +151,6 @@
   let newlyAddedTodoId = null;
   let liveTimer = null;
   let dayRolloverTimer = null;
-  let progressSaveTimer = null;
   let titleSaveTimer = null;
   let noteDraftTaskId = null;
   let draggedSummaryId = null;
@@ -178,14 +183,18 @@
     pendingViewTodos,
     new Date(`${currentDayKey}T00:00:00`),
   );
-  $: ongoingTodos = pendingTodoGroups.ongoing;
-  $: pausedTodos = pendingTodoGroups.paused;
-  $: openTodos = pendingTodoGroups.scheduled;
+  $: ongoingTodos = filterTodosBySearch(pendingTodoGroups.ongoing, taskSearchQuery);
+  $: pausedTodos = filterTodosBySearch(pendingTodoGroups.paused, taskSearchQuery);
+  $: openTodos = filterTodosBySearch(pendingTodoGroups.scheduled, taskSearchQuery);
   $: openTodoSections = getOpenTodoSections(openTodos, new Date(`${currentDayKey}T00:00:00`));
-  $: openCount = openTodos.length;
-  $: summary = getDaySummary(state, selectedDay);
+  $: summary = filterTodoSections(getDaySummary(state, selectedDay), taskSearchQuery);
   $: boardColumns = getBoardColumns(state, { dayKey: selectedDay, dueFilter: boardDueFilter });
   $: projectTodos = getProjectTodos(state);
+  $: searchMatches = findOverflowSearchMatches(
+    state.todos,
+    [...ongoingTodos, ...pausedTodos, ...openTodos, ...summary.flatMap((section) => section.items)],
+    taskSearchQuery,
+  );
   $: calendarMonthData = getCalendarMonth(state, { year: calendarYear, month: calendarMonth });
   $: completedToday = summary.reduce(
     (total, section) => total + section.items.filter((item) => item.outcome !== 'failed').length,
@@ -195,15 +204,12 @@
   $: selectedNoteSaveStatus = noteSaveStatuses[selectedTaskId] ?? 'saved';
   $: selectedTaskSessions = selectedTaskId ? getProgressSessions(state, selectedTaskId) : [];
 
-  $: if (selectedDay !== lastSelectedDayForDraft && dueDateDraft === lastSelectedDayForDraft) {
-    dueDateDraft = selectedDay;
-    lastSelectedDayForDraft = selectedDay;
-  }
 
   onMount(() => {
     useRemote = isInsForgeConfigured && !new URLSearchParams(window.location.search).has('local');
     syncMessage = useRemote ? 'Connecting' : 'Local only';
-    state = loadLocalState();
+    state = archivePriorDaySessions(loadLocalState());
+    saveLocalState(state);
     queuePendingNoteSaves();
     themeMode = loadThemeMode();
     viewMode = loadViewMode();
@@ -218,7 +224,6 @@
   onDestroy(() => {
     window.clearInterval(liveTimer);
     window.clearTimeout(dayRolloverTimer);
-    window.clearTimeout(progressSaveTimer);
     window.clearTimeout(titleSaveTimer);
     window.clearTimeout(completionCueTimer);
     void noteAutosave.flushAll().catch(() => {});
@@ -249,20 +254,36 @@
     noteDraft = nextDraft.noteDraft;
   }
 
-  // A due date is a calendar day, so anchor the picked YYYY-MM-DD to local
-  // midnight before storing it as an ISO string. Empty input -> no due date.
-  function dueDateInputToIso(value) {
-    if (!value) {
-      return null;
+  function openComposer(kind = 'task') {
+    composerKind = kind === 'project' ? 'project' : 'task';
+    if (!titleDraft.trim()) {
+      dueDateDraft = formatDayKey(new Date());
+    }
+    composerError = '';
+    composerOpen = true;
+  }
+
+  function closeComposer() {
+    composerOpen = false;
+  }
+
+  function handleWorkspaceKeydown(event) {
+    if (!isNewTaskShortcut(event) || (useRemote && authChecked && !authUser)) {
+      return;
     }
 
-    const date = new Date(`${value}T00:00:00`);
-    return Number.isNaN(date.getTime()) ? null : date.toISOString();
+    event.preventDefault();
+    if (composerOpen) {
+      document.getElementById('overlay-todo-title')?.focus();
+      return;
+    }
+    openComposer(viewMode === 'projects' ? 'project' : 'task');
   }
 
   async function handleSubmit() {
     const duplicate = findDuplicateTodo(state, titleDraft);
     if (duplicate) {
+      composerError = `That is already open as "${duplicate.title}".`;
       syncMessage = `Duplicate task: "${duplicate.title}" is already open`;
       return;
     }
@@ -271,7 +292,7 @@
     const kind = composerKind === 'project' ? 'project' : 'task';
     state = addTodo(state, titleDraft, new Date(), {
       kind,
-      dueDate: kind === 'project' ? null : dueDateInputToIso(dueDateDraft || selectedDay),
+      dueDate: kind === 'project' ? null : dueDateInputToIso(dueDateDraft || formatDayKey(new Date())),
     });
     const createdTodo = state.todos.find((todo) => !existingIds.has(todo.id));
 
@@ -279,12 +300,12 @@
       return;
     }
 
+    composerError = '';
     newlyAddedTodoId = createdTodo.id;
-    draftTitle = '';
     titleDraft = '';
     composerKind = 'task';
-    dueDateDraft = selectedDay;
-    lastSelectedDayForDraft = selectedDay;
+    dueDateDraft = formatDayKey(new Date());
+    composerOpen = false;
     saveLocalState(state);
     window.setTimeout(() => {
       if (newlyAddedTodoId === createdTodo.id) {
@@ -299,10 +320,6 @@
     await syncRemoteChange('Saving', () => persistNewTodo(createdTodo));
   }
 
-  function handleDraftInput() {
-    draftTitle = titleDraft.trim();
-  }
-
   function withLatestProgressSession(todos) {
     return todos.map((todo) => ({
       ...todo,
@@ -312,14 +329,11 @@
 
   async function handleComplete(todoId) {
     const beforeTodos = state.todos;
-    const beforeTodo = findTodo(todoId);
-    state = logProgressSession(state, todoId);
-    const afterTodo = findTodo(todoId);
-    const createdTodo = state.todos.find((todo) => !beforeTodos.some((before) => before.id === todo.id));
-    const completedTodo = createdTodo ?? afterTodo;
+    state = completeTodo(state, todoId);
+    const completedTodo = findTodo(todoId);
 
     triggerCompletionCue(completedTodo);
-    if (!beforeTodo?.isProgressive && selectedTaskId === todoId) {
+    if (selectedTaskId === todoId) {
       selectedTaskId = null;
     }
     selectedDay = completedTodo?.completedAt
@@ -327,15 +341,11 @@
       : formatDayKey(new Date());
     saveLocalState(state);
 
-    if (beforeTodo?.isProgressive) {
-      await syncRemoteChange('Saving session', () => persistProgressSession(afterTodo, createdTodo));
-      return;
-    }
-
-    await syncRemoteChange('Saving', () => persistCompletedTodo(completedTodo));
+    await syncRemoteChange('Saving', () => persistArchivedTodos(beforeTodos, state.todos));
   }
 
   async function handleFail(todoId) {
+    const beforeTodos = state.todos;
     const beforeTodo = findTodo(todoId);
     state = failTodo(state, todoId);
     const failedTodo = findTodo(todoId);
@@ -352,18 +362,17 @@
       ? formatDayKey(new Date(failedTodo.completedAt))
       : formatDayKey(new Date());
     saveLocalState(state);
-    await syncRemoteChange('Saving failed task', () => persistCompletedTodo(failedTodo));
+    await syncRemoteChange('Saving failed task', () => persistArchivedTodos(beforeTodos, state.todos));
   }
 
   async function handleTimerAction(action, todoId) {
     const beforeTodos = state.todos;
     state = action === 'pause' ? pauseTodoTimer(state, todoId) : startTodoTimer(state, todoId);
-    const changedTodos = getTimerChangedTodos(beforeTodos, state.todos);
     saveLocalState(state);
     if (action === 'start') {
       await revealTodo(todoId);
     }
-    await syncRemoteChange('Saving time', () => Promise.all(changedTodos.map((todo) => persistTodoTimer(todo))));
+    await syncRemoteChange('Saving time', () => persistArchivedTodos(beforeTodos, state.todos));
   }
 
   async function revealTodo(todoId) {
@@ -557,7 +566,8 @@
       return;
     }
 
-    state = loadLocalState();
+    state = archivePriorDaySessions(loadLocalState());
+    saveLocalState(state);
   }
 
   function handleWindowFocus() {
@@ -653,7 +663,7 @@
     const beforeTodo = findTodo(todoId);
     state = moveTodoToBoardColumn(state, todoId, columnId);
     const afterTodo = findTodo(todoId);
-    const createdTodo = state.todos.find((todo) => !beforeTodos.some((before) => before.id === todo.id));
+    const createdTodos = getCreatedTodos(beforeTodos, state.todos);
     const changedWorkflowTodos = getTodosWithChangedFields(beforeTodos, state.todos, [
       ...TIMER_SYNC_FIELDS,
       ...COMPLETION_SYNC_FIELDS,
@@ -667,15 +677,15 @@
       beforeTodo.somedayAt === afterTodo.somedayAt &&
       beforeTodo.activeStartedAt === afterTodo.activeStartedAt &&
       beforeTodo.trackedSeconds === afterTodo.trackedSeconds &&
-      !createdTodo
+      createdTodos.length === 0
     ) {
       return;
     }
 
     if (columnId === 'done') {
-      const completedTodo = createdTodo ?? afterTodo;
+      const completedTodo = afterTodo;
       triggerCompletionCue(completedTodo);
-      if (!beforeTodo?.isProgressive && selectedTaskId === todoId) {
+      if (selectedTaskId === todoId) {
         selectedTaskId = null;
       }
       selectedDay = completedTodo?.completedAt
@@ -685,20 +695,11 @@
 
     saveLocalState(state);
 
-    if (beforeTodo?.isProgressive && columnId === 'done') {
-      await syncRemoteChange('Saving session', async () => {
-        await persistProgressSession(afterTodo, createdTodo);
-        if (beforeTodo.somedayAt !== afterTodo?.somedayAt) {
-          await persistTodoWorkflow(afterTodo);
-        }
+    if (createdTodos.length > 0 || changedWorkflowTodos.length > 0) {
+      await syncRemoteChange('Saving task state', async () => {
+        await persistArchivedSessions(createdTodos);
+        await Promise.all(changedWorkflowTodos.map((todo) => persistTodoWorkflow(todo)));
       });
-      return;
-    }
-
-    if (changedWorkflowTodos.length > 0) {
-      await syncRemoteChange('Saving task state', () =>
-        Promise.all(changedWorkflowTodos.map((todo) => persistTodoWorkflow(todo))),
-      );
     }
   }
 
@@ -750,6 +751,12 @@
     currentDayKey = today;
     if (selectedDay !== today) {
       selectedDay = today;
+    }
+    const previous = state;
+    state = archivePriorDaySessions(state);
+    if (state !== previous) {
+      saveLocalState(state);
+      void syncRemoteChange('Saving sessions', () => persistArchivedTodos(previous.todos, state.todos));
     }
     scheduleSelectedDayRefresh();
   }
@@ -877,24 +884,6 @@
     noteSaveStatuses = { ...noteSaveStatuses, [todoId]: status };
   }
 
-  async function handleProgressiveChange(todoId, isProgressive) {
-    state = setTodoProgressive(state, todoId, isProgressive);
-    const todo = findTodo(todoId);
-    saveLocalState(state);
-    await syncRemoteChange('Saving progress', () => persistTodoProgress(todo));
-  }
-
-  function handleProgressInput(todoId, progressLabel) {
-    state = updateTodoProgress(state, todoId, progressLabel);
-    saveLocalState(state);
-    syncMessage = 'Saving progress';
-    window.clearTimeout(progressSaveTimer);
-    progressSaveTimer = window.setTimeout(async () => {
-      const todo = findTodo(todoId);
-      await syncRemoteChange('Saving progress', () => persistTodoProgress(todo));
-    }, 450);
-  }
-
   function handleDetailTitleCommit(todoId, title) {
     window.clearTimeout(titleSaveTimer);
     titleSaveTimer = window.setTimeout(() => {
@@ -999,11 +988,6 @@
       }
       await persistDeletedTodos(deletedIds);
     });
-  }
-
-  async function handleProjectSubmit() {
-    composerKind = 'project';
-    await handleSubmit();
   }
 
   async function handlePromoteProject(todoId) {
@@ -1209,8 +1193,10 @@
         snapshotNoteEdits([...todoIds]),
       );
       clearNoteEdits(merged.staleEditIds ?? []);
-      state = { todos: merged.todos };
+      const beforeTodos = merged.todos;
+      state = archivePriorDaySessions({ todos: merged.todos });
       saveLocalState(state);
+      await persistArchivedTodos(beforeTodos, state.todos);
       renderRemoteStatus(remoteTodos.length);
     } catch (error) {
       showOfflineCache(error);
@@ -1386,11 +1372,6 @@
     await updateRemoteTodoPhoto(insforge, authUser.id, todo);
   }
 
-  async function persistTodoProgress(todo) {
-    if (!useRemote || !authUser || !todo) return;
-    await updateRemoteTodoProgress(insforge, authUser.id, todo);
-  }
-
   async function persistTodoTimer(todo) {
     if (!useRemote || !authUser || !todo) return;
     await updateRemoteTodoTimer(insforge, authUser.id, todo);
@@ -1401,9 +1382,19 @@
     await updateRemoteTodoWorkflow(insforge, authUser.id, todo);
   }
 
-  async function persistProgressSession(parent, session) {
-    if (!useRemote || !authUser || !parent || !session) return;
-    await logRemoteProgressSession(insforge, parent, session);
+  async function persistArchivedSessions(sessions) {
+    if (!useRemote || !authUser) return;
+    await Promise.all(
+      sessions.map((session) => insertRemoteProgressSession(insforge, authUser.id, session)),
+    );
+  }
+
+  async function persistArchivedTodos(beforeTodos, afterTodos) {
+    await persistArchivedSessions(getCreatedTodos(beforeTodos, afterTodos));
+    const changedTodos = getTodosWithChangedFields(beforeTodos, afterTodos, ARCHIVE_SYNC_FIELDS);
+    await Promise.all(
+      changedTodos.map((todo) => (todo.completedAt ? persistCompletedTodo(todo) : persistTodoTimer(todo))),
+    );
   }
 
   async function persistCompletionChangedTodos(todosToUpdate) {
@@ -1432,8 +1423,9 @@
     return state.todos.find((todo) => todo.id === todoId);
   }
 
-  function getTimerChangedTodos(beforeTodos, afterTodos) {
-    return getTodosWithChangedFields(beforeTodos, afterTodos, TIMER_SYNC_FIELDS);
+  function getCreatedTodos(beforeTodos, afterTodos) {
+    const beforeIds = new Set(beforeTodos.map((todo) => todo.id));
+    return afterTodos.filter((todo) => !beforeIds.has(todo.id));
   }
 
   function getCompletionChangedTodos(beforeTodos, afterTodos) {
@@ -1464,6 +1456,8 @@
   }
 </script>
 
+<svelte:window on:keydown={handleWorkspaceKeydown} />
+
 {#if useRemote && authChecked && !authUser}
   <AuthGate
     mode={authMode}
@@ -1486,9 +1480,7 @@
       projects={projectTodos}
       inboxCount={inboxLoops.length}
       waitingCount={waitingLoops.length}
-      bind:titleDraft
-      onSubmit={handleProjectSubmit}
-      onDraftInput={handleDraftInput}
+      onOpenComposer={openComposer}
       onOpenTask={openTask}
       onPromote={handlePromoteProject}
       onDelete={handleDeleteTask}
@@ -1586,11 +1578,8 @@
       {ongoingTodos}
       {pausedTodos}
       {openTodoSections}
-      {openCount}
-      bind:titleDraft
-      bind:dueDateDraft
-      bind:composerKind
-      {draftTitle}
+      bind:searchQuery={taskSearchQuery}
+      {searchMatches}
       {editingTaskId}
       {newlyAddedTodoId}
       {draggedSummaryId}
@@ -1599,14 +1588,15 @@
       {viewMode}
       inboxCount={inboxLoops.length}
       waitingCount={waitingLoops.length}
-      onSubmit={handleSubmit}
-      onDraftInput={handleDraftInput}
+      onOpenComposer={openComposer}
+      composerOpen={composerOpen}
       onStartTitleEdit={startTitleEdit}
       onTitleKeydown={handleTitleKeydown}
       onCommitTitleEdit={commitTitleEdit}
       onTimerAction={handleTimerAction}
       onOpenTask={openTask}
       onComplete={handleComplete}
+      onDeleteTask={handleDeleteTask}
       onFail={handleFail}
       onOpenListDragOver={handleOpenListDragOver}
       onOpenListDrop={handleOpenListDrop}
@@ -1633,6 +1623,7 @@
       onBucketDrop={handleBucketDrop}
       onCompletedTimeChange={handleSummaryCompletedTimeChange}
       {completedTime}
+      searchActive={Boolean(taskSearchQuery.trim())}
     />
   {/if}
 
@@ -1644,8 +1635,6 @@
     onClose={closeTask}
     onNoteInput={handleNoteInput}
     onDetailTitleCommit={handleDetailTitleCommit}
-    onProgressiveChange={handleProgressiveChange}
-    onProgressInput={handleProgressInput}
     onTimeSegmentsChange={handleTimeSegmentsChange}
     onCompletedAtChange={handleCompletedAtChange}
     onDueDateChange={handleDueDateChange}
@@ -1668,6 +1657,16 @@
       <span>Done</span>
     </aside>
   {/if}
+
+  <AddTaskOverlay
+    bind:open={composerOpen}
+    bind:title={titleDraft}
+    bind:kind={composerKind}
+    bind:dueDate={dueDateDraft}
+    bind:error={composerError}
+    onClose={closeComposer}
+    onSubmit={handleSubmit}
+  />
 
   <div class="workspace-feedback">
     <FeedbackSdkWidget theme={themeMode === 'dark' ? 'dark' : 'light'} />

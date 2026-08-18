@@ -3,9 +3,13 @@
   import { onDestroy, onMount, tick } from 'svelte';
   import '../../styles.css';
   import AuthGate from '../../lib/components/AuthGate.svelte';
+  import AddTaskOverlay from '../../lib/components/AddTaskOverlay.svelte';
   import FloatingTaskNote from '../../lib/components/FloatingTaskNote.svelte';
   import MenubarTaskRow from '../../lib/components/MenubarTaskRow.svelte';
   import ThemeToggle from '../../lib/components/ThemeToggle.svelte';
+  import { flip } from 'svelte/animate';
+  import { iconSearch, iconX } from '../../lib/components/icons.js';
+  import { rollUp, searchFlip } from '../../lib/motion/rollUp.js';
   import { resolveMenubarShell } from '../../menubarShell.js';
   import {
     applyThemeMode,
@@ -15,30 +19,34 @@
   } from '../../theme.js';
   import {
     addTodo,
+    archivePriorDaySessions,
+    completeTodo,
     createInitialState,
     deleteTodo,
+    dueDateInputToIso,
     findDuplicateTodo,
+    formatDayKey,
     getActiveTodos,
     getOpenTodoSections,
     getCompletedTodoSections,
     getProgressSessions,
     getSomedayTodos,
-    logProgressSession,
+    filterTodoSections,
+    filterTodosBySearch,
     pauseTodoTimer,
     partitionTaskFlowTodos,
     restoreTodoFromSomeday,
     setTodoDueDate,
     setTodoPhoto,
-    setTodoProgressive,
     setTodoSomeday,
     startTodoTimer,
     updateTodoTimeSegments,
     updateTodoNote,
     updateTodoNoteFromEditor,
-    updateTodoProgress,
     updateTodoTitle,
     stripNoteStampsForEditor,
   } from '../../todoStore.js';
+  import { isNewTaskShortcut } from '../../newTaskShortcut.js';
   import { getCurrentUser, signInWithPassword, signOut, signUp } from '../../auth.js';
   import { insforge, isInsForgeConfigured } from '../../insforgeClient.js';
   import {
@@ -67,13 +75,12 @@
   import {
     completeRemoteTodo,
     deleteRemoteTodo,
+    insertRemoteProgressSession,
     insertRemoteTodo,
     loadRemoteTodos,
-    logRemoteProgressSession,
     updateRemoteTodoDueDate,
     updateRemoteTodoNote,
     updateRemoteTodoPhoto,
-    updateRemoteTodoProgress,
     updateRemoteTodoTimer,
     updateRemoteTodoTitle,
     updateRemoteTodoWorkflow,
@@ -87,7 +94,6 @@
     validateTaskPhoto,
   } from '../../todoPhoto.js';
 
-  const TIMER_FIELDS = ['firstStartedAt', 'activeStartedAt', 'trackedSeconds', 'timeSegments'];
   const TIMING_FIELDS = [
     'firstStartedAt',
     'activeStartedAt',
@@ -109,6 +115,12 @@
   let authError = '';
   let authLoading = false;
   let titleDraft = '';
+  let composerOpen = false;
+  let composerError = '';
+  let composerKind = 'task';
+  let dueDateDraft = formatDayKey(new Date());
+  let taskSearchQuery = '';
+  $: isSearching = Boolean(taskSearchQuery.trim());
   let floatingNoteId = null;
   let standaloneNoteId = null;
   let isNativeHost = false;
@@ -133,14 +145,23 @@
     latestProgressSession: getProgressSessions(state, todo.id)[0] ?? null,
   }));
   $: pendingTodoGroups = partitionTaskFlowTodos(pendingTodos, new Date());
-  $: ongoingTodos = pendingTodoGroups.ongoing;
-  $: pausedTodos = pendingTodoGroups.paused;
-  $: openTodoSections = getOpenTodoSections(pendingTodoGroups.scheduled, new Date());
+  $: ongoingTodos = filterTodosBySearch(pendingTodoGroups.ongoing, taskSearchQuery);
+  $: pausedTodos = filterTodosBySearch(pendingTodoGroups.paused, taskSearchQuery);
+  $: openTodoSections = filterTodoSections(
+    getOpenTodoSections(pendingTodoGroups.scheduled, new Date()),
+    taskSearchQuery,
+  );
   $: todayOpenSection = openTodoSections.find((section) => section.isToday) ?? null;
   $: datedOpenSections = openTodoSections.filter((section) => !section.isToday);
   $: openTodos = openTodoSections.flatMap((section) => section.items);
-  $: somedayTodos = getSomedayTodos(state);
-  $: completedTodoSections = getCompletedTodoSections(state, new Date());
+  $: somedayTodos = filterTodosBySearch(getSomedayTodos(state), taskSearchQuery);
+  $: completedTodoSections = filterTodoSections(getCompletedTodoSections(state, new Date()), taskSearchQuery);
+  $: menubarMatchCount =
+    ongoingTodos.length +
+    pausedTodos.length +
+    openTodoSections.reduce((count, section) => count + section.items.length, 0) +
+    somedayTodos.length +
+    completedTodoSections.reduce((count, section) => count + section.items.length, 0);
   $: updateAction = resolveUpdateAction({
     isNativeHost,
     isLegacyNativeHost,
@@ -176,7 +197,8 @@
     standaloneNoteId = requestedNoteId;
     useRemote = isInsForgeConfigured && !searchParams.has('local');
     syncMessage = useRemote ? 'Connecting' : 'Local only';
-    state = loadLocalState();
+    state = archivePriorDaySessions(loadLocalState());
+    saveLocalState(state);
     stateLoaded = true;
     queuePendingNoteSaves();
     themeMode = loadThemeMode();
@@ -252,7 +274,8 @@
       return;
     }
 
-    state = loadLocalState();
+    state = archivePriorDaySessions(loadLocalState());
+    saveLocalState(state);
     renderSyncStatus();
   }
 
@@ -394,8 +417,10 @@
         snapshotNoteEdits([...todoIds]),
       );
       clearNoteEdits(merged.staleEditIds ?? []);
-      state = { todos: merged.todos };
+      const beforeTodos = merged.todos;
+      state = archivePriorDaySessions({ todos: merged.todos });
       saveLocalState(state);
+      await persistArchivedTodos(beforeTodos, state.todos);
       renderSyncStatus();
     } catch (error) {
       syncMessage = `Offline cache: ${error.message}`;
@@ -405,13 +430,18 @@
   async function handleAdd() {
     const duplicate = findDuplicateTodo(state, titleDraft);
     if (duplicate) {
+      composerError = `That is already open as "${duplicate.title}".`;
       syncMessage = `Duplicate task: "${duplicate.title}" is already open`;
       return;
     }
 
     const existingIds = new Set(state.todos.map((todo) => todo.id));
     const createdAt = new Date();
-    state = addTodo(state, titleDraft, createdAt);
+    const kind = composerKind === 'project' ? 'project' : 'task';
+    state = addTodo(state, titleDraft, createdAt, {
+      kind,
+      dueDate: kind === 'project' ? null : dueDateInputToIso(dueDateDraft),
+    });
     const createdTodo = state.todos.find((todo) => !existingIds.has(todo.id));
 
     if (!createdTodo) {
@@ -419,21 +449,48 @@
     }
 
     titleDraft = '';
+    composerKind = 'task';
+    dueDateDraft = formatDayKey(new Date());
+    composerError = '';
+    composerOpen = false;
     saveLocalState(state);
     await syncRemoteChange('Saving', () => persistNewTodo(createdTodo));
+  }
+
+  function openComposer(kind = 'task') {
+    composerKind = kind === 'project' ? 'project' : 'task';
+    if (!titleDraft.trim()) {
+      dueDateDraft = formatDayKey(new Date());
+    }
+    composerError = '';
+    composerOpen = true;
+  }
+
+  function closeComposer() {
+    composerOpen = false;
+  }
+
+  function handleWorkspaceKeydown(event) {
+    if (!isNewTaskShortcut(event) || shell !== 'app') {
+      return;
+    }
+
+    event.preventDefault();
+    if (composerOpen) {
+      document.getElementById('overlay-todo-title')?.focus();
+      return;
+    }
+    openComposer('task');
   }
 
   async function handleTimerAction(action, todoId) {
     const beforeTodos = state.todos;
     state = action === 'pause' ? pauseTodoTimer(state, todoId) : startTodoTimer(state, todoId);
-    const changedTodos = getChangedTodos(beforeTodos, state.todos, TIMER_FIELDS);
     saveLocalState(state);
     if (action === 'start') {
       await revealTodo(todoId);
     }
-    await syncRemoteChange('Saving time', () =>
-      Promise.all(changedTodos.map((todo) => persistTodoTimer(todo))),
-    );
+    await syncRemoteChange('Saving time', () => persistArchivedTodos(beforeTodos, state.todos));
   }
 
   async function revealTodo(todoId) {
@@ -447,21 +504,13 @@
 
   async function handleComplete(todoId) {
     const beforeTodos = state.todos;
-    const beforeTodo = findTodo(todoId);
-    state = logProgressSession(state, todoId);
-    const afterTodo = findTodo(todoId);
-    const createdTodo = state.todos.find((todo) => !beforeTodos.some((before) => before.id === todo.id));
+    state = completeTodo(state, todoId);
     saveLocalState(state);
-
-    if (beforeTodo?.isProgressive) {
-      await syncRemoteChange('Saving session', () => persistProgressSession(afterTodo, createdTodo));
-      return;
-    }
 
     if (expandedTaskId === todoId) {
       expandedTaskId = null;
     }
-    await syncRemoteChange('Saving', () => persistCompletedTodo(afterTodo));
+    await syncRemoteChange('Saving', () => persistArchivedTodos(beforeTodos, state.todos));
   }
 
   async function handleTitleCommit(todoId, title) {
@@ -580,32 +629,9 @@
     noteSaveStatuses = { ...noteSaveStatuses, [todoId]: status };
   }
 
-  async function handleProgressiveChange(todoId, isProgressive) {
-    state = setTodoProgressive(state, todoId, isProgressive);
-    const todo = findTodo(todoId);
-    saveLocalState(state);
-    await syncRemoteChange('Saving progress', () => persistTodoProgress(todo));
-  }
-
-  async function handleProgressCommit(todoId, progressLabel) {
-    const before = findTodo(todoId);
-    state = updateTodoProgress(state, todoId, progressLabel);
-    const after = findTodo(todoId);
-    saveLocalState(state);
-
-    if (!before || !after || before.progressLabel === after.progressLabel) {
-      renderSyncStatus();
-      return;
-    }
-
-    await syncRemoteChange('Saving progress', () => persistTodoProgress(after));
-  }
-
   async function handleDueDateChange(todoId, value) {
     const before = findTodo(todoId);
-    const dueDate = value ? new Date(`${value}T00:00:00`) : null;
-    const nextDueDate = dueDate && !Number.isNaN(dueDate.getTime()) ? dueDate.toISOString() : null;
-    state = setTodoDueDate(state, todoId, nextDueDate);
+    state = setTodoDueDate(state, todoId, dueDateInputToIso(value));
     const after = findTodo(todoId);
     saveLocalState(state);
 
@@ -803,9 +829,19 @@
     await updateRemoteTodoWorkflow(insforge, authUser.id, todo);
   }
 
-  async function persistProgressSession(parent, session) {
-    if (!useRemote || !authUser || !parent || !session) return;
-    await logRemoteProgressSession(insforge, parent, session);
+  async function persistArchivedSessions(sessions) {
+    if (!useRemote || !authUser) return;
+    await Promise.all(
+      sessions.map((session) => insertRemoteProgressSession(insforge, authUser.id, session)),
+    );
+  }
+
+  async function persistArchivedTodos(beforeTodos, afterTodos) {
+    await persistArchivedSessions(getCreatedTodos(beforeTodos, afterTodos));
+    const changedTodos = getChangedTodos(beforeTodos, afterTodos, TIMING_FIELDS);
+    await Promise.all(
+      changedTodos.map((todo) => (todo.completedAt ? persistCompletedTodo(todo) : persistTodoTimer(todo))),
+    );
   }
 
   async function persistTodoTitle(todo) {
@@ -816,11 +852,6 @@
   async function persistTodoNote(todo) {
     if (!useRemote || !authUser || !todo) return;
     await updateRemoteTodoNote(insforge, authUser.id, todo);
-  }
-
-  async function persistTodoProgress(todo) {
-    if (!useRemote || !authUser || !todo) return;
-    await updateRemoteTodoProgress(insforge, authUser.id, todo);
   }
 
   async function persistTodoDueDate(todo) {
@@ -846,6 +877,11 @@
     return state.todos.find((todo) => todo.id === todoId);
   }
 
+  function getCreatedTodos(beforeTodos, afterTodos) {
+    const beforeIds = new Set(beforeTodos.map((todo) => todo.id));
+    return afterTodos.filter((todo) => !beforeIds.has(todo.id));
+  }
+
   function getChangedTodos(beforeTodos, afterTodos, fields) {
     const beforeById = new Map(beforeTodos.map((todo) => [todo.id, todo]));
     return afterTodos.filter((todo) => {
@@ -855,6 +891,8 @@
   }
 
 </script>
+
+<svelte:window on:keydown={handleWorkspaceKeydown} />
 
 {#if shell === 'loading'}
   <main class="menubar-loading" aria-label="Loading Daymark">Connecting...</main>
@@ -915,77 +953,147 @@
       <span class="menubar-count">{pendingTodos.length} open</span>
     </header>
 
-    <form class="menubar-quick-add" on:submit|preventDefault={handleAdd}>
-      <label class="sr-only" for="menubar-quick-add">Add task</label>
-      <input
-        id="menubar-quick-add"
-        type="text"
-        bind:value={titleDraft}
-        autocomplete="off"
-        placeholder="Add a task and press Enter"
-      />
-      <button type="submit">Add</button>
-    </form>
+    <div class="task-toolbar menubar-toolbar">
+      <div class="task-search" class:is-searching={isSearching}>
+        <span class="task-search-icon" aria-hidden="true">{@html iconSearch()}</span>
+        <label class="sr-only" for="menubar-task-search">Search tasks</label>
+        <input
+          id="menubar-task-search"
+          type="search"
+          autocomplete="off"
+          placeholder="Search tasks..."
+          enterkeyhint="search"
+          bind:value={taskSearchQuery}
+          aria-describedby="menubar-task-search-status"
+          on:keydown={(event) => {
+            if (event.key === 'Escape' && taskSearchQuery) {
+              event.preventDefault();
+              taskSearchQuery = '';
+            }
+          }}
+        />
+        {#if isSearching}
+          <div class="task-search-actions">
+            <span class="task-search-count" aria-hidden="true">{menubarMatchCount}</span>
+            <button
+              type="button"
+              class="task-search-clear"
+              aria-label="Clear search"
+              on:click={() => (taskSearchQuery = '')}
+            >
+              {@html iconX()}
+            </button>
+          </div>
+        {/if}
+      </div>
+      <button
+        type="button"
+        class="new-task-button"
+        aria-haspopup="dialog"
+        aria-expanded={composerOpen}
+        on:click={() => openComposer('task')}
+      >
+        New task
+      </button>
+    </div>
+    <output id="menubar-task-search-status" class="sr-only" aria-live="polite">
+      {isSearching ? `${menubarMatchCount} matching` : ''}
+    </output>
 
     <div class="menubar-task-list">
-      <section data-menubar-section="ongoing" aria-labelledby="menubar-ongoing-heading">
-        <div class="menubar-section-heading">
-          <h2 id="menubar-ongoing-heading">Ongoing</h2>
-          <span>{ongoingTodos.length} running</span>
-        </div>
-        <div class="menubar-section-list">
-          {#each ongoingTodos as todo (todo.id)}
-            {@render taskRow(todo)}
-          {:else}
-            <p class="menubar-empty">No timers are running.</p>
-          {/each}
-        </div>
-      </section>
+      {#if isSearching && menubarMatchCount === 0}
+        <p class="menubar-empty">Nothing matches that search.</p>
+      {/if}
 
-      <section data-menubar-section="ready" aria-labelledby="menubar-ready-heading">
-        <div class="menubar-section-heading">
-          <h2 id="menubar-ready-heading">Today</h2>
-          <span>{todayOpenSection?.items.length ?? 0} tasks</span>
-        </div>
-        <div class="menubar-date-groups">
-          {#if todayOpenSection}
-            <div
-              class="menubar-date-group"
-              data-menubar-date-group={todayOpenSection.id}
-              data-menubar-is-today="true"
-            >
-              <div class="menubar-date-heading">
-                <h3>{todayOpenSection.label}</h3>
-                <span>{todayOpenSection.items.length}</span>
+      {#if ongoingTodos.length || !isSearching}
+        <section data-menubar-section="ongoing" aria-labelledby="menubar-ongoing-heading">
+          <div class="menubar-section-heading">
+            <h2 id="menubar-ongoing-heading">Ongoing</h2>
+            <span>{ongoingTodos.length} running</span>
+          </div>
+          <div class="menubar-section-list">
+            {#each ongoingTodos as todo (todo.id)}
+              <div
+                class="menubar-task-motion"
+                animate:flip={searchFlip(isSearching)}
+                in:rollUp|local={{ enabled: isSearching }}
+                out:rollUp|local={{ enabled: isSearching }}
+              >
+                {@render taskRow(todo)}
               </div>
-              <div class="menubar-section-list">
-                {#each todayOpenSection.items as todo (todo.id)}
-                  {@render taskRow(todo)}
-                {/each}
-              </div>
-            </div>
-          {:else}
-            <p class="menubar-empty">Nothing ready for today.</p>
-          {/if}
-        </div>
-      </section>
+            {:else}
+              <p class="menubar-empty">No timers are running.</p>
+            {/each}
+          </div>
+        </section>
+      {/if}
 
-      <section data-menubar-section="paused" aria-labelledby="menubar-paused-heading">
-        <div class="menubar-section-heading">
-          <h2 id="menubar-paused-heading">Paused</h2>
-          <span>{pausedTodos.length} paused</span>
-        </div>
-        <div class="menubar-section-list">
-          {#each pausedTodos as todo (todo.id)}
-            {@render taskRow(todo)}
-          {:else}
-            <p class="menubar-empty">No paused tasks.</p>
-          {/each}
-        </div>
-      </section>
+      {#if todayOpenSection || !isSearching}
+        <section data-menubar-section="ready" aria-labelledby="menubar-ready-heading">
+          <div class="menubar-section-heading">
+            <h2 id="menubar-ready-heading">Today</h2>
+            <span>{todayOpenSection?.items.length ?? 0} tasks</span>
+          </div>
+          <div class="menubar-date-groups">
+            {#if todayOpenSection}
+              <div
+                class="menubar-date-group"
+                data-menubar-date-group={todayOpenSection.id}
+                data-menubar-is-today="true"
+              >
+                <div class="menubar-date-heading">
+                  <h3>{todayOpenSection.label}</h3>
+                  <span>{todayOpenSection.items.length}</span>
+                </div>
+                <div class="menubar-section-list">
+                  {#each todayOpenSection.items as todo (todo.id)}
+                    <div
+                      class="menubar-task-motion"
+                      animate:flip={searchFlip(isSearching)}
+                      in:rollUp|local={{ enabled: isSearching }}
+                      out:rollUp|local={{ enabled: isSearching }}
+                    >
+                      {@render taskRow(todo)}
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {:else}
+              <p class="menubar-empty">Nothing ready for today.</p>
+            {/if}
+          </div>
+        </section>
+      {/if}
+
+      {#if pausedTodos.length || !isSearching}
+        <section data-menubar-section="paused" aria-labelledby="menubar-paused-heading">
+          <div class="menubar-section-heading">
+            <h2 id="menubar-paused-heading">Paused</h2>
+            <span>{pausedTodos.length} paused</span>
+          </div>
+          <div class="menubar-section-list">
+            {#each pausedTodos as todo (todo.id)}
+              <div
+                class="menubar-task-motion"
+                animate:flip={searchFlip(isSearching)}
+                in:rollUp|local={{ enabled: isSearching }}
+                out:rollUp|local={{ enabled: isSearching }}
+              >
+                {@render taskRow(todo)}
+              </div>
+            {:else}
+              <p class="menubar-empty">No paused tasks.</p>
+            {/each}
+          </div>
+        </section>
+      {/if}
 
       {#if datedOpenSections.length}
-        <section data-menubar-section="dated-ready" aria-labelledby="menubar-dated-ready-heading">
+        <section
+          data-menubar-section="dated-ready"
+          aria-labelledby="menubar-dated-ready-heading"
+          transition:rollUp={{ enabled: isSearching }}
+        >
           <div class="menubar-section-heading">
             <h2 id="menubar-dated-ready-heading">Other dates</h2>
             <span>{datedOpenSections.reduce((count, section) => count + section.items.length, 0)} ready</span>
@@ -1003,7 +1111,14 @@
                 </div>
                 <div class="menubar-section-list">
                   {#each section.items as todo (todo.id)}
-                    {@render taskRow(todo)}
+                    <div
+                      class="menubar-task-motion"
+                      animate:flip={searchFlip(isSearching)}
+                      in:rollUp|local={{ enabled: isSearching }}
+                      out:rollUp|local={{ enabled: isSearching }}
+                    >
+                      {@render taskRow(todo)}
+                    </div>
                   {/each}
                 </div>
               </div>
@@ -1013,21 +1128,36 @@
       {/if}
 
       {#if somedayTodos.length}
-        <section data-menubar-section="someday" aria-labelledby="menubar-someday-heading">
+        <section
+          data-menubar-section="someday"
+          aria-labelledby="menubar-someday-heading"
+          transition:rollUp={{ enabled: isSearching }}
+        >
           <div class="menubar-section-heading">
             <h2 id="menubar-someday-heading">Stall</h2>
             <span>{somedayTodos.length} parked</span>
           </div>
           <div class="menubar-section-list">
             {#each somedayTodos as todo (todo.id)}
-              {@render taskRow(todo)}
+              <div
+                class="menubar-task-motion"
+                animate:flip={searchFlip(isSearching)}
+                in:rollUp|local={{ enabled: isSearching }}
+                out:rollUp|local={{ enabled: isSearching }}
+              >
+                {@render taskRow(todo)}
+              </div>
             {/each}
           </div>
         </section>
       {/if}
 
       {#if completedTodoSections.length}
-        <section data-menubar-section="finished" aria-labelledby="menubar-finished-heading">
+        <section
+          data-menubar-section="finished"
+          aria-labelledby="menubar-finished-heading"
+          transition:rollUp={{ enabled: isSearching }}
+        >
           <div class="menubar-section-heading">
             <h2 id="menubar-finished-heading">Finished</h2>
             <span>{completedTodoSections.reduce((count, section) => count + section.items.length, 0)} done</span>
@@ -1044,7 +1174,14 @@
                 </div>
                 <div class="menubar-section-list">
                   {#each section.items as todo (todo.id)}
-                    {@render taskRow(todo)}
+                    <div
+                      class="menubar-task-motion"
+                      animate:flip={searchFlip(isSearching)}
+                      in:rollUp|local={{ enabled: isSearching }}
+                      out:rollUp|local={{ enabled: isSearching }}
+                    >
+                      {@render taskRow(todo)}
+                    </div>
                   {/each}
                 </div>
               </div>
@@ -1053,6 +1190,16 @@
         </section>
       {/if}
     </div>
+
+    <AddTaskOverlay
+      bind:open={composerOpen}
+      bind:title={titleDraft}
+      bind:kind={composerKind}
+      bind:dueDate={dueDateDraft}
+      bind:error={composerError}
+      onClose={closeComposer}
+      onSubmit={handleAdd}
+    />
 
     {#if floatingNoteTodo}
       <FloatingTaskNote
@@ -1077,8 +1224,6 @@
     onNoteInput={handleNoteInput}
     onOpenNote={openFloatingNote}
     noteSaveStatus={noteSaveStatuses[todo.id] ?? 'saved'}
-    onProgressiveChange={handleProgressiveChange}
-    onProgressCommit={handleProgressCommit}
     onDueDateChange={handleDueDateChange}
     onSomedayChange={handleSomedayChange}
     onTimingChange={handleTimingChange}
@@ -1182,7 +1327,7 @@
   .menubar-open-full:active,
   .menubar-update:active,
   .menubar-sign-out:active,
-  .menubar-quick-add button:active {
+  .new-task-button:active {
     transform: scale(0.97);
   }
 
@@ -1208,40 +1353,8 @@
     justify-self: end;
   }
 
-  .menubar-quick-add {
-    display: grid;
-    grid-template-columns: minmax(0, 1fr) auto;
-    gap: 7px;
+  .menubar-toolbar {
     margin-top: 14px;
-    padding: 6px;
-    border: 1px solid var(--border);
-    border-radius: 13px;
-    background: var(--surface);
-    box-shadow: inset 0 1px 0 var(--inset-highlight);
-  }
-
-  .menubar-quick-add input {
-    min-width: 0;
-    min-height: 39px;
-    border: 0;
-    border-radius: 9px;
-    padding: 0 10px;
-    background: transparent;
-    color: var(--strong);
-    font-size: 13px;
-  }
-
-  .menubar-quick-add button {
-    min-width: 52px;
-    min-height: 39px;
-    border-radius: 9px;
-    background: var(--button-bg);
-    color: var(--button-fg);
-    font-size: 12px;
-    font-weight: 600;
-    transition:
-      opacity var(--motion-hover) ease,
-      transform var(--motion-press) var(--ease-out);
   }
 
   @media (hover: hover) and (pointer: fine) {
@@ -1252,13 +1365,13 @@
       background: var(--block-hover);
     }
 
-    .menubar-quick-add button:hover {
+    .new-task-button:hover {
       opacity: 0.86;
     }
   }
 
-  .menubar-quick-add input:focus-visible,
-  .menubar-quick-add button:focus-visible,
+  .task-search:focus-within,
+  .new-task-button:focus-visible,
   .menubar-update:focus-visible,
   .menubar-open-full:focus-visible,
   .menubar-sign-out:focus-visible {
@@ -1298,6 +1411,10 @@
   .menubar-section-list {
     display: grid;
     gap: 7px;
+  }
+
+  .menubar-task-motion {
+    min-width: 0;
   }
 
   .menubar-date-groups {

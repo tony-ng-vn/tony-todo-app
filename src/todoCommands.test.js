@@ -292,7 +292,7 @@ describe('runTodoCommand complete', () => {
     expect(result.view.task.completedAt).toBe('2026-06-10T23:20:00.000Z');
   });
 
-  it('does not complete a progressive task', () => {
+  it('completes a previously progressive-flagged task', () => {
     const state = createInitialState([openTodo({ isProgressive: true })]);
     const result = runTodoCommand(
       state,
@@ -300,8 +300,87 @@ describe('runTodoCommand complete', () => {
       UTC_EVENING,
     );
 
-    expect(result.ok).toBe(false);
-    expect(result.error.code).toBe('progressive_unsupported');
+    expect(result.ok).toBe(true);
+    expect(result.persist.todo.completedAt).toBe(UTC_EVENING.toISOString());
+    expect(result.persist.sessions).toEqual([]);
+    expect(result.persist.updates).toEqual([]);
+  });
+
+  it('persists merged leftover recap time on complete', () => {
+    const mondayStart = '2026-06-08T16:00:00.000Z';
+    const mondayMid = '2026-06-08T16:20:00.000Z';
+    const mondayEnd = '2026-06-08T17:00:00.000Z';
+    const state = createInitialState([
+      openTodo({
+        id: 'parent',
+        title: 'Read',
+        createdAt: mondayStart,
+        firstStartedAt: mondayStart,
+        trackedSeconds: 40 * 60,
+        timeSegments: [{ startedAt: mondayStart, endedAt: mondayEnd }],
+      }),
+      openTodo({
+        id: 'session-1',
+        title: 'Read',
+        createdAt: mondayStart,
+        completedAt: mondayMid,
+        parentTaskId: 'parent',
+        isProgressSession: true,
+        firstStartedAt: mondayStart,
+        trackedSeconds: 20 * 60,
+        timeSegments: [{ startedAt: mondayStart, endedAt: mondayMid }],
+      }),
+    ]);
+    const result = runTodoCommand(
+      state,
+      { kind: 'complete', target: { by: 'id', id: 'parent' } },
+      new Date('2026-06-10T17:30:00.000Z'),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.persist.sessions).toEqual([]);
+    expect(result.persist.updates).toHaveLength(1);
+    expect(result.persist.updates[0].id).toBe('session-1');
+    expect(result.persist.updates[0].trackedSeconds).toBe(60 * 60);
+    expect(result.persist.todo.timeSegments).toEqual([]);
+    expect(result.persist.todo.completedAt).toBe('2026-06-10T17:30:00.000Z');
+  });
+
+  it('persists new recap sessions and other archived tasks on complete', () => {
+    const mondayStart = '2026-06-08T16:00:00.000Z';
+    const mondayEnd = '2026-06-08T16:20:00.000Z';
+    const state = createInitialState([
+      openTodo({
+        id: 'parent',
+        title: 'Read',
+        createdAt: mondayStart,
+        firstStartedAt: mondayStart,
+        trackedSeconds: 20 * 60,
+        timeSegments: [{ startedAt: mondayStart, endedAt: mondayEnd }],
+      }),
+      openTodo({
+        id: 'other',
+        title: 'Write',
+        createdAt: mondayStart,
+        firstStartedAt: mondayStart,
+        trackedSeconds: 20 * 60,
+        timeSegments: [{ startedAt: mondayStart, endedAt: mondayEnd }],
+      }),
+    ]);
+    const result = runTodoCommand(
+      state,
+      { kind: 'complete', target: { by: 'id', id: 'parent' } },
+      new Date('2026-06-10T17:30:00.000Z'),
+    );
+
+    expect(result.ok).toBe(true);
+    expect(result.persist.todo).toMatchObject({ id: 'parent', trackedSeconds: 0, timeSegments: [] });
+    expect(result.persist.sessions.map((session) => session.parentTaskId).toSorted()).toEqual([
+      'other',
+      'parent',
+    ]);
+    expect(result.persist.updates).toHaveLength(1);
+    expect(result.persist.updates[0]).toMatchObject({ id: 'other', trackedSeconds: 0, timeSegments: [] });
   });
 
   it('completes an open task by title', () => {
@@ -386,7 +465,7 @@ describe('runTodoCommand list and daySummary', () => {
       completable: true,
     });
     expect(result.view.tasks.find((task) => task.id === 'progressive')).toMatchObject({
-      completable: false,
+      completable: true,
     });
   });
 

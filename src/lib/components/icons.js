@@ -47,6 +47,18 @@ export function iconPlay() {
   `;
 }
 
+export function iconTrash() {
+  return `
+    <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <path d="M3.5 4.5h9" />
+      <path d="M6.25 4.5V3.25h3.5V4.5" />
+      <path d="M5.25 4.5l.6 8h4.3l.6-8" />
+      <path d="M7 6.75v4" />
+      <path d="M9 6.75v4" />
+    </svg>
+  `;
+}
+
 export function iconPause() {
   return `
     <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">
@@ -76,6 +88,15 @@ export function iconSun() {
       <path d="M11.85 11.85l.9.9" />
       <path d="M12.75 3.25l-.9.9" />
       <path d="M4.15 11.85l-.9.9" />
+    </svg>
+  `;
+}
+
+export function iconSearch() {
+  return `
+    <svg class="nucleo-icon" viewBox="0 0 16 16" aria-hidden="true">
+      <circle cx="7" cy="7" r="4.25" />
+      <path d="m10.25 10.25 3 3" />
     </svg>
   `;
 }

@@ -4,9 +4,7 @@
   export let projects = [];
   export let inboxCount = 0;
   export let waitingCount = 0;
-  export let titleDraft = '';
-  export let onSubmit;
-  export let onDraftInput;
+  export let onOpenComposer;
   export let onOpenTask;
   export let onPromote;
   export let onDelete;
@@ -25,21 +23,11 @@
     Ideas you want to keep without pretending they are work yet. Stall is for a task you already started and paused.
   </p>
 
-  <form class="new-task-form" on:submit|preventDefault={onSubmit}>
-    <label for="project-title">New project idea</label>
-    <div class="input-row">
-      <input
-        id="project-title"
-        name="title"
-        type="text"
-        autocomplete="off"
-        placeholder="+ Add a project idea and press Enter"
-        bind:value={titleDraft}
-        on:input={onDraftInput}
-      />
-      <button type="submit">Add</button>
-    </div>
-  </form>
+  <div class="projects-toolbar">
+    <button type="button" class="new-task-button" aria-haspopup="dialog" on:click={() => onOpenComposer?.('project')}>
+      New project
+    </button>
+  </div>
 
   <ol class="project-list">
     {#each projects as project (project.id)}
@@ -98,6 +86,11 @@
     font-size: 12px;
     line-height: 1.5;
     color: var(--muted);
+  }
+
+  .projects-toolbar {
+    display: flex;
+    justify-content: flex-end;
   }
 
   .project-list {

@@ -27,6 +27,21 @@ async function moveCalendarToMonth(page, target) {
   throw new Error(`Could not navigate calendar to ${targetTitle}`);
 }
 
+// Opens the New task overlay (if needed), types the title, and submits with Enter.
+async function submitOverlayTitle(page, title) {
+  if (!(await page.locator('.composer-overlay[open]').count())) {
+    await page.locator('.new-task-button').click();
+    await page.waitForSelector('.composer-overlay[open]');
+  }
+  await page.fill('#overlay-todo-title', title);
+  await page.locator('#overlay-todo-title').press('Enter');
+}
+
+async function dismissOverlay(page) {
+  await page.keyboard.press('Escape');
+  await page.waitForFunction(() => !document.querySelector('.composer-overlay[open]'));
+}
+
 async function chooseCalendarDay(page, selector, value) {
   const target = new Date(`${value}T12:00:00`);
   await page.locator(selector).click();
@@ -165,15 +180,13 @@ try {
           },
           {
             id: 'menubar-progressive',
-            title: 'Progressive task',
+            title: 'Long-running task',
             createdAt: new Date(now - 20 * 60 * 1000).toISOString(),
             completedAt: null,
             note: '',
             firstStartedAt: null,
             activeStartedAt: null,
             trackedSeconds: 0,
-            isProgressive: true,
-            progressLabel: 'Chapter 2',
             dueDate: yesterday.toISOString(),
           },
           {
@@ -290,12 +303,13 @@ try {
     hasCacheBuster: updateUrl.searchParams.has('updated'),
   };
 
-  await page.locator('#menubar-quick-add').press('Enter');
+  await submitOverlayTitle(page, '');
   await page.waitForTimeout(50);
   const countAfterEmptyAdd = await page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     return state.todos.length;
   });
+  await dismissOverlay(page);
 
   await page.evaluate(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
@@ -314,8 +328,7 @@ try {
   });
   await page.waitForSelector('[data-menubar-id="menubar-external"]');
 
-  await page.fill('#menubar-quick-add', 'Captured from menu bar');
-  await page.locator('#menubar-quick-add').press('Enter');
+  await submitOverlayTitle(page, 'Captured from menu bar');
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     return state.todos.some((todo) => todo.title === 'Captured from menu bar');
@@ -345,8 +358,7 @@ try {
         .textContent()
     )?.trim(),
   };
-  await page.fill('#menubar-quick-add', 'Captured from menu ba');
-  await page.locator('#menubar-quick-add').press('Enter');
+  await submitOverlayTitle(page, 'Captured from menu ba');
   await page.waitForFunction(() =>
     document.querySelector('.menubar-sync')?.textContent.includes('Duplicate task'),
   );
@@ -355,10 +367,12 @@ try {
     return {
       matchingTasks: state.todos.filter((todo) => todo.title.startsWith('Captured from menu ba'))
         .length,
-      draft: document.querySelector('#menubar-quick-add')?.value,
+      draft: document.querySelector('#overlay-todo-title')?.value,
+      overlayError: document.querySelector('.composer-error')?.textContent.trim(),
       message: document.querySelector('.menubar-sync')?.textContent.trim(),
     };
   });
+  await dismissOverlay(page);
   await page.click('[data-menubar-id="menubar-open"] .menubar-start');
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
@@ -557,18 +571,6 @@ try {
   });
 
   await page.click('[data-menubar-id="menubar-progressive"] .menubar-details-toggle');
-  await page.fill('[data-menubar-details="menubar-progressive"] .menubar-progress-input', 'Chapter');
-  await page.locator('[data-menubar-details="menubar-progressive"] .menubar-progress-input').press(
-    'End',
-  );
-  await page.locator('[data-menubar-details="menubar-progressive"] .menubar-progress-input').press(
-    'Tab',
-  );
-  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(resolve)));
-  await page.locator('[data-menubar-details="menubar-progressive"] .menubar-progress-input').type(
-    '3',
-  );
-  await page.locator('[data-menubar-details="menubar-progressive"] .menubar-progress-input').blur();
   await chooseCalendarDay(
     page,
     '[data-menubar-details="menubar-progressive"] button[aria-label^="Due date for"]',
@@ -577,7 +579,7 @@ try {
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     const todo = state.todos.find((item) => item.id === 'menubar-progressive');
-    return todo?.progressLabel === 'Chapter\t3' && todo?.dueDate?.startsWith('2026-08-01');
+    return todo?.dueDate?.startsWith('2026-08-01');
   });
   await page.click(
     '[data-menubar-details="menubar-progressive"] button[aria-label^="Due date for"]',
@@ -601,18 +603,10 @@ try {
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     const parent = state.todos.find((todo) => todo.id === 'menubar-progressive');
-    const session = state.todos.find((todo) => todo.parentTaskId === 'menubar-progressive');
-    return !parent?.completedAt && Boolean(session?.completedAt);
+    return Boolean(parent?.completedAt);
   });
 
   await page.click('[data-menubar-id="menubar-delete"] .menubar-details-toggle');
-  await page.check(
-    '[data-menubar-details="menubar-delete"] .menubar-progressive-toggle input[type="checkbox"]',
-  );
-  await page.waitForFunction(() => {
-    const state = JSON.parse(localStorage.getItem('done-log-state'));
-    return state.todos.find((todo) => todo.id === 'menubar-delete')?.isProgressive === true;
-  });
   await page.click('[data-menubar-details="menubar-delete"] .menubar-delete');
   await page.waitForFunction(() => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
@@ -630,13 +624,10 @@ try {
       completedTrackedSeconds: state.todos.find((todo) => todo.id === 'menubar-open')?.trackedSeconds,
       completedTimeBlocks: state.todos.find((todo) => todo.id === 'menubar-open')?.timeSegments?.length,
       pausedCompleted: Boolean(state.todos.find((todo) => todo.id === 'menubar-paused')?.completedAt),
-      progress: state.todos.find((todo) => todo.id === 'menubar-progressive')?.progressLabel,
       dueDate: state.todos.find((todo) => todo.id === 'menubar-progressive')?.dueDate,
-      progressSession: state.todos.some(
-        (todo) => todo.parentTaskId === 'menubar-progressive' && todo.completedAt,
+      finishedLongRunning: Boolean(
+        state.todos.find((todo) => todo.id === 'menubar-progressive')?.completedAt,
       ),
-      progressiveParentOpen: !state.todos.find((todo) => todo.id === 'menubar-progressive')
-        ?.completedAt,
       deleted: !state.todos.some((todo) => todo.id === 'menubar-delete'),
       nativeCalendarInputs: document.querySelectorAll('input[type="date"], input[type="datetime-local"]').length,
     };
@@ -722,6 +713,7 @@ try {
   if (
     duplicateTask.matchingTasks !== 1 ||
     duplicateTask.draft !== 'Captured from menu ba' ||
+    duplicateTask.overlayError !== 'That is already open as "Captured from menu bar".' ||
     duplicateTask.message !== 'Duplicate task: "Captured from menu bar" is already open'
   ) {
     failures.push(`menu bar duplicate matching failed: ${JSON.stringify(duplicateTask)}`);
@@ -766,12 +758,10 @@ try {
     noteBody(final.note) !== '- [x] Review menu bar' ||
     final.completed ||
     !final.pausedCompleted ||
-    final.progress !== 'Chapter\t3' ||
     !final.dueDate?.startsWith('2026-08-01') ||
-    !final.progressSession ||
+    !final.finishedLongRunning ||
     noteAutosavePresentation.saveButtonVisible ||
     noteAutosavePresentation.status !== 'Note saved automatically' ||
-    !final.progressiveParentOpen ||
     !final.deleted ||
     final.nativeCalendarInputs !== 0
   ) {

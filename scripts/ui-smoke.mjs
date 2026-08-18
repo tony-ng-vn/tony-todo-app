@@ -13,7 +13,7 @@ try {
   const mobile = await inspectViewport({ width: 390, height: 844 }, true);
   const mobileTaskDetail = await inspectMobileTaskDetail({ width: 390, height: 844 });
   const desktop = await inspectViewport({ width: 1366, height: 900 }, false);
-  const draftCue = await inspectDraftInsertionCue({ width: 1366, height: 900 });
+  const overlayAddedTask = await inspectOverlayAddedTask({ width: 1366, height: 900 });
   const boardCardLayout = await inspectBoardCardLayout({ width: 1366, height: 900 });
   const duplicateTask = await inspectDuplicateTask({ width: 1366, height: 900 });
   const navigation = await inspectWorkspaceNavigation({ width: 1366, height: 900 });
@@ -25,16 +25,18 @@ try {
     ...assertNoOverflow(mobile),
     ...assertNoOverflow(desktop),
     ...assertMobileTaskDetail(mobileTaskDetail),
-    ...assertMinimumTarget(mobile, '#todo-title', 44, 'mobile task input'),
+    ...assertMinimumTarget(mobile, '#task-search', 44, 'mobile task search'),
+    ...assertMinimumTarget(mobile, '.new-task-button', 44, 'mobile new-task button'),
     ...assertMinimumTarget(mobile, '#summary-date', 44, 'mobile date picker'),
     ...assertMinimumTarget(mobile, '#summary-previous-day', 44, 'mobile previous-day button'),
     ...assertMinimumTarget(mobile, '#summary-next-day', 44, 'mobile next-day button'),
     ...assertMinimumTarget(mobile, '.theme-toggle', 34, 'mobile theme toggle'),
     ...assertMinimumContrast(mobile, '.todo-item button', 4.5, 'Done button'),
-    ...assertHasMotion(mobile, '.input-row button', 'Add button'),
+    ...assertHasMotion(mobile, '.new-task-button', 'New task button'),
     ...assertHasMotion(mobile, '.todo-item button', 'Done button'),
     ...assertHasMotion(mobile, '.theme-toggle', 'Theme toggle'),
     ...assertTimerControlLabel(desktop),
+    ...assertRowDelete(desktop),
     ...assertTaskRowSpacing(desktop),
     ...assertCalendarConsistency(desktop),
     ...assertNewTaskCalendarClear(desktop),
@@ -47,7 +49,7 @@ try {
     ...assertFixedDocumentScroll(desktop),
     ...assertRecapRhythm(desktop),
     ...assertDetailEditing(desktop),
-    ...assertProgressiveSession(desktop),
+    ...assertCompletedFromDetail(desktop),
     ...assertGlassSurface(desktop, '.task-panel', 'task panel'),
     ...assertGlassSurface(desktop, '.summary-panel', 'summary panel'),
     ...assertExists(desktop, '.flow-rail', 'frosted focus rail'),
@@ -57,7 +59,7 @@ try {
     ...assertStartsWith(desktop.summaryTiming, 'Start ', 'summary start time'),
     ...assertIncludes(desktop.summaryTiming, 'End', 'summary end time'),
     ...assertStartsWith(desktop.taskTiming, 'Started ', 'running task start label'),
-    ...assertDraftInsertionCue(draftCue),
+    ...assertOverlayAddedTask(overlayAddedTask),
     ...assertWorkspaceNavigation(navigation),
     ...assertRunningTimingEdit(runningTimingEdit),
     ...assertRecapDayNavigation(recapDayNavigation),
@@ -109,6 +111,14 @@ async function inspectMobileTaskDetail(viewport) {
   await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
   await page.locator('[data-todo-id="ui-smoke-mobile-detail-task"] .open-task-button').tap();
   await page.waitForSelector('#task-detail');
+  await page.waitForFunction(() => {
+    const detail = document.querySelector('#task-detail');
+    if (!detail) {
+      return false;
+    }
+    const transform = getComputedStyle(detail).transform;
+    return transform === 'none' || transform === 'matrix(1, 0, 0, 1, 0, 0)';
+  });
 
   const layout = await page.evaluate(() => {
     const viewportHeight = window.innerHeight;
@@ -130,10 +140,18 @@ async function inspectMobileTaskDetail(viewport) {
         inViewport: visibleHeight > 24 && visibleWidth > 24,
       };
     }
+    const detailEl = document.querySelector('#task-detail');
+    const closeEl = document.querySelector('#detail-close');
+    const closeRect = closeEl?.getBoundingClientRect();
     return {
       viewportHeight,
+      viewportWidth,
       detail: box('#task-detail'),
       note: box('#detail-note'),
+      close: box('#detail-close'),
+      detailPosition: detailEl ? getComputedStyle(detailEl).position : null,
+      closeTop: closeRect ? Math.round(closeRect.top) : null,
+      closeRight: closeRect ? Math.round(closeRect.right) : null,
     };
   });
 
@@ -184,6 +202,22 @@ async function inspectMobileTaskDetail(viewport) {
   }
 
   await page.locator('.detail-start-picker').scrollIntoViewIfNeeded();
+  const closeAfterScroll = await page.evaluate(() => {
+    const closeEl = document.querySelector('#detail-close');
+    if (!closeEl) {
+      return null;
+    }
+    const rect = closeEl.getBoundingClientRect();
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const visibleHeight = Math.max(0, Math.min(rect.bottom, viewportHeight) - Math.max(rect.top, 0));
+    const visibleWidth = Math.max(0, Math.min(rect.right, viewportWidth) - Math.max(rect.left, 0));
+    return {
+      top: Math.round(rect.top),
+      right: Math.round(rect.right),
+      inViewport: visibleHeight > 24 && visibleWidth > 24,
+    };
+  });
   await page.locator('.detail-start-picker').tap();
   await page.waitForSelector('.calendar-popover');
   const calendar = await page.evaluate(() => {
@@ -207,16 +241,51 @@ async function inspectMobileTaskDetail(viewport) {
     };
   });
 
+  await page.keyboard.press('Escape');
+  await page.locator('#detail-close').tap();
+  await page.waitForSelector('#task-detail', { state: 'detached' });
+  const detailClosed = await page.evaluate(() => !document.querySelector('#task-detail'));
+
   await page.close();
-  return { layout, noteValue, noteFillError, noteLinkPresentation, calendar };
+  return { layout, noteValue, noteFillError, noteLinkPresentation, calendar, closeAfterScroll, detailClosed };
 }
 
 function assertMobileTaskDetail(result) {
   const failures = [];
-  if (!result.layout.detail || result.layout.detail.viewportCoverage < 0.85) {
+  if (
+    result.layout.detailPosition !== 'fixed' ||
+    !result.layout.detail ||
+    result.layout.detail.viewportCoverage < 0.98 ||
+    result.layout.detail.top > 2 ||
+    result.layout.detail.width < (result.layout.viewportWidth ?? 0) - 2
+  ) {
     failures.push(
-      `iPhone task details are not on screen after Open: ${JSON.stringify(result.layout.detail)}`,
+      `iPhone task details are not a full-screen overlay after Open: ${JSON.stringify(result.layout)}`,
     );
+  }
+  if (
+    !result.layout.close?.inViewport ||
+    result.layout.closeTop == null ||
+    result.layout.closeTop > 96 ||
+    result.layout.closeRight == null ||
+    (result.layout.viewportWidth ?? 0) - result.layout.closeRight > 80
+  ) {
+    failures.push(
+      `iPhone task detail close is not pinned to the top right: ${JSON.stringify({
+        close: result.layout.close,
+        closeTop: result.layout.closeTop,
+        closeRight: result.layout.closeRight,
+        viewportWidth: result.layout.viewportWidth,
+      })}`,
+    );
+  }
+  if (!result.closeAfterScroll?.inViewport || result.closeAfterScroll.top > 96) {
+    failures.push(
+      `iPhone task detail close scrolled away with the note: ${JSON.stringify(result.closeAfterScroll)}`,
+    );
+  }
+  if (!result.detailClosed) {
+    failures.push('iPhone task details could not be closed from the overlay');
   }
   if (!result.layout.note?.inViewport) {
     failures.push(`iPhone task note is not on screen after Open: ${JSON.stringify(result.layout.note)}`);
@@ -372,11 +441,11 @@ async function captureNativeLayout(page) {
       taskTitle: measure('#task-heading'),
       taskPanelNote: measure('.task-panel > .panel-note'),
       workspaceTabs: measure('.task-panel > .view-toggle'),
-      newTaskForm: measure('.new-task-form'),
-      quickAddTitle: measure('#todo-title'),
+      taskToolbar: measure('.task-toolbar'),
+      taskSearch: measure('#task-search'),
       taskContent: measure('[data-todo-id="ui-smoke-native-paused"] .task-content'),
       taskActions: measure('[data-todo-id="ui-smoke-native-paused"] .task-actions'),
-      quickAddControls: measureGroup('.input-row', '#todo-title, .new-task-calendar, :scope > button'),
+      quickAddControls: measureGroup('.task-toolbar', '.task-search, .new-task-button'),
       taskCardControls: measureGroup(
         '[data-todo-id="ui-smoke-native-paused"]',
         ':scope > .task-content, :scope > .task-actions',
@@ -412,9 +481,9 @@ function assertNativeWorkspaceLayout(result) {
       }
     }
   }
-  if (result.defaultLayout.quickAddTitle.width < 220) {
+  if (result.defaultLayout.taskSearch.width < 180) {
     failures.push(
-      `native quick-add title is too narrow at ${result.defaultLayout.quickAddTitle.width}px`,
+      `native task search is too narrow at ${result.defaultLayout.taskSearch.width}px`,
     );
   }
   if (result.defaultLayout.flowRailDisplay !== 'none') {
@@ -432,8 +501,8 @@ function assertNativeWorkspaceLayout(result) {
     failures.push('native panel headings do not share a horizontal baseline');
   }
   if (
-    Math.abs(result.defaultLayout.workspaceTabs.left - result.defaultLayout.newTaskForm.left) > 1 ||
-    Math.abs(result.defaultLayout.workspaceTabs.right - result.defaultLayout.newTaskForm.right) > 1
+    Math.abs(result.defaultLayout.workspaceTabs.left - result.defaultLayout.taskToolbar.left) > 1 ||
+    Math.abs(result.defaultLayout.workspaceTabs.right - result.defaultLayout.taskToolbar.right) > 1
   ) {
     failures.push('native task blocks do not share horizontal edges');
   }
@@ -558,8 +627,9 @@ async function inspectDuplicateTask(viewport) {
     );
   });
   await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
-  await page.fill('#todo-title', 'Review launch checklst');
-  await page.click('.input-row button[type="submit"]');
+  await page.locator('.new-task-button').click();
+  await page.fill('#overlay-todo-title', 'Review launch checklst');
+  await page.click('.composer-add');
   await page.waitForFunction(() =>
     document.querySelector('#sync-status')?.textContent.includes('Duplicate task'),
   );
@@ -568,10 +638,11 @@ async function inspectDuplicateTask(viewport) {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     return {
       taskCount: state.todos.length,
-      draft: document.querySelector('#todo-title')?.value,
+      draft: document.querySelector('#overlay-todo-title')?.value,
       message: document.querySelector('#sync-status')?.textContent.trim(),
     };
   });
+  await page.keyboard.press('Escape');
   await page.getByRole('button', { name: 'Board', exact: true }).click();
   await page.waitForSelector('.board-panel');
   await page.click('[data-column="not_started"] .board-new-task');
@@ -716,33 +787,16 @@ function assertWorkspaceNavigation(navigation) {
   return failures;
 }
 
-async function inspectDraftInsertionCue(viewport) {
+async function inspectOverlayAddedTask(viewport) {
   const page = await browser.newPage({ viewport });
   await page.addInitScript(() => {
-    localStorage.setItem('done-log-client-id', 'ui-smoke-draft-cue');
+    localStorage.setItem('done-log-client-id', 'ui-smoke-overlay-add');
     localStorage.setItem('done-log-state', JSON.stringify({ todos: [] }));
   });
   await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
-  await page.fill('#todo-title', 'Fix');
-  await page.waitForSelector('.block-insertion-cue');
-
-  const draftMetrics = await page.evaluate(() => {
-    const cue = document.querySelector('.block-insertion-cue');
-    const line = document.querySelector('.block-insertion-line');
-    const label = document.querySelector('.block-insertion-label');
-    const cueRect = cue?.getBoundingClientRect();
-    const lineRect = line?.getBoundingClientRect();
-    const labelRect = label?.getBoundingClientRect();
-
-    return {
-      visible: Boolean(cue),
-      cueHeight: Math.round(cueRect?.height ?? 0),
-      lineLabelGap: Math.round((labelRect?.top ?? 0) - (lineRect?.bottom ?? 0)),
-      alignContent: getComputedStyle(document.querySelector('.todo-list')).alignContent,
-    };
-  });
-
-  await page.click('.input-row button[type="submit"]');
+  await page.locator('.new-task-button').click();
+  await page.fill('#overlay-todo-title', 'Fix');
+  await page.click('.composer-add');
   await page.waitForSelector('.todo-item');
   await page.waitForTimeout(750);
 
@@ -752,11 +806,13 @@ async function inspectDraftInsertionCue(viewport) {
     return {
       itemHeight: Math.round(itemRect?.height ?? 0),
       itemAlignSelf: item ? getComputedStyle(item).alignSelf : null,
+      alignContent: getComputedStyle(document.querySelector('.todo-list')).alignContent,
+      overlayOpen: Boolean(document.querySelector('.composer-overlay[open]')),
     };
   });
 
   await page.close();
-  return { ...draftMetrics, ...taskMetrics };
+  return taskMetrics;
 }
 
 async function inspectBoardCardLayout(viewport) {
@@ -819,7 +875,7 @@ async function inspectBoardCardLayout(viewport) {
 }
 
 async function inspectViewport(viewport, isMobile) {
-  const page = await browser.newPage({ viewport, isMobile });
+  const page = await browser.newPage({ viewport, isMobile, timezoneId: 'America/Los_Angeles' });
   await page.addInitScript(() => {
     const today = new Date();
     const dayKey = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
@@ -859,8 +915,8 @@ async function inspectViewport(viewport, isMobile) {
             title: `Overflow task ${index + 1}`,
             createdAt: new Date(Date.UTC(2026, 5, 8, 8, index + 1, 0)).toISOString(),
             completedAt: null,
-            firstStartedAt: index === 0 ? '2026-06-08T08:10:00.000Z' : null,
-            activeStartedAt: index === 0 ? '2026-06-08T08:10:00.000Z' : null,
+            firstStartedAt: index === 0 ? completedAt(8, 10) : null,
+            activeStartedAt: index === 0 ? completedAt(8, 10) : null,
             trackedSeconds: index === 0 ? 180 : 0,
           })),
           {
@@ -974,7 +1030,7 @@ async function inspectViewport(viewport, isMobile) {
       },
       calendarPresentation: {
         nativeInputCount: document.querySelectorAll('input[type="date"], input[type="datetime-local"]').length,
-        hasNewTaskPicker: Boolean(document.querySelector('#todo-due-date.calendar-trigger')),
+        hasNewTaskPicker: Boolean(document.querySelector('.new-task-button[aria-haspopup="dialog"]')),
         hasSummaryPicker: Boolean(document.querySelector('#summary-date.calendar-trigger')),
       },
       summaryBuckets: Array.from(document.querySelectorAll('.summary-section h3')).map((element) => element.textContent.trim()),
@@ -1015,7 +1071,8 @@ async function inspectViewport(viewport, isMobile) {
         summaryScrollbarWidth: getComputedStyle(document.querySelector('.summary-list')).scrollbarWidth,
       },
       rects: {
-        '#todo-title': rectFor('#todo-title'),
+        '#task-search': rectFor('#task-search'),
+        '.new-task-button': rectFor('.new-task-button'),
         '#summary-date': rectFor('#summary-date'),
         '#summary-previous-day': rectFor('#summary-previous-day'),
         '#summary-next-day': rectFor('#summary-next-day'),
@@ -1031,18 +1088,27 @@ async function inspectViewport(viewport, isMobile) {
         '.todo-item button': contrastFor('.todo-item button'),
       },
       transitions: {
-        '.input-row button': transitionFor('.input-row button'),
+        '.new-task-button': transitionFor('.new-task-button'),
         '.todo-item button': transitionFor('.todo-item button'),
         '.theme-toggle': transitionFor('.theme-toggle'),
       },
       timerControl: (() => {
-        const button = document.querySelector('.timer-button');
-        const label = button?.querySelector('.timer-button-label');
-        const labelRect = label?.getBoundingClientRect();
+        const item = document.querySelector('.todo-item');
+        const button = item?.querySelector('.timer-button');
+        const other = item?.querySelector('.open-task-button');
+        const visibleLabel = Array.from(button?.querySelectorAll('span') ?? []).find((span) => {
+          const style = getComputedStyle(span);
+          const rect = span.getBoundingClientRect();
+          return style.position !== 'absolute' && rect.width > 1 && rect.height > 1;
+        });
+        const buttonRect = button?.getBoundingClientRect();
+        const otherRect = other?.getBoundingClientRect();
         return {
-          text: label?.textContent.trim(),
-          width: Math.round(labelRect?.width ?? 0),
+          visibleText: visibleLabel?.textContent.trim() ?? '',
+          width: Math.round(buttonRect?.width ?? 0),
+          otherWidth: Math.round(otherRect?.width ?? 0),
           ariaLabel: button?.getAttribute('aria-label') ?? '',
+          hasDelete: Boolean(item?.querySelector('.delete-task-button')),
         };
       })(),
       taskRowSpacing: (() => {
@@ -1068,6 +1134,8 @@ async function inspectViewport(viewport, isMobile) {
     }
   });
 
+  const rowDelete = isMobile ? null : await exerciseRowDelete(page);
+
   await page.close();
   return {
     viewport,
@@ -1077,21 +1145,54 @@ async function inspectViewport(viewport, isMobile) {
     summaryTimeEdit,
     taskFlowChecks,
     newTaskCalendarClear,
+    rowDelete,
     ...metrics,
   };
 }
 
+async function exerciseRowDelete(page) {
+  const button = page.locator('[data-todo-id="ui-smoke-today-task"] .delete-task-button');
+  const visible = await button.isVisible().catch(() => false);
+  if (!visible) {
+    return { visible: false, ariaLabel: '', removedFromList: false, removedFromState: false };
+  }
+  const ariaLabel = (await button.getAttribute('aria-label')) ?? '';
+  await button.click();
+  await page.waitForFunction(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    return !state.todos.some((item) => item.id === 'ui-smoke-today-task') &&
+      !document.querySelector('[data-todo-id="ui-smoke-today-task"]');
+  });
+  const after = await page.evaluate(() => {
+    const state = JSON.parse(localStorage.getItem('done-log-state'));
+    return {
+      removedFromList: !document.querySelector('[data-todo-id="ui-smoke-today-task"]'),
+      removedFromState: !state.todos.some((item) => item.id === 'ui-smoke-today-task'),
+    };
+  });
+  return { visible, ariaLabel, ...after };
+}
+
 async function exerciseNewTaskCalendarClear(page) {
-  await page.locator('#todo-due-date').click();
-  await page.locator('.calendar-footer button', { hasText: 'Today' }).click();
-  await page.locator('#todo-due-date').click();
+  await page.locator('.new-task-button').click();
+  await page.waitForSelector('#overlay-todo-due-date');
+  await page.locator('#overlay-todo-due-date').click();
+  await page.waitForSelector('.calendar-popover');
   const clearAvailable = Boolean(
     await page.locator('.calendar-footer button', { hasText: 'Clear' }).count(),
   );
-  await page.locator('.calendar-footer button', { hasText: 'Clear' }).click();
+  const triggerText = (await page.locator('#overlay-todo-due-date').textContent())?.trim() ?? '';
+  const nativeInputCount = await page.locator('input[type="date"], input[type="datetime-local"]').count();
+  for (let attempt = 0; attempt < 3; attempt += 1) {
+    if (!(await page.locator('.composer-overlay[open]').count())) {
+      break;
+    }
+    await page.keyboard.press('Escape');
+  }
   return {
     clearAvailable,
-    triggerText: (await page.locator('#todo-due-date').textContent())?.trim() ?? '',
+    triggerText,
+    nativeInputCount,
   };
 }
 
@@ -1361,28 +1462,9 @@ async function exerciseDetailEditing(page) {
   await page.waitForTimeout(120);
   const outsideClickKeepsDetailOpen = await page.evaluate(() => Boolean(document.querySelector('#task-detail')));
 
-  await page.locator('.progress-toggle input').check();
-  await page.fill('#progress-label', 'pages 41-52');
-  await page.keyboard.press('Shift+Tab');
-  const shiftTabMovedToProgressToggle = await page.evaluate(
-    () => document.activeElement === document.querySelector('.progress-toggle input'),
-  );
-  await page.locator('#progress-label').focus();
-  await page.locator('#progress-label').evaluate((editor) => editor.setSelectionRange(0, 0));
-  await page.keyboard.press('Tab');
-  const progressEditorCheck = {
-    ...(await page.evaluate(() => ({
-      tagName: document.querySelector('#progress-label')?.tagName,
-      value: document.querySelector('#progress-label')?.value,
-      selectionStart: document.querySelector('#progress-label')?.selectionStart,
-      activeElementId: document.activeElement?.id,
-    }))),
-    shiftTabMovedToProgressToggle,
-  };
-  await page.fill('#progress-label', 'pages 41-52');
   await page.click('#detail-close');
   await page.waitForTimeout(120);
-  await page.click(`${localTaskSelector} button[aria-label^="Log"]`);
+  await page.click(`${localTaskSelector} button[aria-label^="Mark"]`);
   await page.waitForTimeout(100);
   await page.mouse.click(24, 24);
   await page.waitForTimeout(120);
@@ -1486,7 +1568,7 @@ async function exerciseDetailEditing(page) {
     return !state.todos.some((item) => item.id === 'ui-smoke-evening-task');
   });
 
-  const editChecks = await page.evaluate(({ taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteAfterInput, slashTodoValue, clickedTodoValue, tabEditCheck, enterIndentCheck, progressEditorCheck }) => {
+  const editChecks = await page.evaluate(({ taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteAfterInput, slashTodoValue, clickedTodoValue, tabEditCheck, enterIndentCheck }) => {
     const state = JSON.parse(localStorage.getItem('done-log-state'));
     const todo = state.todos.find((item) => item.id === 'ui-smoke-local-task');
     const session = state.todos.find((item) => item.parentTaskId === 'ui-smoke-local-task');
@@ -1496,13 +1578,8 @@ async function exerciseDetailEditing(page) {
       titleValue: document.querySelector('#detail-title-input')?.value,
       storedNote: todo?.note,
       storedTitle: todo?.title,
-      storedIsProgressive: todo?.isProgressive,
-      storedProgressLabel: todo?.progressLabel,
-      parentStillOpen: todo?.completedAt === null,
-      sessionTitle: session?.title,
-      sessionProgressLabel: session?.progressLabel,
-      sessionCompleted: Boolean(session?.completedAt),
-      recapProgress: Array.from(document.querySelectorAll('.summary-progress')).map((element) => element.textContent.trim()),
+      localTaskCompleted: Boolean(todo?.completedAt),
+      sessionCreated: Boolean(session),
       titleDisplayAfterEdit: document.querySelector('.detail-title-display')?.textContent.trim(),
       taskDetailScroll,
       deleteButtonUpfront,
@@ -1511,7 +1588,6 @@ async function exerciseDetailEditing(page) {
       clickedTodoValue,
       tabEditCheck,
       enterIndentCheck,
-      progressEditorCheck,
       lunchTrackedSeconds: lunch?.trackedSeconds,
       lunchStart: lunch?.firstStartedAt,
       lunchCompletedAt: lunch?.completedAt,
@@ -1520,7 +1596,7 @@ async function exerciseDetailEditing(page) {
       detailUsesCustomCalendar,
       doneDateMoveCheck,
     };
-  }, { taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteAfterInput, slashTodoValue, clickedTodoValue, tabEditCheck, enterIndentCheck, progressEditorCheck });
+  }, { taskDetailScroll, deleteButtonUpfront, detailUsesCustomCalendar, doneDateMoveCheck, noteAfterInput, slashTodoValue, clickedTodoValue, tabEditCheck, enterIndentCheck });
 
   return { ...editChecks, initialTitlePresentation, detailLayout, outsideClickKeepsDetailOpen };
 }
@@ -1575,11 +1651,21 @@ function assertHasMotion(result, selector, label) {
 }
 
 function assertTimerControlLabel(result) {
-  return ['Start', 'Stop'].includes(result.timerControl.text) &&
-    result.timerControl.width > 22 &&
-    result.timerControl.ariaLabel.includes(result.timerControl.text)
+  const control = result.timerControl;
+  const iconSized = control.width === 42 && control.width === control.otherWidth;
+  const named = /Start|Pause/.test(control.ariaLabel);
+  return !control.visibleText && iconSized && named && control.hasDelete
     ? []
-    : [`timer control label is not visible/clear: ${JSON.stringify(result.timerControl)}`];
+    : [`timer and delete row actions are not icon-only: ${JSON.stringify(control)}`];
+}
+
+function assertRowDelete(result) {
+  return result.rowDelete?.visible &&
+    result.rowDelete.ariaLabel.includes('Delete') &&
+    result.rowDelete.removedFromList &&
+    result.rowDelete.removedFromState
+    ? []
+    : [`row delete did not remove the task from the list: ${JSON.stringify(result.rowDelete)}`];
 }
 
 function assertTaskRowSpacing(result) {
@@ -1655,10 +1741,13 @@ function assertCalendarConsistency(result) {
 }
 
 function assertNewTaskCalendarClear(result) {
-  return result.newTaskCalendarClear?.clearAvailable &&
-    result.newTaskCalendarClear.triggerText === 'Select date'
+  return result.newTaskCalendarClear &&
+    result.newTaskCalendarClear.clearAvailable === false &&
+    result.newTaskCalendarClear.triggerText &&
+    result.newTaskCalendarClear.triggerText !== 'Select date' &&
+    result.newTaskCalendarClear.nativeInputCount === 0
     ? []
-    : [`new-task assigned date could not be cleared: ${JSON.stringify(result.newTaskCalendarClear)}`];
+    : [`new-task assigned date did not open with today prefilled: ${JSON.stringify(result.newTaskCalendarClear)}`];
 }
 
 function assertPausedTimeline(result) {
@@ -1819,16 +1908,6 @@ function assertDetailEditing(result) {
   }
 
   if (
-    editChecks.progressEditorCheck?.tagName !== 'TEXTAREA' ||
-    !editChecks.progressEditorCheck?.value?.startsWith('\t') ||
-    editChecks.progressEditorCheck?.selectionStart !== 1 ||
-    editChecks.progressEditorCheck?.activeElementId !== 'progress-label' ||
-    !editChecks.progressEditorCheck?.shiftTabMovedToProgressToggle
-  ) {
-    failures.push(`progress editor did not behave like task notes: ${JSON.stringify(editChecks.progressEditorCheck)}`);
-  }
-
-  if (
     noteBody(editChecks.noteAfterInput?.storedNote) !== 'Smoke note' ||
     editChecks.noteAfterInput?.saveVisible ||
     editChecks.noteAfterInput?.statusText !== 'Saving details...'
@@ -1913,29 +1992,17 @@ function assertDetailEditing(result) {
   return failures;
 }
 
-function assertProgressiveSession(result) {
+function assertCompletedFromDetail(result) {
   const editChecks = result.editChecks;
-  return editChecks.storedIsProgressive === true &&
-    editChecks.storedProgressLabel === 'pages 41-52' &&
-    editChecks.parentStillOpen === true &&
-    editChecks.sessionTitle === 'Smoke renamed task' &&
-    editChecks.sessionProgressLabel === 'pages 41-52' &&
-    editChecks.sessionCompleted === true &&
-    editChecks.recapProgress.includes('pages 41-52')
+  return editChecks.localTaskCompleted === true && editChecks.sessionCreated !== true
     ? []
-    : [`progressive session failed: ${JSON.stringify(editChecks)}`];
+    : [`completing from the open list did not finish the task: ${JSON.stringify(editChecks)}`];
 }
 
-function assertDraftInsertionCue(result) {
+function assertOverlayAddedTask(result) {
   const failures = [];
-  if (!result?.visible) {
-    failures.push(`draft insertion cue missing while typing a new task: ${JSON.stringify(result)}`);
-  }
-  if (result?.cueHeight > 48) {
-    failures.push(`draft insertion cue stretched while typing: height ${result.cueHeight}`);
-  }
-  if (result?.lineLabelGap > 12) {
-    failures.push(`draft insertion cue line and label separated: gap ${result.lineLabelGap}`);
+  if (result?.overlayOpen) {
+    failures.push('new-task overlay stayed open after adding a task');
   }
   if (result?.alignContent !== 'start') {
     failures.push(`todo list align-content is ${result?.alignContent}; expected start`);
