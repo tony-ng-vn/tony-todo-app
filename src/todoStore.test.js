@@ -1360,6 +1360,20 @@ describe('todo day summary', () => {
     expect(sessions[0].trackedSeconds).toBe(30 * 60);
   });
 
+  it('keeps a running timer alive when archiving exactly at the day rollover', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Late night write', new Date('2026-06-08T20:00:00-07:00'));
+    const todoId = state.todos[0].id;
+    state = startTodoTimer(state, todoId, new Date('2026-06-08T23:30:00-07:00'));
+    const midnight = new Date('2026-06-09T00:00:00-07:00');
+    state = archivePriorDaySessions(state, midnight);
+
+    const parent = state.todos.find((todo) => todo.id === todoId);
+    expect(getProgressSessions(state, todoId)).toHaveLength(1);
+    expect(parent.activeStartedAt).toBe(midnight.toISOString());
+    expect(parent.trackedSeconds).toBe(0);
+  });
+
   it('archives the pre-midnight part when pausing after midnight', () => {
     let state = createInitialState();
     state = addTodo(state, 'Late night write', new Date('2026-06-08T20:00:00-07:00'));
