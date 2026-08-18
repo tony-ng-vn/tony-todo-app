@@ -161,7 +161,7 @@ describe('note entries', () => {
 
     expect(stamped).toBe(`Start: ${formatNoteAtLocal(first)}\nLeft voicemail`);
     expect(applyTodoNote(stamped, `${stamped}\n\nWaiting on callback`, later)).toBe(
-      `Start: ${formatNoteAtLocal(first)}\nLeft voicemail\nWaiting on callback`,
+      `Start: ${formatNoteAtLocal(first)}\nLeft voicemail\n\nWaiting on callback`,
     );
   });
 

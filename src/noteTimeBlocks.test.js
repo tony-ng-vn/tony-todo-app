@@ -123,7 +123,43 @@ describe('note time blocks', () => {
       '- third',
     ].join('\n');
 
-    expect(stripNoteStampsForEditor(stored)).toBe('- first\n- second\n\n- third');
+    expect(stripNoteStampsForEditor(stored)).toBe('- first\n- second\n- third');
+  });
+
+  // The editor shows exactly what the user typed: headings are the only
+  // thing removed, blank lines are the user's, and a session boundary adds
+  // nothing on its own. So strip(apply(prev, draft)) must give back draft.
+  it('projects a draft typed after a pause back unchanged, blank line or not', () => {
+    const closed = `${startHeading(START)}\n- old\n${endHeading(PAUSE)}`;
+
+    const tight = applyTodoNote(closed, '- old\n- n', RESUME);
+    expect(tight).toBe(`${closed}\n\n${startHeading(RESUME)}\n- n`);
+    expect(stripNoteStampsForEditor(tight)).toBe('- old\n- n');
+
+    const spaced = applyTodoNote(closed, '- old\n\n- n', RESUME);
+    expect(spaced).toBe(`${startHeading(START)}\n- old\n\n${endHeading(PAUSE)}\n\n${startHeading(RESUME)}\n- n`);
+    expect(stripNoteStampsForEditor(spaced)).toBe('- old\n\n- n');
+  });
+
+  it('keeps blank and whitespace-only lines inside a session verbatim', () => {
+    const paragraphs = applyTodoNote('', 'para one\n\npara two', START);
+    expect(paragraphs).toBe(`${startHeading(START)}\npara one\n\npara two`);
+    expect(stripNoteStampsForEditor(paragraphs)).toBe('para one\n\npara two');
+    expect(parseNoteEntries(paragraphs)).toEqual([
+      { at: START.toISOString(), text: 'para one' },
+      { at: START.toISOString(), text: 'para two' },
+    ]);
+
+    const indented = applyTodoNote('', '\tIndented line\n\t', START);
+    expect(stripNoteStampsForEditor(indented)).toBe('\tIndented line\n\t');
+  });
+
+  it('shows a run of legacy stamps and a new session as one continuous list', () => {
+    const legacy = '@ 2026-06-08 10:00\n- a\n\n@ 2026-06-08 10:03\n- b';
+
+    const next = applyTodoNote(legacy, '- a\n- b\n- c', START);
+
+    expect(stripNoteStampsForEditor(next)).toBe('- a\n- b\n- c');
   });
 
   it('keeps new bullets in the open time block instead of minting a new stamp', () => {
@@ -167,6 +203,7 @@ describe('note time blocks', () => {
         '- later',
       ].join('\n'),
     );
+    expect(stripNoteStampsForEditor(next)).toBe('- first\n- later');
   });
 
   it('opens a new time block for notes added after End', () => {
