@@ -185,10 +185,7 @@
   $: ongoingTodos = filterTodosBySearch(pendingTodoGroups.ongoing, taskSearchQuery);
   $: pausedTodos = filterTodosBySearch(pendingTodoGroups.paused, taskSearchQuery);
   $: openTodos = filterTodosBySearch(pendingTodoGroups.scheduled, taskSearchQuery);
-  $: openTodoSections = filterTodoSections(
-    getOpenTodoSections(openTodos, new Date(`${currentDayKey}T00:00:00`)),
-    taskSearchQuery,
-  );
+  $: openTodoSections = getOpenTodoSections(openTodos, new Date(`${currentDayKey}T00:00:00`));
   $: summary = filterTodoSections(getDaySummary(state, selectedDay), taskSearchQuery);
   $: boardColumns = getBoardColumns(state, { dayKey: selectedDay, dueFilter: boardDueFilter });
   $: projectTodos = getProjectTodos(state);
