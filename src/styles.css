@@ -1612,6 +1612,13 @@ h2 {
   gap: 6px;
 }
 
+/* Row delete has no confirmation, so hover and focus must read as destructive. */
+.task-actions .delete-task-button:hover,
+.task-actions .delete-task-button:focus-visible {
+  border-color: color-mix(in srgb, var(--danger, #d85c52) 60%, var(--border));
+  color: var(--danger, #d85c52);
+}
+
 .open-task-button {
   justify-content: center;
   gap: 6px;
