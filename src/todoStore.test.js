@@ -252,6 +252,45 @@ describe('todo day summary', () => {
     ]);
   });
 
+  it('includes recap session work in the editable time blocks', () => {
+    expect(
+      getEditableTaskTimeSegments(
+        {
+          createdAt: '2026-06-10T08:00:00.000Z',
+          firstStartedAt: '2026-06-10T10:00:00.000Z',
+          activeStartedAt: null,
+          completedAt: null,
+          timeSegments: [
+            {
+              startedAt: '2026-06-10T10:00:00.000Z',
+              endedAt: '2026-06-10T10:05:00.000Z',
+            },
+          ],
+        },
+        new Date('2026-06-10T15:00:00.000Z'),
+        [
+          {
+            timeSegments: [
+              {
+                startedAt: '2026-06-08T20:00:00.000Z',
+                endedAt: '2026-06-08T20:20:00.000Z',
+              },
+            ],
+          },
+        ],
+      ),
+    ).toEqual([
+      {
+        startedAt: '2026-06-08T20:00:00.000Z',
+        endedAt: '2026-06-08T20:20:00.000Z',
+      },
+      {
+        startedAt: '2026-06-10T10:00:00.000Z',
+        endedAt: '2026-06-10T10:05:00.000Z',
+      },
+    ]);
+  });
+
   it('does not invent a time block for a completed task that never used a timer', () => {
     expect(
       getEditableTaskTimeSegments({
@@ -960,6 +999,65 @@ describe('todo day summary', () => {
         },
       ]),
     ).toBe(original);
+  });
+
+  it('deletes the recap session that owned a removed time block', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Read chapter', new Date('2026-06-08T08:00:00-07:00'));
+    const todoId = state.todos[0].id;
+    state = startTodoTimer(state, todoId, new Date('2026-06-08T20:00:00-07:00'));
+    state = pauseTodoTimer(state, todoId, new Date('2026-06-08T20:20:00-07:00'));
+    state = startTodoTimer(state, todoId, new Date('2026-06-10T10:00:00-07:00'));
+    state = pauseTodoTimer(state, todoId, new Date('2026-06-10T10:05:00-07:00'));
+    const now = new Date('2026-06-10T15:00:00-07:00');
+    const todayBlock = {
+      startedAt: new Date('2026-06-10T10:00:00-07:00').toISOString(),
+      endedAt: new Date('2026-06-10T10:05:00-07:00').toISOString(),
+    };
+
+    state = updateTodoTimeSegments(state, todoId, [todayBlock], now);
+
+    expect(getProgressSessions(state, todoId)).toEqual([]);
+    expect(state.todos.find((todo) => todo.id === todoId)).toMatchObject({
+      trackedSeconds: 5 * 60,
+      timeSegments: [todayBlock],
+    });
+  });
+
+  it('syncs recap session times when the matching time block is edited', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Read chapter', new Date('2026-06-08T08:00:00-07:00'));
+    const todoId = state.todos[0].id;
+    state = startTodoTimer(state, todoId, new Date('2026-06-08T20:00:00-07:00'));
+    state = pauseTodoTimer(state, todoId, new Date('2026-06-08T20:20:00-07:00'));
+    state = startTodoTimer(state, todoId, new Date('2026-06-10T10:00:00-07:00'));
+    state = pauseTodoTimer(state, todoId, new Date('2026-06-10T10:05:00-07:00'));
+    const now = new Date('2026-06-10T15:00:00-07:00');
+    const sessionId = getProgressSessions(state, todoId)[0].id;
+    const editedSessionBlock = {
+      startedAt: new Date('2026-06-08T19:00:00-07:00').toISOString(),
+      endedAt: new Date('2026-06-08T21:00:00-07:00').toISOString(),
+    };
+    const todayBlock = {
+      startedAt: new Date('2026-06-10T10:00:00-07:00').toISOString(),
+      endedAt: new Date('2026-06-10T10:05:00-07:00').toISOString(),
+    };
+
+    state = updateTodoTimeSegments(state, todoId, [editedSessionBlock, todayBlock], now);
+
+    const sessions = getProgressSessions(state, todoId);
+    expect(sessions).toHaveLength(1);
+    expect(sessions[0]).toMatchObject({
+      id: sessionId,
+      firstStartedAt: editedSessionBlock.startedAt,
+      completedAt: editedSessionBlock.endedAt,
+      trackedSeconds: 2 * 60 * 60,
+      timeSegments: [editedSessionBlock],
+    });
+    expect(state.todos.find((todo) => todo.id === todoId)).toMatchObject({
+      trackedSeconds: 5 * 60,
+      timeSegments: [todayBlock],
+    });
   });
 
   it('deletes a todo and its progress sessions', () => {

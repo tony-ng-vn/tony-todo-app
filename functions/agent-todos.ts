@@ -774,6 +774,124 @@ function completeTodo(state, todoId, completedAt = new Date()) {
   };
 }
 
+function applyTodoTimeSegmentEdits(state, todoId, timeSegments, now = new Date()) {
+  const parent = state.todos.find((todo) => todo.id === todoId);
+  if (!parent || parent.isProgressSession) {
+    return state;
+  }
+
+  const existingSessions = state.todos.filter(
+    (item) => item.isProgressSession && item.parentTaskId === todoId,
+  );
+  if (existingSessions.length === 0) {
+    return replaceTodoTimeSegments(state, parent, timeSegments);
+  }
+
+  const todayKey = formatSummaryDayKey(now);
+  const homeDayKey = parent.completedAt
+    ? formatSummaryDayKey(new Date(parent.completedAt))
+    : todayKey;
+  const parentSegments = [];
+  const sessionSegmentsByDay = new Map();
+
+  for (const piece of timeSegments.flatMap(splitSegmentBySummaryDays)) {
+    if (piece.dayKey === homeDayKey || piece.dayKey >= todayKey) {
+      parentSegments.push({ startedAt: piece.startedAt, endedAt: piece.endedAt });
+      continue;
+    }
+
+    const current = sessionSegmentsByDay.get(piece.dayKey) ?? [];
+    current.push({ startedAt: piece.startedAt, endedAt: piece.endedAt });
+    sessionSegmentsByDay.set(piece.dayKey, current);
+  }
+
+  parentSegments.sort((first, second) => new Date(first.startedAt) - new Date(second.startedAt));
+  for (const pieces of sessionSegmentsByDay.values()) {
+    pieces.sort((first, second) => new Date(first.startedAt) - new Date(second.startedAt));
+  }
+
+  const nextSessions = [];
+  const keepSessionIds = new Set();
+  for (const [dayKey, segments] of sessionSegmentsByDay) {
+    const existing = findProgressSessionForDay(state.todos, todoId, dayKey);
+    const next = existing
+      ? replaceProgressSessionSegments(existing, dayKey, segments)
+      : createDayProgressSession(parent, dayKey, segments);
+    keepSessionIds.add(next.id);
+    nextSessions.push(next);
+  }
+
+  const editableSessionIds = new Set(
+    existingSessions
+      .filter((session) => normalizeTimeSegments(session.timeSegments).length > 0)
+      .map((session) => session.id),
+  );
+  const removedSessionIds = new Set(
+    existingSessions
+      .filter((session) => editableSessionIds.has(session.id) && !keepSessionIds.has(session.id))
+      .map((session) => session.id),
+  );
+
+  const updatedParent = withEditedTimeSegments(parent, parentSegments);
+  const nextById = new Map([
+    [updatedParent.id, updatedParent],
+    ...nextSessions.map((session) => [session.id, session]),
+  ]);
+  const existingIds = new Set(state.todos.map((todo) => todo.id));
+
+  return {
+    ...state,
+    todos: [
+      ...state.todos
+        .filter((todo) => !removedSessionIds.has(todo.id))
+        .map((todo) => nextById.get(todo.id) ?? todo),
+      ...nextSessions.filter((session) => !existingIds.has(session.id)),
+    ],
+  };
+}
+
+function replaceTodoTimeSegments(state, parent, timeSegments) {
+  return {
+    ...state,
+    todos: state.todos.map((todo) => (todo.id === parent.id ? withEditedTimeSegments(parent, timeSegments) : todo)),
+  };
+}
+
+function withEditedTimeSegments(todo, timeSegments) {
+  const firstStartedAt = timeSegments[0]?.startedAt ?? null;
+  const latestEndedAt = timeSegments.reduce(
+    (latest, segment) =>
+      new Date(segment.endedAt) > new Date(latest) ? segment.endedAt : latest,
+    timeSegments[0]?.endedAt ?? null,
+  );
+  const wasCompleted = Boolean(todo.completedAt);
+  const wasRunning = Boolean(todo.activeStartedAt);
+
+  return {
+    ...todo,
+    firstStartedAt,
+    activeStartedAt: wasRunning && latestEndedAt ? latestEndedAt : null,
+    completedAt: wasCompleted ? todo.completedAt : null,
+    trackedSeconds: totalSegmentSeconds(timeSegments),
+    timeSegments,
+  };
+}
+
+function replaceProgressSessionSegments(session, dayKey, segments) {
+  const firstStart = new Date(segments[0].startedAt);
+  const lastEnd = new Date(segments.at(-1).endedAt);
+
+  return normalizeTodo({
+    ...session,
+    createdAt: firstStart.toISOString(),
+    completedAt: progressSessionEndedAt(dayKey, lastEnd).toISOString(),
+    firstStartedAt: firstStart.toISOString(),
+    activeStartedAt: null,
+    trackedSeconds: totalSegmentSeconds(segments),
+    timeSegments: segments,
+  });
+}
+
 function archivePriorDaySessions(state, now = new Date()) {
   const todayKey = formatSummaryDayKey(now);
   if (!todayKey) {
