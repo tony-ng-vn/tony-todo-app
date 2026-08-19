@@ -2768,6 +2768,10 @@ h2 {
   html:not(.is-native-host) .workspace.is-board-view.has-detail {
     overflow: hidden;
     padding: 0;
+    transform: none;
+    filter: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
   }
 
   html:not(.is-native-host) .workspace.has-detail .task-detail {
@@ -2776,13 +2780,19 @@ h2 {
     z-index: 80;
     order: 0;
     flex: none;
-    width: auto;
-    height: auto;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    height: 100%;
+    height: 100dvh;
+    height: 100svh;
+    max-height: 100dvh;
+    max-height: 100svh;
     min-height: 0;
-    max-height: none;
     overflow: hidden;
     overscroll-behavior: contain;
     border-radius: 0;
+    background: var(--surface-strong);
     padding-top: max(12px, env(safe-area-inset-top, 0px));
     padding-right: max(16px, env(safe-area-inset-right, 0px));
     padding-bottom: max(16px, env(safe-area-inset-bottom, 0px));
@@ -2792,8 +2802,19 @@ h2 {
   }
 
   html:not(.is-native-host) .workspace.has-detail .detail-header {
+    position: sticky;
+    top: 0;
+    z-index: 2;
     flex-shrink: 0;
     align-items: center;
+    background: var(--surface-strong);
+  }
+
+  html:not(.is-native-host) .workspace.has-detail .detail-window-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+    gap: 8px;
   }
 
   html:not(.is-native-host) .workspace.has-detail .detail-body {
