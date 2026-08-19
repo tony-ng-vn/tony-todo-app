@@ -18,6 +18,7 @@
   import TaskPhotoField from './TaskPhotoField.svelte';
 
   export let todo;
+  export let progressSessions = [];
   export let expanded = false;
   export let onToggleDetails;
   export let onTimerAction;
@@ -49,8 +50,8 @@
       draftTodoId = todo.id;
       sourceNote = nextNote;
       noteDraft = stripNoteStampsForEditor(nextNote);
-      sourceTimingBlocks = timingBlocksSource(todo);
-      timingBlocksDraft = timingBlocksForTodo(todo);
+      sourceTimingBlocks = timingBlocksSource(todo, progressSessions);
+      timingBlocksDraft = timingBlocksForTodo(todo, progressSessions);
       timingError = '';
     } else {
       if (nextNote !== sourceNote) {
@@ -58,10 +59,10 @@
         noteDraft = stripNoteStampsForEditor(nextNote);
       }
 
-      const nextTimingBlocks = timingBlocksSource(todo);
+      const nextTimingBlocks = timingBlocksSource(todo, progressSessions);
       if (nextTimingBlocks !== sourceTimingBlocks) {
         sourceTimingBlocks = nextTimingBlocks;
-        timingBlocksDraft = timingBlocksForTodo(todo);
+        timingBlocksDraft = timingBlocksForTodo(todo, progressSessions);
       }
     }
   }
@@ -117,18 +118,24 @@
     return `${year}-${month}-${day}T${hours}:${minutes}`;
   }
 
-  function timingBlocksSource(item) {
+  function timingBlocksSource(item, sessions = []) {
     return JSON.stringify({
       timeSegments: item.timeSegments ?? [],
       firstStartedAt: item.firstStartedAt ?? null,
       activeStartedAt: item.activeStartedAt ?? null,
       createdAt: item.createdAt ?? null,
       completedAt: item.completedAt ?? null,
+      sessions: (sessions ?? []).map((session) => ({
+        id: session.id,
+        completedAt: session.completedAt ?? null,
+        timeSegments: session.timeSegments ?? [],
+        trackedSeconds: session.trackedSeconds ?? 0,
+      })),
     });
   }
 
-  function timingBlocksForTodo(item) {
-    return getEditableTaskTimeSegments(item).map((segment) => ({
+  function timingBlocksForTodo(item, sessions = []) {
+    return getEditableTaskTimeSegments(item, new Date(), sessions).map((segment) => ({
       startedAt: dateTimeLocalValue(segment.startedAt),
       endedAt: dateTimeLocalValue(segment.endedAt),
     }));
@@ -147,8 +154,8 @@
 
   function handleToggleDetails() {
     if (!expanded) {
-      sourceTimingBlocks = timingBlocksSource(todo);
-      timingBlocksDraft = timingBlocksForTodo(todo);
+      sourceTimingBlocks = timingBlocksSource(todo, progressSessions);
+      timingBlocksDraft = timingBlocksForTodo(todo, progressSessions);
       timingError = '';
     }
     onToggleDetails(todo.id);

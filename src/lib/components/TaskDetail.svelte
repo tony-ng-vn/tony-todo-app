@@ -46,11 +46,11 @@
   }
 
   $: {
-    const nextTimingSource = timingSource(selectedTask);
+    const nextTimingSource = timingSource(selectedTask, selectedTaskSessions);
     if (selectedTask?.id !== timingDraftTaskId || nextTimingSource !== timingDraftSource) {
       timingDraftTaskId = selectedTask?.id ?? null;
       timingDraftSource = nextTimingSource;
-      timingDraftBlocks = timingBlocksForTask(selectedTask);
+      timingDraftBlocks = timingBlocksForTask(selectedTask, selectedTaskSessions);
       timingError = '';
     }
   }
@@ -76,18 +76,24 @@
     onDetailTitleCommit(todoId, title);
   }
 
-  function timingSource(todo) {
+  function timingSource(todo, sessions = []) {
     return JSON.stringify({
       timeSegments: todo?.timeSegments ?? [],
       firstStartedAt: todo?.firstStartedAt ?? null,
       activeStartedAt: todo?.activeStartedAt ?? null,
       createdAt: todo?.createdAt ?? null,
       completedAt: todo?.completedAt ?? null,
+      sessions: (sessions ?? []).map((session) => ({
+        id: session.id,
+        completedAt: session.completedAt ?? null,
+        timeSegments: session.timeSegments ?? [],
+        trackedSeconds: session.trackedSeconds ?? 0,
+      })),
     });
   }
 
-  function timingBlocksForTask(todo) {
-    return getEditableTaskTimeSegments(todo).map((segment) => ({
+  function timingBlocksForTask(todo, sessions = []) {
+    return getEditableTaskTimeSegments(todo, new Date(), sessions).map((segment) => ({
       startedAt: toDateTimeLocalValue(segment.startedAt),
       endedAt: toDateTimeLocalValue(segment.endedAt),
     }));

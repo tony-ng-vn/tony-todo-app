@@ -946,9 +946,14 @@
       ...TIMER_SYNC_FIELDS,
       ...COMPLETION_SYNC_FIELDS,
     ]);
+    const createdTodos = getCreatedTodos(beforeTodos, nextState.todos);
+    const deletedTodos = getRemovedTodos(beforeTodos, nextState.todos);
     const updatedTodo = nextState.todos.find((todo) => todo.id === todoId);
 
-    if (changedTodos.length === 0 || !updatedTodo) {
+    if (
+      !updatedTodo ||
+      (changedTodos.length === 0 && createdTodos.length === 0 && deletedTodos.length === 0)
+    ) {
       return { ok: false, error: 'This task timing could not be updated.' };
     }
 
@@ -959,7 +964,7 @@
     }
 
     saveLocalState(state);
-    await syncRemoteChange('Saving time', () => persistCompletionChangedTodos(changedTodos));
+    await syncRemoteChange('Saving time', () => persistEditedTimeSegments(beforeTodos, state.todos));
     return { ok: true };
   }
 
@@ -1411,6 +1416,15 @@
     );
   }
 
+  async function persistEditedTimeSegments(beforeTodos, afterTodos) {
+    await persistArchivedTodos(beforeTodos, afterTodos);
+    const deletedTodos = getRemovedTodos(beforeTodos, afterTodos);
+    if (useRemote && authUser) {
+      await cleanupTodoPhotos(insforge, deletedTodos);
+    }
+    await persistDeletedTodos(deletedTodos.map((todo) => todo.id));
+  }
+
   async function persistCompletionChangedTodos(todosToUpdate) {
     if (!useRemote || !authUser) return;
     await Promise.all(todosToUpdate.map((todo) => updateRemoteTodoCompletion(insforge, authUser.id, todo)));
@@ -1440,6 +1454,11 @@
   function getCreatedTodos(beforeTodos, afterTodos) {
     const beforeIds = new Set(beforeTodos.map((todo) => todo.id));
     return afterTodos.filter((todo) => !beforeIds.has(todo.id));
+  }
+
+  function getRemovedTodos(beforeTodos, afterTodos) {
+    const afterIds = new Set(afterTodos.map((todo) => todo.id));
+    return beforeTodos.filter((todo) => !afterIds.has(todo.id));
   }
 
   function getCompletionChangedTodos(beforeTodos, afterTodos) {
