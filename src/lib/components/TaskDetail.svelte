@@ -235,6 +235,56 @@
     return `${toDateValue(date)}T${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
   }
 
+  function lockToVisualViewport(node) {
+    if (typeof window === 'undefined') {
+      return {};
+    }
+
+    const overlayQuery = window.matchMedia('(max-width: 900px), (pointer: coarse)');
+
+    function sync() {
+      const nativeHost = document.documentElement.classList.contains('is-native-host');
+      if (nativeHost || !overlayQuery.matches || !window.visualViewport) {
+        node.style.removeProperty('height');
+        node.style.removeProperty('top');
+        node.style.removeProperty('left');
+        node.style.removeProperty('right');
+        node.style.removeProperty('bottom');
+        node.style.removeProperty('width');
+        return;
+      }
+
+      const viewport = window.visualViewport;
+      node.style.height = `${viewport.height}px`;
+      node.style.top = `${viewport.offsetTop}px`;
+      node.style.left = `${viewport.offsetLeft}px`;
+      node.style.right = 'auto';
+      node.style.bottom = 'auto';
+      node.style.width = `${viewport.width}px`;
+    }
+
+    overlayQuery.addEventListener('change', sync);
+    window.visualViewport?.addEventListener('resize', sync);
+    window.visualViewport?.addEventListener('scroll', sync);
+    window.addEventListener('orientationchange', sync);
+    sync();
+
+    return {
+      destroy() {
+        overlayQuery.removeEventListener('change', sync);
+        window.visualViewport?.removeEventListener('resize', sync);
+        window.visualViewport?.removeEventListener('scroll', sync);
+        window.removeEventListener('orientationchange', sync);
+        node.style.removeProperty('height');
+        node.style.removeProperty('top');
+        node.style.removeProperty('left');
+        node.style.removeProperty('right');
+        node.style.removeProperty('bottom');
+        node.style.removeProperty('width');
+      },
+    };
+  }
+
   function toDateValue(dateLike) {
     if (!dateLike) {
       return '';
@@ -254,7 +304,12 @@
 </script>
 
 {#if selectedTask}
-<aside class="task-detail" id="task-detail" aria-labelledby="detail-heading">
+<aside
+  class="task-detail"
+  id="task-detail"
+  aria-labelledby="detail-heading"
+  use:lockToVisualViewport
+>
   <div class="detail-header">
     <div>
       <h2 id="detail-heading">Details</h2>
