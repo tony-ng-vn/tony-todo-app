@@ -1255,6 +1255,34 @@ describe('todo day summary', () => {
     });
   });
 
+  it('marks archived recap sessions as partial instead of done', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Read Atomic Habits', new Date('2026-06-08T08:00:00-07:00'));
+    const parentId = state.todos[0].id;
+
+    state = startTodoTimer(state, parentId, new Date('2026-06-08T20:00:00-07:00'));
+    state = pauseTodoTimer(state, parentId, new Date('2026-06-08T20:23:00-07:00'));
+    state = archivePriorDaySessions(state, new Date('2026-06-10T15:00:00-07:00'));
+    state = completeTodo(state, parentId, new Date('2026-06-10T16:00:00-07:00'));
+
+    const mondayItem = getDaySummary(state, '2026-06-08')
+      .flatMap((section) => section.items)
+      .find((item) => item.parentTaskId === parentId);
+    const wednesdayItem = getDaySummary(state, '2026-06-10')
+      .flatMap((section) => section.items)
+      .find((item) => item.id === parentId);
+
+    expect(mondayItem).toMatchObject({
+      isProgressSession: true,
+      outcome: 'partial',
+    });
+    expect(wednesdayItem).toMatchObject({
+      id: parentId,
+      isProgressSession: false,
+      outcome: 'done',
+    });
+  });
+
   it('does not create a second recap session for a day that already has one', () => {
     let state = createInitialState();
     state = addTodo(state, 'Read Atomic Habits', new Date('2026-06-08T08:00:00-07:00'));
