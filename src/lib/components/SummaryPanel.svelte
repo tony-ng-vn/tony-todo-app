@@ -176,6 +176,8 @@
                     <span class="summary-title">{@html linkifyText(item.title)}</span>
                     {#if item.outcome === 'failed'}
                       <span class="summary-outcome is-failed">Failed</span>
+                    {:else if item.outcome === 'partial'}
+                      <span class="summary-outcome is-partial">Partial</span>
                     {/if}
                     {#if item.progressLabel}
                       <span class="summary-progress">{item.progressLabel}</span>

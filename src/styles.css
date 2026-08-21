@@ -1655,6 +1655,12 @@ h2 {
   color: color-mix(in srgb, var(--strong) 78%, #9f3030);
 }
 
+.summary-outcome.is-partial {
+  border-color: var(--board-in-progress-soft);
+  background: var(--board-in-progress-surface);
+  color: var(--board-in-progress);
+}
+
 .task-due-badge {
   width: max-content;
   padding: 2px 7px;
