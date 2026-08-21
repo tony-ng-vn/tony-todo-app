@@ -878,7 +878,7 @@ function getDaySummary(state, dayKey) {
       notes: toNoteViews(todo),
       durationSeconds: normalizedTrackedSeconds(todo),
       durationLabel: formatDuration(normalizedTrackedSeconds(todo)),
-      outcome: todo.notionStatus === 'Failed' ? 'failed' : 'done',
+      outcome: todo.notionStatus === 'Failed' ? 'failed' : todo.isProgressSession ? 'partial' : 'done',
       parentTaskId: todo.parentTaskId ?? null,
       isProgressSession: Boolean(todo.isProgressSession),
       progressLabel: todo.progressLabel ?? '',
