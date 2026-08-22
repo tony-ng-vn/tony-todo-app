@@ -997,12 +997,14 @@
       selectedTaskId = null;
     }
     saveLocalState(state);
-    await syncRemoteChange('Deleting task', async () => {
-      if (useRemote && authUser) {
-        await cleanupTodoPhotos(insforge, deletedTodos);
-      }
-      await persistDeletedTodos(deletedIds);
-    });
+    await queueTimingSave(todoId, () =>
+      syncRemoteChange('Deleting task', async () => {
+        if (useRemote && authUser) {
+          await cleanupTodoPhotos(insforge, deletedTodos);
+        }
+        await persistDeletedTodos(deletedIds);
+      }),
+    );
   }
 
   async function handlePromoteProject(todoId) {

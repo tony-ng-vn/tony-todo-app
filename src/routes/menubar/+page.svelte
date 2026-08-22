@@ -760,12 +760,14 @@
     state = deleteTodo(state, todoId);
     expandedTaskId = null;
     saveLocalState(state);
-    await syncRemoteChange('Deleting task', async () => {
-      if (useRemote && authUser) {
-        await cleanupTodoPhotos(insforge, deletedTodos);
-      }
-      await Promise.all(deletedIds.map((deletedId) => persistDeletedTodo(deletedId)));
-    });
+    await queueTimingSave(todoId, () =>
+      syncRemoteChange('Deleting task', async () => {
+        if (useRemote && authUser) {
+          await cleanupTodoPhotos(insforge, deletedTodos);
+        }
+        await Promise.all(deletedIds.map((deletedId) => persistDeletedTodo(deletedId)));
+      }),
+    );
   }
 
   function toggleDetails(todoId) {
