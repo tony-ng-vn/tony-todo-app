@@ -245,6 +245,7 @@ function assignProgressSessionsToDays(
   const neededDays = [...sessionSegmentsByDay.keys()].toSorted();
   const nextSessions = [];
   const usedIds = new Set();
+  const assignedUnownedDays = new Set();
 
   for (const [sessionId, segmentsByDay] of sessionSegmentsById) {
     const existing = existingSessions.find((session) => session.id === sessionId);
@@ -282,11 +283,10 @@ function assignProgressSessionsToDays(
       replaceProgressSessionSegments(existing, dayKey, sessionSegmentsByDay.get(dayKey)),
     );
     usedIds.add(existing.id);
+    assignedUnownedDays.add(dayKey);
   }
 
-  const leftoverDays = neededDays.filter(
-    (dayKey) => !nextSessions.some((session) => formatSummaryDayKey(new Date(session.completedAt)) === dayKey),
-  );
+  const leftoverDays = neededDays.filter((dayKey) => !assignedUnownedDays.has(dayKey));
   const leftoverSessions = existingSessions.filter(
     (session) => recoverTodoTimeSegments(session).length > 0 && !usedIds.has(session.id),
   );
