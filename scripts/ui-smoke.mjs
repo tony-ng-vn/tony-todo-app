@@ -713,6 +713,7 @@ async function inspectRunningTimingEdit(viewport) {
 
 async function inspectArchivedSessionTimeBlocks(viewport) {
   const page = await browser.newPage({ viewport, timezoneId: 'America/Phoenix' });
+  await page.clock.setFixedTime(new Date('2026-08-21T23:55:00-07:00'));
   await page.addInitScript(() => {
     const taskId = 'archived-session-time-block-task';
     const session = (id, startedAt, endedAt, trackedSeconds) => ({
