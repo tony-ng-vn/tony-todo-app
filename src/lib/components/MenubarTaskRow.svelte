@@ -7,7 +7,7 @@
     formatDueDate,
     formatDuration,
     formatTaskTimestamp,
-    getEditableTaskTimeSegments,
+    getEditableTaskTimeBlocks,
     getElapsedSeconds,
     stripNoteStampsForEditor,
   } from '../../todoStore.js';
@@ -135,9 +135,10 @@
   }
 
   function timingBlocksForTodo(item, sessions = []) {
-    return getEditableTaskTimeSegments(item, new Date(), sessions).map((segment) => ({
+    return getEditableTaskTimeBlocks(item, new Date(), sessions).map((segment) => ({
       startedAt: dateTimeLocalValue(segment.startedAt),
       endedAt: dateTimeLocalValue(segment.endedAt),
+      ...(segment.sessionId ? { sessionId: segment.sessionId } : {}),
     }));
   }
 

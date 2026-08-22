@@ -129,17 +129,29 @@ export function applyTodoTimeSegmentEdits(state, todoId, timeSegments, now = new
   const homeDayKey = todo.completedAt
     ? formatSummaryDayKey(new Date(todo.completedAt))
     : todayKey;
+  const existingSessionIds = new Set(existingSessions.map((session) => session.id));
   const parentSegments = [];
   const sessionSegmentsByDay = new Map();
+  const sessionSegmentsById = new Map();
 
   for (const piece of timeSegments.flatMap(splitSegmentBySummaryDays)) {
+    const segment = { startedAt: piece.startedAt, endedAt: piece.endedAt };
+    if (piece.sessionId && existingSessionIds.has(piece.sessionId)) {
+      const segmentsByDay = sessionSegmentsById.get(piece.sessionId) ?? new Map();
+      const current = segmentsByDay.get(piece.dayKey) ?? [];
+      current.push(segment);
+      segmentsByDay.set(piece.dayKey, current);
+      sessionSegmentsById.set(piece.sessionId, segmentsByDay);
+      continue;
+    }
+
     if (piece.dayKey === homeDayKey || piece.dayKey >= todayKey) {
-      parentSegments.push({ startedAt: piece.startedAt, endedAt: piece.endedAt });
+      parentSegments.push(segment);
       continue;
     }
 
     const current = sessionSegmentsByDay.get(piece.dayKey) ?? [];
-    current.push({ startedAt: piece.startedAt, endedAt: piece.endedAt });
+    current.push(segment);
     sessionSegmentsByDay.set(piece.dayKey, current);
   }
 
@@ -152,6 +164,7 @@ export function applyTodoTimeSegmentEdits(state, todoId, timeSegments, now = new
     todo,
     state.todos,
     sessionSegmentsByDay,
+    sessionSegmentsById,
   );
   const updatedParent = withEditedTimeSegments(todo, parentSegments);
   const nextById = new Map([
@@ -220,7 +233,12 @@ function applyDirectSessionTimeSegmentEdits(state, session, timeSegments) {
   return { ...state, todos };
 }
 
-function assignProgressSessionsToDays(parent, existingTodos, sessionSegmentsByDay) {
+function assignProgressSessionsToDays(
+  parent,
+  existingTodos,
+  sessionSegmentsByDay,
+  sessionSegmentsById = new Map(),
+) {
   const existingSessions = existingTodos.filter(
     (item) => item.isProgressSession && item.parentTaskId === parent.id,
   );
@@ -228,8 +246,34 @@ function assignProgressSessionsToDays(parent, existingTodos, sessionSegmentsByDa
   const nextSessions = [];
   const usedIds = new Set();
 
+  for (const [sessionId, segmentsByDay] of sessionSegmentsById) {
+    const existing = existingSessions.find((session) => session.id === sessionId);
+    if (!existing) {
+      continue;
+    }
+
+    const days = [...segmentsByDay.keys()].toSorted();
+    const originalDay = existing.completedAt
+      ? formatSummaryDayKey(new Date(existing.completedAt))
+      : null;
+    const primaryDay = segmentsByDay.has(originalDay) ? originalDay : days[0];
+    nextSessions.push(
+      replaceProgressSessionSegments(existing, primaryDay, segmentsByDay.get(primaryDay)),
+    );
+    usedIds.add(existing.id);
+
+    for (const dayKey of days.filter((day) => day !== primaryDay)) {
+      nextSessions.push(createDayProgressSession(parent, dayKey, segmentsByDay.get(dayKey)));
+    }
+  }
+
   for (const dayKey of neededDays) {
-    const existing = findProgressSessionForDay(existingTodos, parent.id, dayKey);
+    const existing = existingSessions.find(
+      (session) =>
+        !usedIds.has(session.id) &&
+        session.completedAt &&
+        formatSummaryDayKey(new Date(session.completedAt)) === dayKey,
+    );
     if (!existing) {
       continue;
     }
@@ -244,7 +288,7 @@ function assignProgressSessionsToDays(parent, existingTodos, sessionSegmentsByDa
     (dayKey) => !nextSessions.some((session) => formatSummaryDayKey(new Date(session.completedAt)) === dayKey),
   );
   const leftoverSessions = existingSessions.filter(
-    (session) => normalizeTimeSegments(session.timeSegments).length > 0 && !usedIds.has(session.id),
+    (session) => recoverTodoTimeSegments(session).length > 0 && !usedIds.has(session.id),
   );
 
   leftoverDays.forEach((dayKey, index) => {
@@ -263,7 +307,7 @@ function assignProgressSessionsToDays(parent, existingTodos, sessionSegmentsByDa
     existingSessions
       .filter(
         (session) =>
-          normalizeTimeSegments(session.timeSegments).length > 0 &&
+          recoverTodoTimeSegments(session).length > 0 &&
           !nextSessions.some((item) => item.id === session.id),
       )
       .map((session) => session.id),
@@ -544,6 +588,36 @@ export function normalizeTimeSegments(segments) {
 
 export function normalizedTrackedSeconds(todo) {
   return Math.max(0, Math.floor(Number(todo.trackedSeconds ?? 0)));
+}
+
+export function recoverTodoTimeSegments(todo) {
+  const recorded = normalizeTimeSegments(todo?.timeSegments);
+  const missingSeconds = Math.max(0, normalizedTrackedSeconds(todo) - totalSegmentSeconds(recorded));
+  if (missingSeconds > 0) {
+    const syntheticEnd = new Date(recorded[0]?.startedAt ?? todo?.completedAt);
+    if (!Number.isNaN(syntheticEnd.getTime())) {
+      recorded.unshift({
+        startedAt: new Date(syntheticEnd.getTime() - missingSeconds * 1000).toISOString(),
+        endedAt: syntheticEnd.toISOString(),
+      });
+    }
+  }
+
+  if (recorded.length > 0) {
+    return recorded;
+  }
+
+  const startedAt = new Date(todo?.firstStartedAt);
+  const endedAt = new Date(todo?.completedAt);
+  if (
+    !Number.isNaN(startedAt.getTime()) &&
+    !Number.isNaN(endedAt.getTime()) &&
+    startedAt < endedAt
+  ) {
+    return [{ startedAt: startedAt.toISOString(), endedAt: endedAt.toISOString() }];
+  }
+
+  return [];
 }
 
 export function getActiveSegmentSeconds(startedAt, endedAt) {
@@ -1232,6 +1306,7 @@ function splitSegmentBySummaryDays(segment) {
         dayKey,
         startedAt: cursor.toISOString(),
         endedAt: pieceEnd.toISOString(),
+        ...(segment.sessionId ? { sessionId: segment.sessionId } : {}),
       });
     }
     cursor = pieceEnd;

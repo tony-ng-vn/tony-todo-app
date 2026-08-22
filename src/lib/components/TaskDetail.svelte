@@ -8,7 +8,7 @@
   import { getTextareaCaretRestore, getTextareaKeyEdit } from '../../textareaEditing.js';
   import {
     formatTaskTimestamp,
-    getEditableTaskTimeSegments,
+    getEditableTaskTimeBlocks,
   } from '../../todoStore.js';
 
   export let selectedTask = null;
@@ -93,9 +93,10 @@
   }
 
   function timingBlocksForTask(todo, sessions = []) {
-    return getEditableTaskTimeSegments(todo, new Date(), sessions).map((segment) => ({
+    return getEditableTaskTimeBlocks(todo, new Date(), sessions).map((segment) => ({
       startedAt: toDateTimeLocalValue(segment.startedAt),
       endedAt: toDateTimeLocalValue(segment.endedAt),
+      ...(segment.sessionId ? { sessionId: segment.sessionId } : {}),
     }));
   }
 
@@ -160,7 +161,11 @@
         timingError = 'Start time must be before end time in each block.';
         return;
       }
-      segments.push({ startedAt: block.startedAt, endedAt: block.endedAt });
+      segments.push({
+        startedAt: block.startedAt,
+        endedAt: block.endedAt,
+        ...(block.sessionId ? { sessionId: block.sessionId } : {}),
+      });
     }
 
     const result = await onTimeSegmentsChange?.(selectedTask.id, segments);

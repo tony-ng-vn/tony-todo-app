@@ -21,6 +21,7 @@ import {
   getPendingTodos,
   getProjectTodos,
   parseTodoKind,
+  recoverTodoTimeSegments,
   normalizeTimeSegments,
   normalizeTodo,
   normalizedTrackedSeconds,
@@ -176,6 +177,7 @@ export function updateTodoTimeSegments(state, todoId, segments, now = new Date()
       return {
         startedAt: startedAt.toISOString(),
         endedAt: endedAt.toISOString(),
+        ...(typeof segment?.sessionId === 'string' ? { sessionId: segment.sessionId } : {}),
       };
     })
     .filter(Boolean);
@@ -808,8 +810,20 @@ export function getDefaultTaskStartTimestamp(todo) {
 }
 
 export function getEditableTaskTimeSegments(todo, activeEndedAt = new Date(), sessions = []) {
+  return getEditableTaskTimeBlocks(todo, activeEndedAt, sessions).map(({ startedAt, endedAt }) => ({
+    startedAt,
+    endedAt,
+  }));
+}
+
+export function getEditableTaskTimeBlocks(todo, activeEndedAt = new Date(), sessions = []) {
   const recordedSegments = [
-    ...(sessions ?? []).flatMap((session) => normalizeTimeSegments(session.timeSegments)),
+    ...(sessions ?? []).flatMap((session) =>
+      recoverTodoTimeSegments(session).map((segment) => ({
+        ...segment,
+        sessionId: session.id,
+      })),
+    ),
     ...normalizeTimeSegments(todo?.timeSegments),
   ].toSorted((first, second) => new Date(first.startedAt) - new Date(second.startedAt));
 
