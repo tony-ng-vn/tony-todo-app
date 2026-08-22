@@ -47,6 +47,7 @@
     stripNoteStampsForEditor,
   } from '../../todoStore.js';
   import { isNewTaskShortcut } from '../../newTaskShortcut.js';
+  import { createKeyedSaveQueue } from '../../saveQueue.js';
   import { getCurrentUser, signInWithPassword, signOut, signUp } from '../../auth.js';
   import { insforge, isInsForgeConfigured } from '../../insforgeClient.js';
   import {
@@ -104,6 +105,7 @@
   const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
   let state = createInitialState();
+  const queueTimingSave = createKeyedSaveQueue();
   let stateLoaded = false;
   let syncMessage = 'Connecting';
   let useRemote = false;
@@ -745,7 +747,10 @@
 
     state = nextState;
     saveLocalState(state);
-    await syncRemoteChange('Saving timing', () => persistEditedTimeSegments(beforeTodos, state.todos));
+    const afterTodos = state.todos;
+    await queueTimingSave(todoId, () =>
+      syncRemoteChange('Saving timing', () => persistEditedTimeSegments(beforeTodos, afterTodos)),
+    );
   }
 
   async function handleDelete(todoId) {

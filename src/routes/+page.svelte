@@ -66,6 +66,7 @@
   } from '../todoStore.js';
   import { insforge, isInsForgeConfigured } from '../insforgeClient.js';
   import { isNewTaskShortcut } from '../newTaskShortcut.js';
+  import { createKeyedSaveQueue } from '../saveQueue.js';
   import { getCurrentUser, signInWithPassword, signOut, signUp } from '../auth.js';
   import {
     completeRemoteTodo,
@@ -124,6 +125,7 @@
   const VIEW_STORAGE_KEY = 'done-log-view';
 
   let state = createInitialState();
+  const queueTimingSave = createKeyedSaveQueue();
   let selectedDay = formatDayKey(new Date());
   let boardDueFilter = 'all';
   let calendarYear = new Date().getFullYear();
@@ -964,7 +966,10 @@
     }
 
     saveLocalState(state);
-    await syncRemoteChange('Saving time', () => persistEditedTimeSegments(beforeTodos, state.todos));
+    const afterTodos = state.todos;
+    await queueTimingSave(todoId, () =>
+      syncRemoteChange('Saving time', () => persistEditedTimeSegments(beforeTodos, afterTodos)),
+    );
     return { ok: true };
   }
 
