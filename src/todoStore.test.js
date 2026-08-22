@@ -31,6 +31,7 @@ import {
   formatDuration,
   getElapsedSeconds,
   getDefaultTaskStartTimestamp,
+  getEditableTaskTimeBlocks,
   getEditableTaskTimeSegments,
   getOpenTodoSections,
   moveCompletedTodoToSummaryBucket,
@@ -289,6 +290,34 @@ describe('todo day summary', () => {
         endedAt: '2026-06-10T10:05:00.000Z',
       },
     ]);
+  });
+
+  it('reconstructs an editable block for a legacy session without time segments', () => {
+    expect(
+      getEditableTaskTimeBlocks(
+        {
+          id: 'parent-task',
+          createdAt: '2026-08-21T20:00:00.000Z',
+          completedAt: null,
+          activeStartedAt: null,
+          timeSegments: [],
+        },
+        new Date('2026-08-22T12:00:00.000Z'),
+        [
+          {
+            id: 'legacy-session',
+            firstStartedAt: '2026-08-20T10:00:00.000Z',
+            completedAt: '2026-08-20T13:24:00.000Z',
+            trackedSeconds: 58 * 60,
+            timeSegments: [],
+          },
+        ],
+      ),
+    ).toContainEqual({
+      startedAt: '2026-08-20T12:26:00.000Z',
+      endedAt: '2026-08-20T13:24:00.000Z',
+      sessionId: 'legacy-session',
+    });
   });
 
   it('does not invent a time block for a completed task that never used a timer', () => {
@@ -1134,6 +1163,63 @@ describe('todo day summary', () => {
       trackedSeconds: 60 * 60,
       timeSegments: [movedBlock],
     });
+  });
+
+  it('keeps both session identities when one block moves onto another session day', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Read chapter', new Date('2026-06-08T08:00:00-07:00'));
+    const todoId = state.todos[0].id;
+    state = startTodoTimer(state, todoId, new Date('2026-06-08T08:00:00-07:00'));
+    state = pauseTodoTimer(state, todoId, new Date('2026-06-08T09:00:00-07:00'));
+    state = startTodoTimer(state, todoId, new Date('2026-06-09T10:00:00-07:00'));
+    state = pauseTodoTimer(state, todoId, new Date('2026-06-09T11:00:00-07:00'));
+    state = archivePriorDaySessions(state, new Date('2026-06-10T12:00:00-07:00'));
+
+    const [tuesdaySession, mondaySession] = getProgressSessions(state, todoId);
+    state = {
+      todos: state.todos.map((todo) => {
+        if (todo.id === mondaySession.id) {
+          return { ...todo, note: 'Monday notes', photoKey: 'user-1/monday.png' };
+        }
+        if (todo.id === tuesdaySession.id) {
+          return { ...todo, note: 'Tuesday notes', photoKey: 'user-1/tuesday.png' };
+        }
+        return todo;
+      }),
+    };
+
+    state = updateTodoTimeSegments(
+      state,
+      todoId,
+      [
+        {
+          startedAt: new Date('2026-06-09T08:00:00-07:00').toISOString(),
+          endedAt: new Date('2026-06-09T09:00:00-07:00').toISOString(),
+          sessionId: mondaySession.id,
+        },
+        {
+          startedAt: new Date('2026-06-09T10:00:00-07:00').toISOString(),
+          endedAt: new Date('2026-06-09T11:00:00-07:00').toISOString(),
+          sessionId: tuesdaySession.id,
+        },
+      ],
+      new Date('2026-06-10T12:00:00-07:00'),
+    );
+
+    expect(getProgressSessions(state, todoId)).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: mondaySession.id,
+          note: 'Monday notes',
+          photoKey: 'user-1/monday.png',
+        }),
+        expect.objectContaining({
+          id: tuesdaySession.id,
+          note: 'Tuesday notes',
+          photoKey: 'user-1/tuesday.png',
+        }),
+      ]),
+    );
   });
 
   it('deletes a todo and its progress sessions', () => {
