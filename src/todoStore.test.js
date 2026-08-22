@@ -1222,6 +1222,37 @@ describe('todo day summary', () => {
     );
   });
 
+  it('keeps a new historical block added on an existing session day', () => {
+    let state = createInitialState();
+    state = addTodo(state, 'Read chapter', new Date('2026-06-09T08:00:00-07:00'));
+    const todoId = state.todos[0].id;
+    state = startTodoTimer(state, todoId, new Date('2026-06-09T10:00:00-07:00'));
+    state = pauseTodoTimer(state, todoId, new Date('2026-06-09T11:00:00-07:00'));
+    state = archivePriorDaySessions(state, new Date('2026-06-10T12:00:00-07:00'));
+    const existingSession = getProgressSessions(state, todoId)[0];
+
+    state = updateTodoTimeSegments(
+      state,
+      todoId,
+      [
+        {
+          startedAt: new Date('2026-06-09T08:00:00-07:00').toISOString(),
+          endedAt: new Date('2026-06-09T09:00:00-07:00').toISOString(),
+        },
+        {
+          startedAt: new Date('2026-06-09T10:00:00-07:00').toISOString(),
+          endedAt: new Date('2026-06-09T11:00:00-07:00').toISOString(),
+          sessionId: existingSession.id,
+        },
+      ],
+      new Date('2026-06-10T12:00:00-07:00'),
+    );
+
+    const sessions = getProgressSessions(state, todoId);
+    expect(sessions).toHaveLength(2);
+    expect(sessions.reduce((total, session) => total + session.trackedSeconds, 0)).toBe(2 * 60 * 60);
+  });
+
   it('deletes a todo and its progress sessions', () => {
     let state = createInitialState();
     state = addTodo(state, 'Read chapter', new Date('2026-06-08T08:00:00'));
