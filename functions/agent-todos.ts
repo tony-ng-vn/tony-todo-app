@@ -912,6 +912,7 @@ function assignProgressSessionsToDays(
   const nextSessions = [];
   const usedIds = new Set();
   const assignedUnownedDays = new Set();
+  const claimedIds = new Set(existingTodos.map((item) => item.id));
 
   for (const [sessionId, segmentsByDay] of sessionSegmentsById) {
     const existing = existingSessions.find((session) => session.id === sessionId);
@@ -930,7 +931,14 @@ function assignProgressSessionsToDays(
     usedIds.add(existing.id);
 
     for (const dayKey of days.filter((day) => day !== primaryDay)) {
-      nextSessions.push(createDayProgressSession(parent, dayKey, segmentsByDay.get(dayKey)));
+      const created = createUnclaimedProgressSession(
+        parent,
+        dayKey,
+        segmentsByDay.get(dayKey),
+        claimedIds,
+      );
+      nextSessions.push(created);
+      claimedIds.add(created.id);
     }
   }
 
@@ -966,7 +974,9 @@ function assignProgressSessionsToDays(
       return;
     }
 
-    nextSessions.push(createDayProgressSession(parent, dayKey, segments));
+    const created = createUnclaimedProgressSession(parent, dayKey, segments, claimedIds);
+    nextSessions.push(created);
+    claimedIds.add(created.id);
   });
 
   const removedSessionIds = new Set(
@@ -2017,6 +2027,23 @@ function createDayProgressSession(parent, dayKey, segments) {
     trackedSeconds: totalSegmentSeconds(segments),
     timeSegments: segments,
   });
+}
+
+function createUnclaimedProgressSession(parent, dayKey, segments, claimedIds) {
+  const session = createDayProgressSession(parent, dayKey, segments);
+  if (!claimedIds.has(session.id)) {
+    return session;
+  }
+
+  const startedAt = new Date(segments[0].startedAt).getTime();
+  let attempt = 1;
+  let id;
+  do {
+    id = `${session.id}-${startedAt}-${attempt}`;
+    attempt += 1;
+  } while (claimedIds.has(id));
+
+  return { ...session, id };
 }
 
 function findProgressSessionForDay(existingTodos, parentId, dayKey) {
