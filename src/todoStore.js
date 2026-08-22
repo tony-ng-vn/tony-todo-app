@@ -6,6 +6,7 @@ import {
   compareTodosNewestFirst,
   completeTodo,
   archivePriorDaySessions,
+  applyTodoTimeSegmentEdits,
   createInitialState,
   createTodoId,
   findDuplicateTodo,
@@ -20,6 +21,7 @@ import {
   getPendingTodos,
   getProjectTodos,
   parseTodoKind,
+  recoverTodoTimeSegments,
   normalizeTimeSegments,
   normalizeTodo,
   normalizedTrackedSeconds,
@@ -155,7 +157,7 @@ export function updateTodoTiming(state, todoId, startedAt, completedAt) {
   };
 }
 
-export function updateTodoTimeSegments(state, todoId, segments) {
+export function updateTodoTimeSegments(state, todoId, segments, now = new Date()) {
   if (!Array.isArray(segments) || segments.length === 0) {
     return state;
   }
@@ -175,6 +177,7 @@ export function updateTodoTimeSegments(state, todoId, segments) {
       return {
         startedAt: startedAt.toISOString(),
         endedAt: endedAt.toISOString(),
+        ...(typeof segment?.sessionId === 'string' ? { sessionId: segment.sessionId } : {}),
       };
     })
     .filter(Boolean);
@@ -184,33 +187,7 @@ export function updateTodoTimeSegments(state, todoId, segments) {
   }
 
   timeSegments.sort((first, second) => new Date(first.startedAt) - new Date(second.startedAt));
-  const firstStartedAt = timeSegments[0].startedAt;
-  const latestEndedAt = timeSegments.reduce(
-    (latest, segment) =>
-      new Date(segment.endedAt) > new Date(latest) ? segment.endedAt : latest,
-    timeSegments[0].endedAt,
-  );
-
-  return {
-    ...state,
-    todos: state.todos.map((todo) => {
-      if (todo.id !== todoId) {
-        return todo;
-      }
-
-      const wasCompleted = Boolean(todo.completedAt);
-      const wasRunning = Boolean(todo.activeStartedAt);
-
-      return {
-        ...todo,
-        firstStartedAt,
-        activeStartedAt: wasRunning ? latestEndedAt : null,
-        completedAt: wasCompleted ? todo.completedAt : null,
-        trackedSeconds: totalSegmentSeconds(timeSegments),
-        timeSegments,
-      };
-    }),
-  };
+  return applyTodoTimeSegmentEdits(state, todoId, timeSegments, now);
 }
 
 export function startTodoTimer(state, todoId, startedAt = new Date()) {
@@ -832,8 +809,23 @@ export function getDefaultTaskStartTimestamp(todo) {
   return null;
 }
 
-export function getEditableTaskTimeSegments(todo, activeEndedAt = new Date()) {
-  const recordedSegments = normalizeTimeSegments(todo?.timeSegments);
+export function getEditableTaskTimeSegments(todo, activeEndedAt = new Date(), sessions = []) {
+  return getEditableTaskTimeBlocks(todo, activeEndedAt, sessions).map(({ startedAt, endedAt }) => ({
+    startedAt,
+    endedAt,
+  }));
+}
+
+export function getEditableTaskTimeBlocks(todo, activeEndedAt = new Date(), sessions = []) {
+  const recordedSegments = [
+    ...(sessions ?? []).flatMap((session) =>
+      recoverTodoTimeSegments(session).map((segment) => ({
+        ...segment,
+        sessionId: session.id,
+      })),
+    ),
+    ...normalizeTimeSegments(todo?.timeSegments),
+  ].toSorted((first, second) => new Date(first.startedAt) - new Date(second.startedAt));
 
   if (todo?.activeStartedAt) {
     const startedAt = new Date(todo.activeStartedAt);

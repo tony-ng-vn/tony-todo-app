@@ -47,6 +47,7 @@
     stripNoteStampsForEditor,
   } from '../../todoStore.js';
   import { isNewTaskShortcut } from '../../newTaskShortcut.js';
+  import { createKeyedSaveQueue } from '../../saveQueue.js';
   import { getCurrentUser, signInWithPassword, signOut, signUp } from '../../auth.js';
   import { insforge, isInsForgeConfigured } from '../../insforgeClient.js';
   import {
@@ -104,6 +105,7 @@
   const UPDATE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 
   let state = createInitialState();
+  const queueTimingSave = createKeyedSaveQueue();
   let stateLoaded = false;
   let syncMessage = 'Connecting';
   let useRemote = false;
@@ -733,17 +735,21 @@
 
   async function handleTimingChange(todoId, segments) {
     const beforeTodos = state.todos;
-    state = updateTodoTimeSegments(state, todoId, segments);
-    const changedTodos = getChangedTodos(beforeTodos, state.todos, TIMING_FIELDS);
+    const nextState = updateTodoTimeSegments(state, todoId, segments);
+    const changedTodos = getChangedTodos(beforeTodos, nextState.todos, TIMING_FIELDS);
+    const createdTodos = getCreatedTodos(beforeTodos, nextState.todos);
+    const deletedTodos = getRemovedTodos(beforeTodos, nextState.todos);
 
-    if (changedTodos.length === 0) {
+    if (changedTodos.length === 0 && createdTodos.length === 0 && deletedTodos.length === 0) {
       renderSyncStatus();
       return;
     }
 
+    state = nextState;
     saveLocalState(state);
-    await syncRemoteChange('Saving timing', () =>
-      Promise.all(changedTodos.map((todo) => persistCompletedTodo(todo))),
+    const afterTodos = state.todos;
+    await queueTimingSave(todoId, () =>
+      syncRemoteChange('Saving timing', () => persistEditedTimeSegments(beforeTodos, afterTodos)),
     );
   }
 
@@ -754,12 +760,14 @@
     state = deleteTodo(state, todoId);
     expandedTaskId = null;
     saveLocalState(state);
-    await syncRemoteChange('Deleting task', async () => {
-      if (useRemote && authUser) {
-        await cleanupTodoPhotos(insforge, deletedTodos);
-      }
-      await Promise.all(deletedIds.map((deletedId) => persistDeletedTodo(deletedId)));
-    });
+    await queueTimingSave(todoId, () =>
+      syncRemoteChange('Deleting task', async () => {
+        if (useRemote && authUser) {
+          await cleanupTodoPhotos(insforge, deletedTodos);
+        }
+        await Promise.all(deletedIds.map((deletedId) => persistDeletedTodo(deletedId)));
+      }),
+    );
   }
 
   function toggleDetails(todoId) {
@@ -844,6 +852,15 @@
     );
   }
 
+  async function persistEditedTimeSegments(beforeTodos, afterTodos) {
+    await persistArchivedTodos(beforeTodos, afterTodos);
+    const deletedTodos = getRemovedTodos(beforeTodos, afterTodos);
+    if (useRemote && authUser) {
+      await cleanupTodoPhotos(insforge, deletedTodos);
+    }
+    await Promise.all(deletedTodos.map((todo) => persistDeletedTodo(todo.id)));
+  }
+
   async function persistTodoTitle(todo) {
     if (!useRemote || !authUser || !todo) return;
     await updateRemoteTodoTitle(insforge, authUser.id, todo);
@@ -880,6 +897,11 @@
   function getCreatedTodos(beforeTodos, afterTodos) {
     const beforeIds = new Set(beforeTodos.map((todo) => todo.id));
     return afterTodos.filter((todo) => !beforeIds.has(todo.id));
+  }
+
+  function getRemovedTodos(beforeTodos, afterTodos) {
+    const afterIds = new Set(afterTodos.map((todo) => todo.id));
+    return beforeTodos.filter((todo) => !afterIds.has(todo.id));
   }
 
   function getChangedTodos(beforeTodos, afterTodos, fields) {
@@ -1216,6 +1238,7 @@
 {#snippet taskRow(todo)}
   <MenubarTaskRow
     {todo}
+    progressSessions={getProgressSessions(state, todo.id)}
     expanded={expandedTaskId === todo.id}
     onToggleDetails={toggleDetails}
     onTimerAction={handleTimerAction}
