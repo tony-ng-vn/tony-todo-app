@@ -21,6 +21,7 @@ describe('task timing save wiring', () => {
     'handleTimerAction',
     'moveBoardTodo',
     'handleCompletedAtChange',
+    'handleSomedayChange',
     'moveSummaryTodo',
     'reopenSummaryTodo',
     'handleNoteInput',
@@ -37,7 +38,7 @@ describe('task timing save wiring', () => {
     );
   });
 
-  it.each(['handleTimerAction', 'handleComplete', 'handleNoteInput'])(
+  it.each(['handleTimerAction', 'handleComplete', 'handleNoteInput', 'handleSomedayChange'])(
     'queues menu bar timing writes from %s',
     (handler) => {
       expect(readFunction(menubarPage, handler)).toContain('syncTaskTimingChange(');
