@@ -1184,6 +1184,7 @@
 
   async function handleSignOut() {
     await noteAutosave.flushAll().catch(() => {});
+    await queueTimingSave.flushAll();
     await signOut(insforge);
     authUser = null;
     state = createInitialState();
@@ -1211,7 +1212,10 @@
 
     try {
       const remoteTodos = await loadRemoteAfterNoteFlush(
-        () => noteAutosave.flushAll(),
+        async () => {
+          await noteAutosave.flushAll();
+          await queueTimingSave.flushAll();
+        },
         () => loadRemoteTodos(insforge, authUser.id),
       );
       const todoIds = new Set([...state.todos, ...remoteTodos].map((todo) => todo.id));
@@ -1223,8 +1227,9 @@
       clearNoteEdits(merged.staleEditIds ?? []);
       const beforeTodos = merged.todos;
       state = archivePriorDaySessions({ todos: merged.todos });
+      const afterTodos = state.todos;
       saveLocalState(state);
-      await persistArchivedTodos(beforeTodos, state.todos);
+      await syncArchivedTimingChanges('Saving sessions', beforeTodos, afterTodos);
       renderRemoteStatus(remoteTodos.length);
     } catch (error) {
       showOfflineCache(error);

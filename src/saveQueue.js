@@ -1,7 +1,7 @@
 export function createKeyedSaveQueue() {
   const pendingByKey = new Map();
 
-  return function enqueue(key, save) {
+  function enqueue(key, save) {
     const previous = pendingByKey.get(key);
     const pending = previous
       ? previous.catch(() => undefined).then(save)
@@ -13,5 +13,13 @@ export function createKeyedSaveQueue() {
         pendingByKey.delete(key);
       }
     });
+  }
+
+  enqueue.flushAll = async () => {
+    while (pendingByKey.size > 0) {
+      await Promise.allSettled([...pendingByKey.values()]);
+    }
   };
+
+  return enqueue;
 }
