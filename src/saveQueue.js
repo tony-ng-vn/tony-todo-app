@@ -1,3 +1,7 @@
+export function getTimingSaveKey(todos, todoId) {
+  return todos.find((todo) => todo.id === todoId)?.parentTaskId ?? todoId;
+}
+
 export function createKeyedSaveQueue() {
   const pendingByKey = new Map();
   const failedByKey = new Map();
