@@ -456,7 +456,7 @@
     composerError = '';
     composerOpen = false;
     saveLocalState(state);
-    await syncRemoteChange('Saving', () => persistNewTodo(createdTodo));
+    await syncTaskTimingChange(createdTodo.id, 'Saving', () => persistNewTodo(createdTodo));
   }
 
   function openComposer(kind = 'task') {
@@ -493,9 +493,7 @@
     if (action === 'start') {
       await revealTodo(todoId);
     }
-    await syncTaskTimingChange(todoId, 'Saving time', () =>
-      persistArchivedTodos(beforeTodos, afterTodos),
-    );
+    await syncArchivedTimingChanges('Saving time', beforeTodos, afterTodos);
   }
 
   async function revealTodo(todoId) {
@@ -516,9 +514,7 @@
     if (expandedTaskId === todoId) {
       expandedTaskId = null;
     }
-    await syncTaskTimingChange(todoId, 'Saving', () =>
-      persistArchivedTodos(beforeTodos, afterTodos),
-    );
+    await syncArchivedTimingChanges('Saving', beforeTodos, afterTodos);
   }
 
   async function handleTitleCommit(todoId, title) {
@@ -555,9 +551,7 @@
     setNoteSaveStatus(todoId, 'saving');
     noteAutosave.schedule(todoId, edit);
     if (timerChanged) {
-      void syncTaskTimingChange(todoId, 'Saving time', () =>
-        persistArchivedTodos(beforeState.todos, afterTodos),
-      );
+      void syncArchivedTimingChanges('Saving time', beforeState.todos, afterTodos);
     }
   }
 
@@ -828,6 +822,25 @@
 
   function syncTaskTimingChange(todoId, message, action) {
     return queueTimingSave(todoId, () => syncRemoteChange(message, action));
+  }
+
+  function syncArchivedTimingChanges(message, beforeTodos, afterTodos) {
+    const changedTodos = [
+      ...getCreatedTodos(beforeTodos, afterTodos),
+      ...getChangedTodos(beforeTodos, afterTodos, TIMING_FIELDS),
+    ];
+    const taskIds = new Set(changedTodos.map((todo) => todo.parentTaskId ?? todo.id));
+
+    return Promise.all(
+      [...taskIds].map((todoId) => {
+        const belongsToTask = (todo) => todo.id === todoId || todo.parentTaskId === todoId;
+        const beforeTaskTodos = beforeTodos.filter(belongsToTask);
+        const afterTaskTodos = afterTodos.filter(belongsToTask);
+        return syncTaskTimingChange(todoId, message, () =>
+          persistArchivedTodos(beforeTaskTodos, afterTaskTodos),
+        );
+      }),
+    );
   }
 
   async function persistNewTodo(todo) {
