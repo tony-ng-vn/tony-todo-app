@@ -488,11 +488,14 @@
   async function handleTimerAction(action, todoId) {
     const beforeTodos = state.todos;
     state = action === 'pause' ? pauseTodoTimer(state, todoId) : startTodoTimer(state, todoId);
+    const afterTodos = state.todos;
     saveLocalState(state);
     if (action === 'start') {
       await revealTodo(todoId);
     }
-    await syncRemoteChange('Saving time', () => persistArchivedTodos(beforeTodos, state.todos));
+    await syncTaskTimingChange(todoId, 'Saving time', () =>
+      persistArchivedTodos(beforeTodos, afterTodos),
+    );
   }
 
   async function revealTodo(todoId) {
@@ -507,12 +510,15 @@
   async function handleComplete(todoId) {
     const beforeTodos = state.todos;
     state = completeTodo(state, todoId);
+    const afterTodos = state.todos;
     saveLocalState(state);
 
     if (expandedTaskId === todoId) {
       expandedTaskId = null;
     }
-    await syncRemoteChange('Saving', () => persistArchivedTodos(beforeTodos, state.todos));
+    await syncTaskTimingChange(todoId, 'Saving', () =>
+      persistArchivedTodos(beforeTodos, afterTodos),
+    );
   }
 
   async function handleTitleCommit(todoId, title) {
@@ -544,11 +550,14 @@
     const timerChanged =
       getCreatedTodos(beforeState.todos, state.todos).length > 0 ||
       getChangedTodos(beforeState.todos, state.todos, TIMING_FIELDS).length > 0;
+    const afterTodos = state.todos;
     saveLocalState(state);
     setNoteSaveStatus(todoId, 'saving');
     noteAutosave.schedule(todoId, edit);
     if (timerChanged) {
-      void syncRemoteChange('Saving time', () => persistArchivedTodos(beforeState.todos, state.todos));
+      void syncTaskTimingChange(todoId, 'Saving time', () =>
+        persistArchivedTodos(beforeState.todos, afterTodos),
+      );
     }
   }
 
@@ -748,8 +757,8 @@
     state = nextState;
     saveLocalState(state);
     const afterTodos = state.todos;
-    await queueTimingSave(todoId, () =>
-      syncRemoteChange('Saving timing', () => persistEditedTimeSegments(beforeTodos, afterTodos)),
+    await syncTaskTimingChange(todoId, 'Saving timing', () =>
+      persistEditedTimeSegments(beforeTodos, afterTodos),
     );
   }
 
@@ -760,14 +769,12 @@
     state = deleteTodo(state, todoId);
     expandedTaskId = null;
     saveLocalState(state);
-    await queueTimingSave(todoId, () =>
-      syncRemoteChange('Deleting task', async () => {
-        if (useRemote && authUser) {
-          await cleanupTodoPhotos(insforge, deletedTodos);
-        }
-        await Promise.all(deletedIds.map((deletedId) => persistDeletedTodo(deletedId)));
-      }),
-    );
+    await syncTaskTimingChange(todoId, 'Deleting task', async () => {
+      if (useRemote && authUser) {
+        await cleanupTodoPhotos(insforge, deletedTodos);
+      }
+      await Promise.all(deletedIds.map((deletedId) => persistDeletedTodo(deletedId)));
+    });
   }
 
   function toggleDetails(todoId) {
@@ -815,6 +822,10 @@
       syncMessage = `Offline cache: ${error.message}`;
       return false;
     }
+  }
+
+  function syncTaskTimingChange(todoId, message, action) {
+    return queueTimingSave(todoId, () => syncRemoteChange(message, action));
   }
 
   async function persistNewTodo(todo) {
