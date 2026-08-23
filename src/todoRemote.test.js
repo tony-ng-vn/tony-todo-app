@@ -4,6 +4,7 @@ import {
   deleteRemoteTodo,
   fromRemoteRecord,
   insertRemoteProgressSession,
+  insertRemoteTodo,
   loadRemoteTodos,
   toRemoteRecord,
   updateRemoteTodoDueDate,
@@ -14,6 +15,84 @@ import {
 } from './todoRemote.js';
 
 describe('todo remote mapping', () => {
+  it('treats a committed task insert as successful when its exact retry finds the same user row', async () => {
+    let storedRecord = null;
+    let insertAttempts = 0;
+    const client = {
+      database: {
+        from() {
+          const filters = new Map();
+          return {
+            async upsert(values) {
+              insertAttempts += 1;
+              storedRecord ??= values[0];
+              return {
+                error: insertAttempts === 1 ? new Error('response lost after commit') : null,
+              };
+            },
+            select() {
+              return this;
+            },
+            eq(column, value) {
+              filters.set(column, value);
+              return this;
+            },
+            async maybeSingle() {
+              const matches =
+                storedRecord?.id === filters.get('id') &&
+                storedRecord?.user_id === filters.get('user_id');
+              return { data: matches ? { id: storedRecord.id } : null, error: null };
+            },
+          };
+        },
+      },
+    };
+    const todo = {
+      id: 'todo-retry',
+      title: 'Keep the first stored version',
+      createdAt: '2026-08-23T15:00:00.000Z',
+    };
+
+    await expect(insertRemoteTodo(client, 'user-123', todo)).rejects.toThrow(
+      'response lost after commit',
+    );
+    await expect(insertRemoteTodo(client, 'user-123', todo)).resolves.toBeUndefined();
+
+    expect(insertAttempts).toBe(2);
+    expect(storedRecord).toEqual(toRemoteRecord(todo, 'user-123'));
+  });
+
+  it('does not accept an existing task id owned by another user', async () => {
+    const client = {
+      database: {
+        from() {
+          return {
+            async upsert() {
+              return { error: null };
+            },
+            select() {
+              return this;
+            },
+            eq() {
+              return this;
+            },
+            async maybeSingle() {
+              return { data: null, error: null };
+            },
+          };
+        },
+      },
+    };
+
+    await expect(
+      insertRemoteTodo(client, 'user-123', {
+        id: 'other-user-task',
+        title: 'Do not claim this row',
+        createdAt: '2026-08-23T15:00:00.000Z',
+      }),
+    ).rejects.toThrow('Task insert could not be verified.');
+  });
+
   it('excludes unreviewed inbox-status loops from the main list', async () => {
     const calls = [];
     const client = {
