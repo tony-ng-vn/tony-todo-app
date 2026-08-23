@@ -26,7 +26,7 @@ describe('keyed save queue', () => {
     expect(events).toEqual(['first started', 'first finished', 'second started']);
   });
 
-  it('continues with the latest save after an earlier save fails', async () => {
+  it('does not skip a failed save to run a later delta for the same task', async () => {
     const enqueue = createKeyedSaveQueue();
     const events = [];
     const first = enqueue('task-1', async () => {
@@ -38,8 +38,8 @@ describe('keyed save queue', () => {
     });
 
     await expect(first).rejects.toThrow('offline');
-    await expect(second).resolves.toBeUndefined();
-    expect(events).toEqual(['first', 'second']);
+    await expect(second).rejects.toThrow('offline');
+    expect(events).toEqual(['first', 'first']);
   });
 
   it('flushes saves that are queued while an earlier save is pending', async () => {
@@ -76,7 +76,46 @@ describe('keyed save queue', () => {
     expect(enqueue.getGeneration()).toBe(before + 1);
   });
 
-  it('keeps a failed key dirty until a later save for that key succeeds', async () => {
+  it('retries the exact failed operation before a later save for that key', async () => {
+    const enqueue = createKeyedSaveQueue();
+    const events = [];
+    let deleteAttempts = 0;
+
+    await expect(
+      enqueue('task-1', async () => {
+        deleteAttempts += 1;
+        events.push(`delete ${deleteAttempts}`);
+        if (deleteAttempts === 1) {
+          throw new Error('offline');
+        }
+      }),
+    ).rejects.toThrow('offline');
+
+    await enqueue('task-1', async () => {
+      events.push('timer update');
+    });
+    await expect(enqueue.flushAll()).resolves.toBeUndefined();
+    expect(events).toEqual(['delete 1', 'delete 2', 'timer update']);
+  });
+
+  it('retries a failed operation once when flushing', async () => {
+    const enqueue = createKeyedSaveQueue();
+    let attempts = 0;
+
+    await expect(
+      enqueue('task-1', async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          throw new Error('offline');
+        }
+      }),
+    ).rejects.toThrow('offline');
+
+    await expect(enqueue.flushAll()).resolves.toBeUndefined();
+    expect(attempts).toBe(2);
+  });
+
+  it('keeps the key dirty when the exact retry still fails', async () => {
     const enqueue = createKeyedSaveQueue();
 
     await expect(
@@ -84,9 +123,7 @@ describe('keyed save queue', () => {
         throw new Error('offline');
       }),
     ).rejects.toThrow('offline');
-    await expect(enqueue.flushAll()).rejects.toThrow('offline');
 
-    await enqueue('task-1', async () => {});
-    await expect(enqueue.flushAll()).resolves.toBeUndefined();
+    await expect(enqueue.flushAll()).rejects.toThrow('offline');
   });
 });
