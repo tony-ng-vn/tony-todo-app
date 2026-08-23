@@ -41,4 +41,29 @@ describe('keyed save queue', () => {
     await expect(second).resolves.toBeUndefined();
     expect(events).toEqual(['first', 'second']);
   });
+
+  it('flushes saves that are queued while an earlier save is pending', async () => {
+    const enqueue = createKeyedSaveQueue();
+    const events = [];
+    let finishFirst;
+    const firstGate = new Promise((resolve) => {
+      finishFirst = resolve;
+    });
+
+    void enqueue('task-1', async () => {
+      events.push('first started');
+      await firstGate;
+      events.push('first finished');
+    });
+    const flushing = enqueue.flushAll().then(() => events.push('flushed'));
+    void enqueue('task-1', async () => {
+      events.push('second finished');
+    });
+
+    await Promise.resolve();
+    expect(events).toEqual(['first started']);
+    finishFirst();
+    await flushing;
+    expect(events).toEqual(['first started', 'first finished', 'second finished', 'flushed']);
+  });
 });

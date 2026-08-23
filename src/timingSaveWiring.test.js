@@ -85,4 +85,13 @@ describe('task timing save wiring', () => {
   it('queues the menu bar task insert before later timing updates', () => {
     expect(readFunction(menubarPage, 'handleAdd')).toContain('syncTaskTimingChange(');
   });
+
+  it.each([
+    ['web', webPage],
+    ['menu bar', menubarPage],
+  ])('drains timing saves before %s hydration and sign-out', (_label, source) => {
+    expect(readFunction(source, 'hydrateRemoteTodos')).toContain('queueTimingSave.flushAll()');
+    expect(readFunction(source, 'hydrateRemoteTodos')).toContain('syncArchivedTimingChanges(');
+    expect(readFunction(source, 'handleSignOut')).toContain('queueTimingSave.flushAll()');
+  });
 });
