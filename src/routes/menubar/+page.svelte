@@ -338,6 +338,13 @@
     } catch {
       // Pending notes remain in local storage and retry after the reload.
     }
+    try {
+      await queueTimingSave.flushAll();
+    } catch {
+      updateInFlight = false;
+      syncMessage = 'Update paused until timing changes sync';
+      return;
+    }
 
     if (updateAction.kind === 'native-check') {
       requestNativeUpdate(window);
