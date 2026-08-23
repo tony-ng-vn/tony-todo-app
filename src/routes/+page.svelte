@@ -66,7 +66,7 @@
   } from '../todoStore.js';
   import { insforge, isInsForgeConfigured } from '../insforgeClient.js';
   import { isNewTaskShortcut } from '../newTaskShortcut.js';
-  import { createKeyedSaveQueue } from '../saveQueue.js';
+  import { createKeyedSaveQueue, getTimingSaveKey } from '../saveQueue.js';
   import { getCurrentUser, signInWithPassword, signOut, signUp } from '../auth.js';
   import {
     completeRemoteTodo,
@@ -948,6 +948,7 @@
     }
 
     const beforeTodos = state.todos;
+    const timingSaveKey = getTimingSaveKey(beforeTodos, todoId);
     const nextState = updateTodoTimeSegments(state, todoId, segments);
     const changedTodos = getTodosWithChangedFields(beforeTodos, nextState.todos, [
       ...TIMER_SYNC_FIELDS,
@@ -972,7 +973,7 @@
 
     saveLocalState(state);
     const afterTodos = state.todos;
-    await syncTaskTimingChange(todoId, 'Saving time', () =>
+    await syncTaskTimingChange(timingSaveKey, 'Saving time', () =>
       persistEditedTimeSegments(beforeTodos, afterTodos),
     );
     return { ok: true };
@@ -990,6 +991,7 @@
   }
 
   async function handleDeleteTask(todoId) {
+    const timingSaveKey = getTimingSaveKey(state.todos, todoId);
     const deletedTodos = state.todos.filter((todo) => todo.id === todoId || todo.parentTaskId === todoId);
     const deletedIds = deletedTodos.map((todo) => todo.id);
 
@@ -1002,7 +1004,7 @@
       selectedTaskId = null;
     }
     saveLocalState(state);
-    await syncTaskTimingChange(todoId, 'Deleting task', async () => {
+    await syncTaskTimingChange(timingSaveKey, 'Deleting task', async () => {
       if (useRemote && authUser) {
         await cleanupTodoPhotos(insforge, deletedTodos);
       }

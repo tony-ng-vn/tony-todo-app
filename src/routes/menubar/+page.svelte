@@ -47,7 +47,7 @@
     stripNoteStampsForEditor,
   } from '../../todoStore.js';
   import { isNewTaskShortcut } from '../../newTaskShortcut.js';
-  import { createKeyedSaveQueue } from '../../saveQueue.js';
+  import { createKeyedSaveQueue, getTimingSaveKey } from '../../saveQueue.js';
   import { getCurrentUser, signInWithPassword, signOut, signUp } from '../../auth.js';
   import { insforge, isInsForgeConfigured } from '../../insforgeClient.js';
   import {
@@ -759,6 +759,7 @@
 
   async function handleTimingChange(todoId, segments) {
     const beforeTodos = state.todos;
+    const timingSaveKey = getTimingSaveKey(beforeTodos, todoId);
     const nextState = updateTodoTimeSegments(state, todoId, segments);
     const changedTodos = getChangedTodos(beforeTodos, nextState.todos, TIMING_FIELDS);
     const createdTodos = getCreatedTodos(beforeTodos, nextState.todos);
@@ -772,19 +773,20 @@
     state = nextState;
     saveLocalState(state);
     const afterTodos = state.todos;
-    await syncTaskTimingChange(todoId, 'Saving timing', () =>
+    await syncTaskTimingChange(timingSaveKey, 'Saving timing', () =>
       persistEditedTimeSegments(beforeTodos, afterTodos),
     );
   }
 
   async function handleDelete(todoId) {
+    const timingSaveKey = getTimingSaveKey(state.todos, todoId);
     const deletedTodos = state.todos.filter((todo) => todo.id === todoId || todo.parentTaskId === todoId);
     const deletedIds = deletedTodos.map((todo) => todo.id);
 
     state = deleteTodo(state, todoId);
     expandedTaskId = null;
     saveLocalState(state);
-    await syncTaskTimingChange(todoId, 'Deleting task', async () => {
+    await syncTaskTimingChange(timingSaveKey, 'Deleting task', async () => {
       if (useRemote && authUser) {
         await cleanupTodoPhotos(insforge, deletedTodos);
       }
