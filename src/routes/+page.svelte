@@ -379,10 +379,11 @@
     state = action === 'pause' ? pauseTodoTimer(state, todoId) : startTodoTimer(state, todoId);
     const afterTodos = state.todos;
     saveLocalState(state);
+    const timingSave = syncArchivedTimingChanges('Saving time', beforeTodos, afterTodos);
     if (action === 'start') {
       await revealTodo(todoId);
     }
-    await syncArchivedTimingChanges('Saving time', beforeTodos, afterTodos);
+    await timingSave;
   }
 
   async function revealTodo(todoId) {
@@ -1209,15 +1210,21 @@
     queuePendingNoteSaves();
     syncMessage = 'Loading cloud';
     const noteEditsAtLoad = snapshotNoteEdits(state.todos.map((todo) => todo.id));
+    let timingGeneration = queueTimingSave.getGeneration();
 
     try {
       const remoteTodos = await loadRemoteAfterNoteFlush(
         async () => {
           await noteAutosave.flushAll();
           await queueTimingSave.flushAll();
+          timingGeneration = queueTimingSave.getGeneration();
         },
         () => loadRemoteTodos(insforge, authUser.id),
       );
+      if (queueTimingSave.getGeneration() !== timingGeneration) {
+        renderRemoteStatus();
+        return;
+      }
       const todoIds = new Set([...state.todos, ...remoteTodos].map((todo) => todo.id));
       const merged = preservePendingNotesDuringLoad(
         reconcileRemoteState(state, remoteTodos),
@@ -1376,7 +1383,13 @@
   }
 
   function syncTaskTimingChange(todoId, statusMessage, syncAction) {
-    return queueTimingSave(todoId, () => syncRemoteChange(statusMessage, syncAction));
+    const pending = queueTimingSave(todoId, async () => {
+      const saved = await syncRemoteChange(statusMessage, syncAction);
+      if (!saved) {
+        throw new Error('Timing changes are still pending.');
+      }
+    });
+    return pending.catch(() => false);
   }
 
   function syncArchivedTimingChanges(statusMessage, beforeTodos, afterTodos) {
