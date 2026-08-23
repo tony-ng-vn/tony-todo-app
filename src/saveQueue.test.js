@@ -1,5 +1,18 @@
 import { describe, expect, it } from 'vitest';
-import { createKeyedSaveQueue } from './saveQueue.js';
+import { createKeyedSaveQueue, getTimingSaveKey } from './saveQueue.js';
+
+describe('timing save key', () => {
+  it('uses the parent task key when the edited row is a progress session', () => {
+    const todos = [
+      { id: 'task-1' },
+      { id: 'session-1', parentTaskId: 'task-1', isProgressSession: true },
+    ];
+
+    expect(getTimingSaveKey(todos, 'session-1')).toBe('task-1');
+    expect(getTimingSaveKey(todos, 'task-1')).toBe('task-1');
+    expect(getTimingSaveKey(todos, 'missing')).toBe('missing');
+  });
+});
 
 describe('keyed save queue', () => {
   it('finishes an earlier save before starting the next save for the same task', async () => {
