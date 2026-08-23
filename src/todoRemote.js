@@ -19,9 +19,24 @@ export async function loadRemoteTodos(client, userId) {
 }
 
 export async function insertRemoteTodo(client, userId, todo) {
-  const { error } = await client.database.from('todos').insert([toRemoteRecord(todo, userId)]);
+  const record = toRemoteRecord(todo, userId);
+  const { error } = await client.database
+    .from('todos')
+    .upsert([record], { onConflict: 'id', ignoreDuplicates: true });
 
   throwIfError(error);
+
+  const { data, error: verificationError } = await client.database
+    .from('todos')
+    .select('id')
+    .eq('id', todo.id)
+    .eq('user_id', userId)
+    .maybeSingle();
+
+  throwIfError(verificationError);
+  if (!data) {
+    throw new Error('Task insert could not be verified.');
+  }
 }
 
 // Session ids are deterministic and every client archives on load, focus and

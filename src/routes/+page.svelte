@@ -66,6 +66,7 @@
   } from '../todoStore.js';
   import { insforge, isInsForgeConfigured } from '../insforgeClient.js';
   import { isNewTaskShortcut } from '../newTaskShortcut.js';
+  import { createKeyedSaveQueue, getTimingSaveKey } from '../saveQueue.js';
   import { getCurrentUser, signInWithPassword, signOut, signUp } from '../auth.js';
   import {
     completeRemoteTodo,
@@ -124,6 +125,7 @@
   const VIEW_STORAGE_KEY = 'done-log-view';
 
   let state = createInitialState();
+  const queueTimingSave = createKeyedSaveQueue();
   let selectedDay = formatDayKey(new Date());
   let boardDueFilter = 'all';
   let calendarYear = new Date().getFullYear();
@@ -322,7 +324,7 @@
       setViewMode('projects');
     }
 
-    await syncRemoteChange('Saving', () => persistNewTodo(createdTodo));
+    await syncTaskTimingChange(createdTodo.id, 'Saving', () => persistNewTodo(createdTodo));
   }
 
   function withLatestProgressSession(todos) {
@@ -335,6 +337,7 @@
   async function handleComplete(todoId) {
     const beforeTodos = state.todos;
     state = completeTodo(state, todoId);
+    const afterTodos = state.todos;
     const completedTodo = findTodo(todoId);
 
     triggerCompletionCue(completedTodo);
@@ -346,7 +349,7 @@
       : formatDayKey(new Date());
     saveLocalState(state);
 
-    await syncRemoteChange('Saving', () => persistArchivedTodos(beforeTodos, state.todos));
+    await syncArchivedTimingChanges('Saving', beforeTodos, afterTodos);
   }
 
   async function handleFail(todoId) {
@@ -366,18 +369,21 @@
     selectedDay = failedTodo?.completedAt
       ? formatDayKey(new Date(failedTodo.completedAt))
       : formatDayKey(new Date());
+    const afterTodos = state.todos;
     saveLocalState(state);
-    await syncRemoteChange('Saving failed task', () => persistArchivedTodos(beforeTodos, state.todos));
+    await syncArchivedTimingChanges('Saving failed task', beforeTodos, afterTodos);
   }
 
   async function handleTimerAction(action, todoId) {
     const beforeTodos = state.todos;
     state = action === 'pause' ? pauseTodoTimer(state, todoId) : startTodoTimer(state, todoId);
+    const afterTodos = state.todos;
     saveLocalState(state);
+    const timingSave = syncArchivedTimingChanges('Saving time', beforeTodos, afterTodos);
     if (action === 'start') {
       await revealTodo(todoId);
     }
-    await syncRemoteChange('Saving time', () => persistArchivedTodos(beforeTodos, state.todos));
+    await timingSave;
   }
 
   async function revealTodo(todoId) {
@@ -529,8 +535,10 @@
     }
 
     saveLocalState(state);
-    await syncRemoteChange(moveToSomeday ? 'Moving to Stall' : 'Returning to active tasks', () =>
-      persistTodoWorkflow(after),
+    await syncTaskTimingChange(
+      todoId,
+      moveToSomeday ? 'Moving to Stall' : 'Returning to active tasks',
+      () => persistTodoWorkflow(after),
     );
   }
 
@@ -701,10 +709,7 @@
     saveLocalState(state);
 
     if (createdTodos.length > 0 || changedWorkflowTodos.length > 0) {
-      await syncRemoteChange('Saving task state', async () => {
-        await persistArchivedSessions(createdTodos);
-        await Promise.all(changedWorkflowTodos.map((todo) => persistTodoWorkflow(todo)));
-      });
+      await syncWorkflowTimingChanges('Saving task state', createdTodos, changedWorkflowTodos);
     }
   }
 
@@ -743,11 +748,11 @@
       selectedDay = createdTodo?.completedAt
         ? formatDayKey(new Date(createdTodo.completedAt))
         : formatDayKey(new Date());
-      await syncRemoteChange('Saving', () => persistNewTodo(createdTodo));
+      await syncTaskTimingChange(createdTodo.id, 'Saving', () => persistNewTodo(createdTodo));
       return true;
     }
 
-    await syncRemoteChange('Saving', () => persistNewTodo(createdTodo));
+    await syncTaskTimingChange(createdTodo.id, 'Saving', () => persistNewTodo(createdTodo));
     return true;
   }
 
@@ -760,8 +765,9 @@
     const previous = state;
     state = archivePriorDaySessions(state);
     if (state !== previous) {
+      const afterTodos = state.todos;
       saveLocalState(state);
-      void syncRemoteChange('Saving sessions', () => persistArchivedTodos(previous.todos, state.todos));
+      void syncArchivedTimingChanges('Saving sessions', previous.todos, afterTodos);
     }
     scheduleSelectedDayRefresh();
   }
@@ -803,12 +809,13 @@
     const timerChanged =
       getCreatedTodos(beforeTodos, state.todos).length > 0 ||
       getTodosWithChangedFields(beforeTodos, state.todos, ARCHIVE_SYNC_FIELDS).length > 0;
+    const afterTodos = state.todos;
     saveLocalState(state);
     const edit = recordNoteEdit(selectedTaskId, nextNote);
     setNoteSaveStatus(selectedTaskId, 'saving');
     noteAutosave.schedule(selectedTaskId, edit);
     if (timerChanged) {
-      void syncRemoteChange('Saving time', () => persistArchivedTodos(beforeTodos, state.todos));
+      void syncArchivedTimingChanges('Saving time', beforeTodos, afterTodos);
     }
   }
 
@@ -924,7 +931,7 @@
 
     selectedDay = formatDayKey(completedAt);
     saveLocalState(state);
-    await syncRemoteChange('Saving finish time', () => persistCompletionChangedTodos(changedTodos));
+    await syncCompletionTimingChanges('Saving finish time', changedTodos);
     return { ok: true };
   }
 
@@ -941,14 +948,20 @@
     }
 
     const beforeTodos = state.todos;
+    const timingSaveKey = getTimingSaveKey(beforeTodos, todoId);
     const nextState = updateTodoTimeSegments(state, todoId, segments);
     const changedTodos = getTodosWithChangedFields(beforeTodos, nextState.todos, [
       ...TIMER_SYNC_FIELDS,
       ...COMPLETION_SYNC_FIELDS,
     ]);
+    const createdTodos = getCreatedTodos(beforeTodos, nextState.todos);
+    const deletedTodos = getRemovedTodos(beforeTodos, nextState.todos);
     const updatedTodo = nextState.todos.find((todo) => todo.id === todoId);
 
-    if (changedTodos.length === 0 || !updatedTodo) {
+    if (
+      !updatedTodo ||
+      (changedTodos.length === 0 && createdTodos.length === 0 && deletedTodos.length === 0)
+    ) {
       return { ok: false, error: 'This task timing could not be updated.' };
     }
 
@@ -959,7 +972,10 @@
     }
 
     saveLocalState(state);
-    await syncRemoteChange('Saving time', () => persistCompletionChangedTodos(changedTodos));
+    const afterTodos = state.todos;
+    await syncTaskTimingChange(timingSaveKey, 'Saving time', () =>
+      persistEditedTimeSegments(beforeTodos, afterTodos),
+    );
     return { ok: true };
   }
 
@@ -975,6 +991,7 @@
   }
 
   async function handleDeleteTask(todoId) {
+    const timingSaveKey = getTimingSaveKey(state.todos, todoId);
     const deletedTodos = state.todos.filter((todo) => todo.id === todoId || todo.parentTaskId === todoId);
     const deletedIds = deletedTodos.map((todo) => todo.id);
 
@@ -987,7 +1004,7 @@
       selectedTaskId = null;
     }
     saveLocalState(state);
-    await syncRemoteChange('Deleting task', async () => {
+    await syncTaskTimingChange(timingSaveKey, 'Deleting task', async () => {
       if (useRemote && authUser) {
         await cleanupTodoPhotos(insforge, deletedTodos);
       }
@@ -1005,7 +1022,7 @@
     const after = findTodo(todoId);
     saveLocalState(state);
     setViewMode('flow');
-    await syncRemoteChange('Moving to tasks', () => persistTodoWorkflow(after));
+    await syncTaskTimingChange(todoId, 'Moving to tasks', () => persistTodoWorkflow(after));
   }
 
   function handleDragStart(event, todoId) {
@@ -1090,7 +1107,7 @@
     }
 
     saveLocalState(state);
-    await syncRemoteChange('Saving order', () => persistCompletionChangedTodos(changedTodos));
+    await syncCompletionTimingChanges('Saving order', changedTodos);
   }
 
   async function reopenSummaryTodo(todoId) {
@@ -1107,7 +1124,7 @@
     }
 
     saveLocalState(state);
-    await syncRemoteChange('Reopening task', () => persistCompletionChangedTodos(changedTodos));
+    await syncCompletionTimingChanges('Reopening task', changedTodos);
   }
 
   async function initializeAuth() {
@@ -1170,6 +1187,7 @@
 
   async function handleSignOut() {
     await noteAutosave.flushAll().catch(() => {});
+    await queueTimingSave.flushAll();
     await signOut(insforge);
     authUser = null;
     state = createInitialState();
@@ -1194,12 +1212,21 @@
     queuePendingNoteSaves();
     syncMessage = 'Loading cloud';
     const noteEditsAtLoad = snapshotNoteEdits(state.todos.map((todo) => todo.id));
+    let timingGeneration = queueTimingSave.getGeneration();
 
     try {
       const remoteTodos = await loadRemoteAfterNoteFlush(
-        () => noteAutosave.flushAll(),
+        async () => {
+          await noteAutosave.flushAll();
+          await queueTimingSave.flushAll();
+          timingGeneration = queueTimingSave.getGeneration();
+        },
         () => loadRemoteTodos(insforge, authUser.id),
       );
+      if (queueTimingSave.getGeneration() !== timingGeneration) {
+        renderRemoteStatus();
+        return;
+      }
       const todoIds = new Set([...state.todos, ...remoteTodos].map((todo) => todo.id));
       const merged = preservePendingNotesDuringLoad(
         reconcileRemoteState(state, remoteTodos),
@@ -1209,8 +1236,9 @@
       clearNoteEdits(merged.staleEditIds ?? []);
       const beforeTodos = merged.todos;
       state = archivePriorDaySessions({ todos: merged.todos });
+      const afterTodos = state.todos;
       saveLocalState(state);
-      await persistArchivedTodos(beforeTodos, state.todos);
+      await syncArchivedTimingChanges('Saving sessions', beforeTodos, afterTodos);
       renderRemoteStatus(remoteTodos.length);
     } catch (error) {
       showOfflineCache(error);
@@ -1356,6 +1384,77 @@
     }
   }
 
+  function syncTaskTimingChange(todoId, statusMessage, syncAction) {
+    const pending = queueTimingSave(todoId, async () => {
+      const saved = await syncRemoteChange(statusMessage, syncAction);
+      if (!saved) {
+        throw new Error('Timing changes are still pending.');
+      }
+    });
+    return pending.catch(() => false);
+  }
+
+  function syncArchivedTimingChanges(statusMessage, beforeTodos, afterTodos) {
+    const changedTodos = [
+      ...getCreatedTodos(beforeTodos, afterTodos),
+      ...getTodosWithChangedFields(beforeTodos, afterTodos, ARCHIVE_SYNC_FIELDS),
+    ];
+    const taskIds = new Set(changedTodos.map((todo) => todo.parentTaskId ?? todo.id));
+
+    return Promise.all(
+      [...taskIds].map((todoId) => {
+        const belongsToTask = (todo) => todo.id === todoId || todo.parentTaskId === todoId;
+        const beforeTaskTodos = beforeTodos.filter(belongsToTask);
+        const afterTaskTodos = afterTodos.filter(belongsToTask);
+        return syncTaskTimingChange(todoId, statusMessage, () =>
+          persistArchivedTodos(beforeTaskTodos, afterTaskTodos),
+        );
+      }),
+    );
+  }
+
+  function syncCompletionTimingChanges(statusMessage, changedTodos) {
+    const todosByTaskId = new Map();
+    for (const todo of changedTodos) {
+      const todoId = todo.parentTaskId ?? todo.id;
+      const taskTodos = todosByTaskId.get(todoId) ?? [];
+      taskTodos.push(todo);
+      todosByTaskId.set(todoId, taskTodos);
+    }
+
+    return Promise.all(
+      [...todosByTaskId].map(([todoId, taskTodos]) =>
+        syncTaskTimingChange(todoId, statusMessage, () =>
+          persistCompletionChangedTodos(taskTodos),
+        ),
+      ),
+    );
+  }
+
+  function syncWorkflowTimingChanges(statusMessage, createdTodos, changedTodos) {
+    const todosByTaskId = new Map();
+    for (const todo of [...createdTodos, ...changedTodos]) {
+      const todoId = todo.parentTaskId ?? todo.id;
+      const taskChanges = todosByTaskId.get(todoId) ?? { created: [], changed: [] };
+      if (createdTodos.includes(todo)) {
+        taskChanges.created.push(todo);
+      }
+      if (changedTodos.includes(todo)) {
+        taskChanges.changed.push(todo);
+      }
+      todosByTaskId.set(todoId, taskChanges);
+    }
+
+    return Promise.all(
+      [...todosByTaskId].map(([todoId, taskChanges]) =>
+        syncTaskTimingChange(todoId, statusMessage, async () => {
+          await persistArchivedSessions(taskChanges.created);
+          await Promise.all(taskChanges.changed.map((todo) => persistTodoWorkflow(todo)));
+        }),
+      ),
+    );
+  }
+
   async function persistNewTodo(todo) {
     if (!useRemote || !authUser) return;
     await insertRemoteTodo(insforge, authUser.id, todo);
@@ -1411,6 +1510,15 @@
     );
   }
 
+  async function persistEditedTimeSegments(beforeTodos, afterTodos) {
+    await persistArchivedTodos(beforeTodos, afterTodos);
+    const deletedTodos = getRemovedTodos(beforeTodos, afterTodos);
+    if (useRemote && authUser) {
+      await cleanupTodoPhotos(insforge, deletedTodos);
+    }
+    await persistDeletedTodos(deletedTodos.map((todo) => todo.id));
+  }
+
   async function persistCompletionChangedTodos(todosToUpdate) {
     if (!useRemote || !authUser) return;
     await Promise.all(todosToUpdate.map((todo) => updateRemoteTodoCompletion(insforge, authUser.id, todo)));
@@ -1440,6 +1548,11 @@
   function getCreatedTodos(beforeTodos, afterTodos) {
     const beforeIds = new Set(beforeTodos.map((todo) => todo.id));
     return afterTodos.filter((todo) => !beforeIds.has(todo.id));
+  }
+
+  function getRemovedTodos(beforeTodos, afterTodos) {
+    const afterIds = new Set(afterTodos.map((todo) => todo.id));
+    return beforeTodos.filter((todo) => !afterIds.has(todo.id));
   }
 
   function getCompletionChangedTodos(beforeTodos, afterTodos) {

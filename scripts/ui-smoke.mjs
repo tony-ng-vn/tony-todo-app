@@ -18,6 +18,7 @@ try {
   const duplicateTask = await inspectDuplicateTask({ width: 1366, height: 900 });
   const navigation = await inspectWorkspaceNavigation({ width: 1366, height: 900 });
   const runningTimingEdit = await inspectRunningTimingEdit({ width: 1366, height: 900 });
+  const archivedSessionTimeBlocks = await inspectArchivedSessionTimeBlocks({ width: 1366, height: 900 });
   const recapDayNavigation = await inspectRecapDayNavigation({ width: 1366, height: 900 });
   const nativeWorkspaceLayout = await inspectNativeWorkspaceLayout({ width: 1280, height: 820 });
   const nativeMinimumLayout = await inspectNativeWorkspaceLayout({ width: 900, height: 600 });
@@ -62,6 +63,7 @@ try {
     ...assertOverlayAddedTask(overlayAddedTask),
     ...assertWorkspaceNavigation(navigation),
     ...assertRunningTimingEdit(runningTimingEdit),
+    ...assertArchivedSessionTimeBlocks(archivedSessionTimeBlocks),
     ...assertRecapDayNavigation(recapDayNavigation),
     ...assertNativeWorkspaceLayout(nativeWorkspaceLayout),
     ...assertNativeWorkspaceLayout(nativeMinimumLayout),
@@ -707,6 +709,88 @@ async function inspectRunningTimingEdit(viewport) {
   });
   await page.close();
   return result;
+}
+
+async function inspectArchivedSessionTimeBlocks(viewport) {
+  const page = await browser.newPage({ viewport, timezoneId: 'America/Phoenix' });
+  await page.clock.setFixedTime(new Date('2026-08-21T23:55:00-07:00'));
+  await page.addInitScript(() => {
+    const taskId = 'archived-session-time-block-task';
+    const session = (id, startedAt, endedAt, trackedSeconds) => ({
+      id,
+      title: 'Fix Resume with all new Project',
+      createdAt: startedAt,
+      completedAt: endedAt,
+      firstStartedAt: startedAt,
+      activeStartedAt: null,
+      trackedSeconds,
+      timeSegments: [{ startedAt, endedAt }],
+      parentTaskId: taskId,
+      isProgressSession: true,
+      source: 'progress-session',
+    });
+
+    localStorage.setItem('done-log-client-id', 'ui-smoke-archived-session-time-blocks');
+    localStorage.setItem(
+      'done-log-state',
+      JSON.stringify({
+        todos: [
+          {
+            id: taskId,
+            title: 'Fix Resume with all new Project',
+            createdAt: '2026-08-17T08:00:00-07:00',
+            completedAt: null,
+            firstStartedAt: '2026-08-21T22:43:00-07:00',
+            activeStartedAt: null,
+            trackedSeconds: 60 * 60,
+            timeSegments: [
+              {
+                startedAt: '2026-08-21T22:43:00-07:00',
+                endedAt: '2026-08-21T23:43:00-07:00',
+              },
+            ],
+          },
+          session(
+            'archived-session-one',
+            '2026-08-18T12:26:00-07:00',
+            '2026-08-18T13:24:00-07:00',
+            58 * 60,
+          ),
+          session(
+            'archived-session-two',
+            '2026-08-19T12:55:00-07:00',
+            '2026-08-19T23:59:00-07:00',
+            (11 * 60 + 4) * 60,
+          ),
+          session(
+            'archived-session-three',
+            '2026-08-20T12:55:00-07:00',
+            '2026-08-20T15:52:00-07:00',
+            (2 * 60 + 57) * 60,
+          ),
+        ],
+      }),
+    );
+  });
+
+  await page.goto(targetUrl.toString(), { waitUntil: 'networkidle' });
+  await page.click('[data-todo-id="archived-session-time-block-task"] .open-task-button');
+  await page.waitForSelector('#task-detail');
+  const result = await page.evaluate(() => ({
+    timeBlockCount: document.querySelectorAll('.time-block-item').length,
+    sessionCount: document.querySelectorAll('.session-history li').length,
+    total: document.querySelector('.time-block-heading strong')?.textContent.trim() ?? '',
+  }));
+  await page.close();
+  return result;
+}
+
+function assertArchivedSessionTimeBlocks(result) {
+  const failures = [];
+  if (result.timeBlockCount !== 4 || result.sessionCount !== 3 || result.total !== 'Total 15h 59m') {
+    failures.push(`archived session time blocks do not match their session history: ${JSON.stringify(result)}`);
+  }
+  return failures;
 }
 
 function assertDuplicateTask(result) {
