@@ -66,4 +66,27 @@ describe('keyed save queue', () => {
     await flushing;
     expect(events).toEqual(['first started', 'first finished', 'second finished', 'flushed']);
   });
+
+  it('tracks new saves so a stale load can detect concurrent timing changes', async () => {
+    const enqueue = createKeyedSaveQueue();
+    const before = enqueue.getGeneration();
+
+    await enqueue('task-1', async () => {});
+
+    expect(enqueue.getGeneration()).toBe(before + 1);
+  });
+
+  it('keeps a failed key dirty until a later save for that key succeeds', async () => {
+    const enqueue = createKeyedSaveQueue();
+
+    await expect(
+      enqueue('task-1', async () => {
+        throw new Error('offline');
+      }),
+    ).rejects.toThrow('offline');
+    await expect(enqueue.flushAll()).rejects.toThrow('offline');
+
+    await enqueue('task-1', async () => {});
+    await expect(enqueue.flushAll()).resolves.toBeUndefined();
+  });
 });

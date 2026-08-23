@@ -90,8 +90,21 @@ describe('task timing save wiring', () => {
     ['web', webPage],
     ['menu bar', menubarPage],
   ])('drains timing saves before %s hydration and sign-out', (_label, source) => {
-    expect(readFunction(source, 'hydrateRemoteTodos')).toContain('queueTimingSave.flushAll()');
-    expect(readFunction(source, 'hydrateRemoteTodos')).toContain('syncArchivedTimingChanges(');
+    const hydration = readFunction(source, 'hydrateRemoteTodos');
+    expect(hydration).toContain('queueTimingSave.flushAll()');
+    expect(hydration).toContain('queueTimingSave.getGeneration()');
+    expect(hydration).toContain('syncArchivedTimingChanges(');
     expect(readFunction(source, 'handleSignOut')).toContain('queueTimingSave.flushAll()');
+    expect(readFunction(source, 'syncTaskTimingChange')).toContain('if (!saved)');
+  });
+
+  it.each([
+    ['web', webPage],
+    ['menu bar', menubarPage],
+  ])('registers %s timer saves before yielding to the UI', (_label, source) => {
+    const handler = readFunction(source, 'handleTimerAction');
+    expect(handler.indexOf('syncArchivedTimingChanges(')).toBeLessThan(
+      handler.indexOf('await revealTodo('),
+    );
   });
 });
