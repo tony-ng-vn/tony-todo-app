@@ -93,6 +93,15 @@ describe('task timing save wiring', () => {
   });
 
   it.each([
+    ['web editor', webPage, 'handleTimeSegmentsChange'],
+    ['web deletion', webPage, 'handleDeleteTask'],
+    ['menu bar editor', menubarPage, 'handleTimingChange'],
+    ['menu bar deletion', menubarPage, 'handleDelete'],
+  ])('uses the parent timing queue key for %s', (_label, source, handler) => {
+    expect(readFunction(source, handler)).toContain('getTimingSaveKey(');
+  });
+
+  it.each([
     ['web', webPage],
     ['menu bar', menubarPage],
   ])('drains timing saves before %s hydration and sign-out', (_label, source) => {
