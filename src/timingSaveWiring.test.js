@@ -16,17 +16,44 @@ function readFunction(source, name) {
 
 describe('task timing save wiring', () => {
   it.each([
-    'handleComplete',
-    'handleFail',
-    'handleTimerAction',
-    'moveBoardTodo',
-    'handleCompletedAtChange',
     'handleSomedayChange',
-    'moveSummaryTodo',
-    'reopenSummaryTodo',
-    'handleNoteInput',
+    'handlePromoteProject',
   ])('queues web timing writes from %s', (handler) => {
     expect(readFunction(webPage, handler)).toContain('syncTaskTimingChange(');
+  });
+
+  it.each(['handleComplete', 'handleFail', 'handleTimerAction', 'handleNoteInput'])(
+    'queues every task archived by %s',
+    (handler) => {
+      expect(readFunction(webPage, handler)).toContain('syncArchivedTimingChanges(');
+    },
+  );
+
+  it('queues each board workflow change under its affected task', () => {
+    expect(readFunction(webPage, 'moveBoardTodo')).toContain('syncWorkflowTimingChanges(');
+    expect(readFunction(webPage, 'syncWorkflowTimingChanges')).toContain(
+      'syncTaskTimingChange(',
+    );
+  });
+
+  it.each(['handleCompletedAtChange', 'moveSummaryTodo', 'reopenSummaryTodo'])(
+    'queues every task changed by %s',
+    (handler) => {
+      expect(readFunction(webPage, handler)).toContain('syncCompletionTimingChanges(');
+    },
+  );
+
+  it('queues completion changes under every affected task key', () => {
+    expect(readFunction(webPage, 'syncCompletionTimingChanges')).toContain(
+      'syncTaskTimingChange(',
+    );
+  });
+
+  it('queues each web task insert before later timing updates', () => {
+    expect(readFunction(webPage, 'handleSubmit')).toContain('syncTaskTimingChange(');
+    expect(readFunction(webPage, 'handleCreateTaskInColumn').match(/syncTaskTimingChange\(/g)).toHaveLength(
+      2,
+    );
   });
 
   it('queues each task changed by the automatic day rollover', () => {
@@ -38,10 +65,24 @@ describe('task timing save wiring', () => {
     );
   });
 
-  it.each(['handleTimerAction', 'handleComplete', 'handleNoteInput', 'handleSomedayChange'])(
+  it('queues menu bar Stall changes under the task key', () => {
+    expect(readFunction(menubarPage, 'handleSomedayChange')).toContain('syncTaskTimingChange(');
+  });
+
+  it.each(['handleTimerAction', 'handleComplete', 'handleNoteInput'])(
     'queues menu bar timing writes from %s',
     (handler) => {
-      expect(readFunction(menubarPage, handler)).toContain('syncTaskTimingChange(');
+      expect(readFunction(menubarPage, handler)).toContain('syncArchivedTimingChanges(');
     },
   );
+
+  it('queues menu bar archive changes under every affected task key', () => {
+    expect(readFunction(menubarPage, 'syncArchivedTimingChanges')).toContain(
+      'syncTaskTimingChange(',
+    );
+  });
+
+  it('queues the menu bar task insert before later timing updates', () => {
+    expect(readFunction(menubarPage, 'handleAdd')).toContain('syncTaskTimingChange(');
+  });
 });
