@@ -86,6 +86,12 @@ describe('task timing save wiring', () => {
     expect(readFunction(menubarPage, 'handleAdd')).toContain('syncTaskTimingChange(');
   });
 
+  it('drains menu bar timing saves before a manual update reload', () => {
+    expect(readFunction(menubarPage, 'handleManualUpdate')).toContain(
+      'queueTimingSave.flushAll()',
+    );
+  });
+
   it.each([
     ['web', webPage],
     ['menu bar', menubarPage],
