@@ -540,8 +540,10 @@
     }
 
     saveLocalState(state);
-    await syncRemoteChange(moveToSomeday ? 'Moving to Stall' : 'Returning to active tasks', () =>
-      persistTodoWorkflow(after),
+    await syncTaskTimingChange(
+      todoId,
+      moveToSomeday ? 'Moving to Stall' : 'Returning to active tasks',
+      () => persistTodoWorkflow(after),
     );
   }
 
