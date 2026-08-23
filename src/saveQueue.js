@@ -12,12 +12,14 @@ export function createKeyedSaveQueue() {
     pendingByKey.set(key, pending);
 
     async function runSave() {
+      if (failedByKey.has(key)) {
+        await retryFailed(key);
+      }
+
       try {
-        const result = await save();
-        failedByKey.delete(key);
-        return result;
+        return await save();
       } catch (error) {
-        failedByKey.set(key, error);
+        failedByKey.set(key, { error, save });
         throw error;
       }
     }
@@ -29,12 +31,41 @@ export function createKeyedSaveQueue() {
     });
   }
 
+  async function retryFailed(key) {
+    const failure = failedByKey.get(key);
+    if (!failure) {
+      return;
+    }
+
+    try {
+      await failure.save();
+      if (failedByKey.get(key) === failure) {
+        failedByKey.delete(key);
+      }
+    } catch (error) {
+      failedByKey.set(key, { ...failure, error });
+      throw error;
+    }
+  }
+
   enqueue.flushAll = async () => {
+    let retriedFailures = false;
     while (pendingByKey.size > 0) {
       await Promise.allSettled([...pendingByKey.values()]);
     }
 
-    const failure = failedByKey.values().next().value;
+    if (failedByKey.size > 0) {
+      retriedFailures = true;
+      await Promise.allSettled([...failedByKey.keys()].map((key) => enqueue(key, async () => {})));
+    }
+
+    if (retriedFailures) {
+      while (pendingByKey.size > 0) {
+        await Promise.allSettled([...pendingByKey.values()]);
+      }
+    }
+
+    const failure = failedByKey.values().next().value?.error;
     if (failure) {
       throw failure;
     }
