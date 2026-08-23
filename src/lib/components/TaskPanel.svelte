@@ -127,7 +127,8 @@
       <label class="sr-only" for="task-search">Search tasks, projects, and notes</label>
       <input
         id="task-search"
-        type="search"
+        type="text"
+        inputmode="search"
         autocomplete="off"
         placeholder="Search tasks, projects, notes..."
         enterkeyhint="search"
